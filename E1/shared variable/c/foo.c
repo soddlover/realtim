@@ -5,12 +5,19 @@
 #include <stdio.h>
 
 int i = 0;
+pthread_mutex_t lock;
+
+//We use mutex since this is suted for a binary resource which can only be unlocked by the same process that locked it.
+//Semaphore is for signalling and deciding how many proccesses can use a resource (often more than 1). Everyone has the "key"
+
 
 // Note the return type: void*
 void* incrementingThreadFunction(){
     // TODO: increment i 1_000_000 times
     for (int j=1;j<1000000; j++){
+        pthread_mutex_lock(&lock);
         i=i+1;
+        pthread_mutex_unlock(&lock);
     }
 
     return NULL;
@@ -19,7 +26,9 @@ void* incrementingThreadFunction(){
 void* decrementingThreadFunction(){
     // TODO: decrement i 1_000_000 times
     for (int j=1;j<1000000; j++){
+        pthread_mutex_lock(&lock);
         i=i-1;
+        pthread_mutex_unlock(&lock);
     }
     return NULL;
 }
@@ -31,6 +40,8 @@ int main(){
     // Hint: search the web! Maybe try "pthread_create example"?
     pthread_t thread_id_1;
     pthread_t thread_id_2;
+
+    pthread_mutex_init(&lock, NULL);
 
     pthread_create(&thread_id_1, NULL, incrementingThreadFunction, NULL);
     pthread_create(&thread_id_2, NULL, decrementingThreadFunction, NULL);
