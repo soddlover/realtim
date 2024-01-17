@@ -9,6 +9,8 @@
 #define PORT 30000
 #define BUF_SIZE 1024
 
+//10.100.23.129
+
 void* send_udp(void* arg) {
     int sockfd;
     struct sockaddr_in servaddr;
@@ -27,13 +29,14 @@ void* send_udp(void* arg) {
     servaddr.sin_addr.s_addr = INADDR_ANY;
 
     int n;
-    char buffer[BUF_SIZE] = "Hello from sender thread";
-
-    sendto(sockfd, (const char *)buffer, strlen(buffer),
-        MSG_CONFIRM, (const struct sockaddr *) &servaddr, 
-            sizeof(servaddr));
-    printf("Message sent.\n");
-
+    char buffer[BUF_SIZE] = "Balls";
+    while (1){
+        sendto(sockfd, (const char *)buffer, strlen(buffer),
+            MSG_CONFIRM, (const struct sockaddr *) &servaddr, 
+                sizeof(servaddr));
+        printf("Message sent.\n");
+        sleep(5);
+    }
     close(sockfd);
     return NULL;
 }
