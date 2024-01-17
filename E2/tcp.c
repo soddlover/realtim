@@ -8,7 +8,7 @@
 #include <unistd.h>
 #include <signal.h>
 
-#define PORT 34933
+#define PORT 33546
 #define BUF_SIZE 1024
 
 int sockfd;
@@ -54,7 +54,7 @@ void* send_receive_tcp(void* arg) {
         printf("Server : %s\n", buffer);
 
         sleep(1);
-        char buffer[BUF_SIZE] = "jalla";
+        buffer[BUF_SIZE] = "jalla\0";
     }
     close(sockfd);
     return NULL;
