@@ -41,11 +41,11 @@ void* send_receive_tcp(void* arg) {
         exit(EXIT_FAILURE);
     }
 
-    char buffer[BUF_SIZE] = "Connect to: 10.100.23.34:34933\0";
+    char buffer[BUF_SIZE] = "Connect to: 10.100.23.34:33546\0";
     while(1){
         send(sockfd, buffer, strlen(buffer), 0);
         printf("Message sent.\n");
-
+        memset(buffer,0,BUF_SIZE);
         int n = recv(sockfd, buffer, BUF_SIZE, 0);
         if (n <= 0) {
             break; // Connection closed or error
@@ -54,7 +54,7 @@ void* send_receive_tcp(void* arg) {
         printf("Server : %s\n", buffer);
 
         sleep(1);
-        buffer[BUF_SIZE] = "jalla\0";
+        strcpy(buffer, "jalla\0");
     }
     close(sockfd);
     return NULL;

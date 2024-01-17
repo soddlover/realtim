@@ -6,7 +6,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#define PORT 30000
+#define PORT 20025
 #define BUF_SIZE 1024
 
 //10.100.23.129

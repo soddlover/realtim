@@ -9,10 +9,54 @@ import (
 
 func main() {
 
-	if len(os.Args)==1 {
+	if len(os.Args) == 1 {
 		fmt.Println("please")
 		os.Exit(1)
 	}
 
-	tcpAddr, err := net.ResolveTCPAddr
+	tcpAddr, err := net.ResolveTCPAddr("tcp4", os.Args[1])
+
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	conn, err := net.DialTCP("tcp", nil, tcpAddr)
+
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	_, err = conn.Write([]byte("Connect to: 10.100.23.34:33546\n"))
+	fmt.Println("send...")
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	data, err := bufio.NewReader(conn).ReadString(0)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Print("> ", string(data))
+
+	_, err = conn.Write([]byte("halla"))
+	fmt.Println("send...")
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	data, err = bufio.NewReader(conn).ReadString(0)
+
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Print("> ", string(data))
+
 }
