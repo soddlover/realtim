@@ -27,37 +27,23 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+	err = conn.SetNoDelay(true)
 
-	_, err = conn.Write([]byte("Connect to: 10.100.23.34:33546\000"))
+	reader := bufio.NewReader(conn)
+	data, err := reader.ReadBytes('\000')
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Print("pooop> ", string(data))
+
+	_, err = conn.Write([]byte("wanker\000"))
 	fmt.Println("send connect...")
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-
-	reader := bufio.NewReader(conn)
-	data, err := reader.ReadString('\000')
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	fmt.Print("> ", string(data))
-
-	_, err = conn.Write([]byte("halla\000"))
-	fmt.Println("send message...")
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	data, err = reader.ReadString('\000')
-
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	fmt.Print("> ", string(data))
+	response, err := reader.ReadBytes('\000')
+	fmt.Println(string(response))
 
 }
