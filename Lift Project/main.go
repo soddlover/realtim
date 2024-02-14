@@ -2,14 +2,14 @@ package main
 
 import (
 	"fmt"
-	. "mymodule/assigner"
+	//. "mymodule/assigner"
 	. "mymodule/elevator"
 )
 
 func main() {
-	world := &World{
-		Map: make(map[string]Elev),
-	}
+	// world := &World{
+	// 	Map: make(map[string]Elev),
+	// }
 
 	channels := Channels{
 		ElevatorStates: make(chan Elev),
@@ -19,6 +19,6 @@ func main() {
 	}
 	fmt.Print("Hello, World!")
 	go RunElev(channels)
-	go Assigner(channels, world)
+	//go Assigner(channels, world)
 	select {}
 }
