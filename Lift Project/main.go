@@ -2,11 +2,18 @@ package main
 
 import (
 	"fmt"
-	elevatorFSM "mymodule/elevator"
+	. "mymodule/elevator"
 )
 
 func main() {
-	fmt.Println("Hello, World!")
-	go elevatorFSM.RunElev()
+	channels := Channels{
+		ElevatorStates: make(chan Elev),
+		OrderRequest:   make(chan Order),
+		OrderComplete:  make(chan Order),
+		OrderAssigned:  make(chan Order),
+	}
+	fmt.Print("Hello, World!")
+	go RunElev(channels)
+
 	select {}
 }
