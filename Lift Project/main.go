@@ -1,14 +1,20 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"mymodule/assigner"
 	. "mymodule/elevator"
 	. "mymodule/network"
-	"mymodule/assigner"
 	"time"
 )
 
 func main() {
+
+	var id string
+	flag.StringVar(&id, "id", "", "id of this peer")
+	flag.Parse()
+
 	world := &assigner.World{
 		Map: make(map[string]Elev),
 	}
@@ -23,7 +29,8 @@ func main() {
 	go SendRandomShitMotherFucker(testchan)
 	fmt.Print("Hello, World!")
 	go RunElev(channels)
-	go BroadcastNetwork(testchan, world)
+	go StateBroadcaster(testchan, world, id)
+	go PeerConnector(id, world)
 	select {}
 }
 
