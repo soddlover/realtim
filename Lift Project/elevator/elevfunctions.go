@@ -20,7 +20,7 @@ func elevStart(drv_floors chan int, elevator Elev) {
 	elevator.Dir = DirStop
 }
 
-func ShouldStop(elevator Elev) bool {
+func shouldStop(elevator Elev) bool {
 	switch elevator.Dir {
 	case DirUp:
 		return elevator.Queue[elevator.Floor][BT_HallUp] ||
@@ -36,7 +36,7 @@ func ShouldStop(elevator Elev) bool {
 	return false
 }
 
-func ChooseDirection(elevator Elev) ElevatorDirection {
+func chooseDirection(elevator Elev) ElevatorDirection {
 	switch elevator.Dir {
 	case DirStop:
 		if ordersAbove(elevator) {

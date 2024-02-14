@@ -88,7 +88,7 @@ func RunElev(channels Channels) {
 
 			switch elevator.State {
 			case EB_Idle:
-				elevator.Dir = ChooseDirection(elevator)
+				elevator.Dir = chooseDirection(elevator)
 				elevio.SetMotorDirection(elevio.MotorDirection(elevator.Dir))
 				if elevator.Dir == DirStop {
 					elevator.State = EB_DoorOpen
@@ -124,7 +124,7 @@ func RunElev(channels Channels) {
 		case elevator.Floor = <-drv_floors:
 			fmt.Println("Arrived at floor", elevator.Floor+1)
 			elevio.SetFloorIndicator(elevator.Floor)
-			if ShouldStop(elevator) {
+			if shouldStop(elevator) {
 				motorErrorTimer.Stop()
 				elevio.SetMotorDirection(elevio.MD_Stop)
 				elevio.SetDoorOpenLamp(true)
@@ -142,7 +142,7 @@ func RunElev(channels Channels) {
 
 		case <-doorTimer.C:
 			elevio.SetDoorOpenLamp(false)
-			elevator.Dir = ChooseDirection(elevator)
+			elevator.Dir = chooseDirection(elevator)
 			if elevator.Dir == DirStop {
 				elevator.State = EB_Idle
 				motorErrorTimer.Stop()
