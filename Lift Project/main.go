@@ -20,5 +20,16 @@ func main() {
 	fmt.Print("Hello, World!")
 	go RunElev(channels)
 	go Assigner(channels, world)
+	go print(channels)
 	select {}
+}
+
+func print(channels Channels) {
+	for {
+		select {
+
+		case elev := <-channels.ElevatorStates:
+			fmt.Println("Elevator state: ", elev)
+		}
+	}
 }

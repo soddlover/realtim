@@ -1,6 +1,7 @@
 package elevatorFSM
 
 import (
+	"fmt"
 	. "mymodule/config"
 	. "mymodule/elevator/elevio"
 )
@@ -17,6 +18,7 @@ func elevStart(drv_floors chan int, elevator Elev) {
 		SetMotorDirection(MD_Stop)
 	}
 	SetFloorIndicator(GetFloor())
+	fmt.Println("Arrived at floor: ", GetFloor())
 	elevator.Dir = DirStop
 }
 

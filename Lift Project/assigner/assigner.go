@@ -73,37 +73,45 @@ func Assigner(channels Channels, world *World) {
 	for {
 		select {
 		case order := <-channels.OrderRequest:
-			for {
-				best_id := ""
-				best_duration := 1000000
-				for id, elevator := range world.Map {
-					if elevator.State == Undefined {
-						continue
-					}
-					duration := timeToServeRequest(elevator, order.Button, order.Floor)
-					if duration < best_duration {
-						best_duration = duration
-						best_id = id
-					}
-				}
-
-				if best_id == self_id {
-					channels.OrderAssigned <- order
-				}
-
-				peer <- OrderAndID{order, best_id}
-
-				confirmation := <-confirmed
-				if confirmation {
-					// Confirmation was successful, break the loop to handle the next order
-					break
-				} else {
-					elevator := world.Map[best_id]
-					elevator.State = Undefined
-					world.Map[best_id] = elevator
-					// Confirmation was not successful, remove the failed elevator and try again
-				}
+			if order.Button == elevio.BT_Cab {
+				channels.OrderAssigned <- order
+				continue
 			}
+			channels.OrderAssigned <- order
+
+			/*
+				for {
+					best_id := ""
+					best_duration := 1000000
+					for id, elevator := range world.Map {
+						if elevator.State == Undefined {
+							continue
+						}
+						duration := timeToServeRequest(elevator, order.Button, order.Floor)
+						if duration < best_duration {
+							best_duration = duration
+							best_id = id
+						}
+					}
+
+					if best_id == self_id {
+						channels.OrderAssigned <- order
+					}
+
+					peer <- OrderAndID{order, best_id}
+
+					confirmation := <-confirmed
+					if confirmation {
+						// Confirmation was successful, break the loop to handle the next order
+						break
+					} else {
+						elevator := world.Map[best_id]
+						elevator.State = Undefined
+						world.Map[best_id] = elevator
+						// Confirmation was not successful, remove the failed elevator and try again
+					}
+				}
+			*/
 		}
 	}
 }

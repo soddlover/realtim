@@ -57,14 +57,10 @@ func RunElev(channels Channels) {
 	motorErrorTimer := time.NewTimer(3 * time.Second)
 	motorErrorTimer.Stop()
 
-	drv_buttons := make(chan elevio.ButtonEvent)
+	drv_buttons := make(chan elevio.ButtonEvent, 10)
 	drv_floors := make(chan int)
 	drv_obstr := make(chan bool)
 	drv_stop := make(chan bool)
-	elevator_states := make(chan Elev)
-	OrderRequest := make(chan Order)
-	orderComplete := make(chan Order)
-	OrderAssigned := make(chan Order)
 
 	go elevio.PollButtons(drv_buttons)
 	go elevio.PollFloorSensor(drv_floors)
@@ -76,16 +72,17 @@ func RunElev(channels Channels) {
 	for {
 		select {
 		case buttonEvent := <-drv_buttons:
-			fmt.Println("Button event at floor", buttonEvent.Floor+1, "button", buttonEvent.Button)
-			if buttonEvent.Button == elevio.BT_Cab {
-				elevator.Queue[buttonEvent.Floor][buttonEvent.Button] = true
-				elevio.SetButtonLamp(buttonEvent.Button, buttonEvent.Floor, true)
-			} else {
-				OrderRequest <- Order{buttonEvent.Floor, buttonEvent.Button}
-			}
+			fmt.Println("Button event at floor", buttonEvent.Floor, "button", buttonEvent.Button)
+
+			channels.OrderRequest <- Order{buttonEvent.Floor, buttonEvent.Button}
+
 			//elevator.Queue[buttonEvent.Floor][buttonEvent.Button] = true
 			//elevio.SetButtonLamp(buttonEvent.Button, buttonEvent.Floor, true)
 
+		case order := <-channels.OrderAssigned:
+			fmt.Println("Order assigned: ", order)
+			elevator.Queue[order.Floor][order.Button] = true
+			elevio.SetButtonLamp(order.Button, order.Floor, true)
 			switch elevator.State {
 			case EB_Idle:
 				elevator.Dir = ChooseDirection(elevator)
@@ -95,34 +92,32 @@ func RunElev(channels Channels) {
 					doorTimer.Reset(3 * time.Second)
 					elevio.SetDoorOpenLamp(true)
 					elevator.Queue[elevator.Floor] = [N_BUTTONS]bool{}
+					elevio.SetButtonLamp(elevio.BT_Cab, elevator.Floor, false)
 				} else {
 					elevator.State = EB_Moving
 					motorErrorTimer.Reset(3 * time.Second)
 				}
-				elevator_states <- elevator
-
 			case EB_Moving:
 			case EB_DoorOpen:
-				if elevator.Floor == buttonEvent.Floor {
-					elevator.Queue[buttonEvent.Floor][buttonEvent.Button] = false
-					elevio.SetButtonLamp(buttonEvent.Button, buttonEvent.Floor, false)
+				if elevator.Floor == order.Floor {
+					elevator.Queue[order.Floor][order.Button] = false
+					elevio.SetButtonLamp(order.Button, order.Floor, false)
 					doorTimer.Reset(3 * time.Second)
 				}
-				elevator_states <- elevator
 			case Undefined:
 			default:
 				fmt.Println("Undefined state WTF")
 			}
-		case order := <-OrderAssigned:
-			elevator.Queue[order.Floor][order.Button] = true
-			elevator_states <- elevator
-		case order := <-OrderRequest:
-			elevio.SetButtonLamp(order.Button, order.Floor, true)
-		case order := <-orderComplete:
-			elevio.SetButtonLamp(order.Button, order.Floor, false)
-			//add func for only one way clearing later
+
+			channels.ElevatorStates <- elevator
+
+		/*
+			case order := <-channels.orderComplete:
+				elevio.SetButtonLamp(order.Button, order.Floor, false)
+				//add func for only one way clearing later
+		*/
 		case elevator.Floor = <-drv_floors:
-			fmt.Println("Arrived at floor", elevator.Floor+1)
+			fmt.Println("Arrived at floor", elevator.Floor)
 			elevio.SetFloorIndicator(elevator.Floor)
 			if ShouldStop(elevator) {
 				motorErrorTimer.Stop()
@@ -131,14 +126,16 @@ func RunElev(channels Channels) {
 				doorTimer.Reset(3 * time.Second)
 				elevator.Queue[elevator.Floor] = [N_BUTTONS]bool{}
 				elevio.SetButtonLamp(elevio.BT_Cab, elevator.Floor, false)
+				elevio.SetButtonLamp(elevio.BT_HallUp, elevator.Floor, false)
+				elevio.SetButtonLamp(elevio.BT_HallDown, elevator.Floor, false)
 				//same here add one way clearing later
-				orderComplete <- Order{elevator.Floor, elevio.BT_HallUp}
-				orderComplete <- Order{elevator.Floor, elevio.BT_HallDown}
+				//channels.orderComplete <- Order{elevator.Floor, elevio.BT_HallUp}
+				//channels.orderComplete <- Order{elevator.Floor, elevio.BT_HallDown}
 				elevator.State = EB_DoorOpen
 			} else if elevator.State == EB_Moving {
 				motorErrorTimer.Reset(3 * time.Second)
 			}
-			elevator_states <- elevator
+			channels.ElevatorStates <- elevator
 
 		case <-doorTimer.C:
 			elevio.SetDoorOpenLamp(false)
@@ -151,7 +148,7 @@ func RunElev(channels Channels) {
 				elevio.SetMotorDirection(elevio.MotorDirection(elevator.Dir))
 				motorErrorTimer.Reset(3 * time.Second)
 			}
-			elevator_states <- elevator
+			channels.ElevatorStates <- elevator
 		case <-motorErrorTimer.C:
 			elevio.SetMotorDirection(elevio.MD_Stop)
 			elevator.State = Undefined
@@ -164,9 +161,9 @@ func RunElev(channels Channels) {
 			}
 			elevStart(drv_floors, elevator)
 			elevator.State = EB_Idle
-			elevator_states <- elevator
+			channels.ElevatorStates <- elevator
 			//fullfør cab ordre
-
 		}
+
 	}
 }
