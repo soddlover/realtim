@@ -5,20 +5,21 @@ import (
 	"fmt"
 	. "mymodule/assigner"
 	"mymodule/backup"
+	"mymodule/config"
 	. "mymodule/elevator"
-
-	//. "mymodule/network"
+	"mymodule/network"
 	"mymodule/network/localip"
-
 	"time"
+	//. "mymodule/network"
 )
 
 func main() {
-	fmt.Println("main running.")
 
 	var id string
 	flag.StringVar(&id, "id", "", "id of this peer")
+	fresh := flag.Bool("fresh", false, "Start a fresh elevator")
 	flag.Parse()
+
 	if id == "" {
 		localIP, err := localip.LocalIP()
 		if err != nil {
@@ -28,12 +29,7 @@ func main() {
 		//id = fmt.Sprintf("peer-%s-%d", localIP, os.Getpid())
 		id = localIP
 	}
-
-	world := &assigner.World{
-
-	fresh := flag.Bool("fresh", false, "Start a fresh elevator")
-	flag.Parse()
-
+	config.Self_id = id
 	initElev := backup.Backup(*fresh)
 
 	if (initElev == Elev{}) {
@@ -46,39 +42,33 @@ func main() {
 	}
 
 	channels := Channels{
-		ElevatorStates: make(chan Elev, 10),
-		OrderRequest:   make(chan Order, 10),
-		OrderComplete:  make(chan Order, 10),
-		OrderAssigned:  make(chan Order, 10),
+		ElevatorStates:          make(chan Elev, 10),
+		ElevatorStatesBroadcast: make(chan Elev, 10),
+		OrderRequest:            make(chan Order, 10),
+		OrderComplete:           make(chan Order, 10),
+		OrderAssigned:           make(chan Order, 10),
 	}
-	assigner.TestOrderCommunication(channels, world, id)
 
-	// testchan := make(chan Elev)
-	// go SendRandomShitMotherFucker(testchan)
 	//fmt.Print("Hello, World!")
 	// go RunElev(channels)
-	// go StateBroadcaster(testchan, world, id)
+	go network.PeerConnector(id, world)
+	go network.StateBroadcaster(channels.ElevatorStatesBroadcast, world, id)
 	// go PeerConnector(id, world)
-	fmt.Print("Hello, World!")
 	go backup.WriteBackup(channels.ElevatorStates)
 	go RunElev(channels, initElev)
 	go Assigner(channels, world)
+	go printWorld(world)
 	select {}
 }
 
-func SendRandomShitMotherFucker(outputChan chan<- Elev) {
+func printWorld(world *World) {
+	ticker := time.NewTicker(5 * time.Second)
 	for {
-		elevatorState := Elev{
-			State: EB_Idle,
-			Dir:   DirStop,
-			Floor: 0,
-			Queue: [4][3]bool{},
+		select {
+		case <-ticker.C:
+			for key, value := range world.Map {
+				fmt.Println("Key:", key, "Value:", value)
+			}
 		}
-		outputChan <- elevatorState
-		time.Sleep(5 * time.Second)
-		elevatorState.Floor = 1
-		outputChan <- elevatorState
-		time.Sleep(5 * time.Second)
-
 	}
 }

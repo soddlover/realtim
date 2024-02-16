@@ -1,7 +1,8 @@
 package assigner
 
 import (
-	. "mymodule/config"
+	"fmt"
+	"mymodule/config"
 	. "mymodule/elevator"
 	"mymodule/elevator/elevio"
 )
@@ -36,10 +37,10 @@ func timeToServeRequest(e_old Elev, b elevio.ButtonType, f int) int {
 			return duration
 		}
 	case EB_Moving:
-		duration += TRAVEL_TIME / 2
+		duration += config.TRAVEL_TIME / 2
 		e.Floor += int(e.Dir)
 	case EB_DoorOpen:
-		duration -= DOOR_OPEN_TIME / 2
+		duration -= config.DOOR_OPEN_TIME / 2
 	}
 
 	for {
@@ -48,17 +49,17 @@ func timeToServeRequest(e_old Elev, b elevio.ButtonType, f int) int {
 			if arrivedAtRequest == 1 {
 				return duration
 			}
-			duration += DOOR_OPEN_TIME
+			duration += config.DOOR_OPEN_TIME
 			e.Dir = ChooseDirection(e)
 		}
 		e.Floor += int(e.Dir)
-		duration += TRAVEL_TIME
+		duration += config.TRAVEL_TIME
 	}
 }
 
 func requestsClearAtCurrentFloor(e_old Elev, f func(elevio.ButtonType, int)) Elev {
 	e := e_old
-	for b := elevio.ButtonType(0); b < N_BUTTONS; b++ {
+	for b := elevio.ButtonType(0); b < config.N_BUTTONS; b++ {
 		if e.Queue[e.Floor][b] {
 			e.Queue[e.Floor][b] = false
 			if f != nil {
@@ -78,41 +79,41 @@ func Assigner(channels Channels, world *World) {
 				channels.OrderAssigned <- order
 				continue
 			}
-			channels.OrderAssigned <- order
+			//channels.OrderAssigned <- order
 
-			/*
-				for {
-					best_id := ""
-					best_duration := 1000000
-					for id, elevator := range world.Map {
-						if elevator.State == Undefined {
-							continue
-						}
-						duration := timeToServeRequest(elevator, order.Button, order.Floor)
-						if duration < best_duration {
-							best_duration = duration
-							best_id = id
-						}
+			for {
+				best_id := ""
+				best_duration := 1000000
+				for id, elevator := range world.Map {
+					if elevator.State == Undefined {
+						continue
 					}
-
-					if best_id == self_id {
-						channels.OrderAssigned <- order
-					}
-
-					peer <- OrderAndID{order, best_id}
-
-					confirmation := <-confirmed
-					if confirmation {
-						// Confirmation was successful, break the loop to handle the next order
-						break
-					} else {
-						elevator := world.Map[best_id]
-						elevator.State = Undefined
-						world.Map[best_id] = elevator
-						// Confirmation was not successful, remove the failed elevator and try again
+					duration := timeToServeRequest(elevator, order.Button, order.Floor)
+					if duration < best_duration {
+						best_duration = duration
+						best_id = id
 					}
 				}
-			*/
+				fmt.Println("Assigning order to elevator with id: ", best_id)
+
+				if best_id == config.Self_id {
+					channels.OrderAssigned <- order
+				}
+
+				confirmation := true
+				if confirmation {
+					channels.OrderAssigned <- order
+
+					// Confirmation was successful, break the loop to handle the next order
+					break
+				} else {
+					elevator := world.Map[best_id]
+					elevator.State = Undefined
+					world.Map[best_id] = elevator
+					// Confirmation was not successful, remove the failed elevator and try again
+				}
+			}
+
 		}
 	}
 }

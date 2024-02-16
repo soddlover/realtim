@@ -54,7 +54,6 @@ func WriteBackup(elevChan chan elevatorFSM.Elev) {
 		case elev = <-elevChan:
 		case <-ticker.C:
 		}
-		fmt.Println(elev)
 		stateJson, err := json.Marshal(elev)
 		if err != nil {
 			fmt.Println("Error marshalling json:", err)

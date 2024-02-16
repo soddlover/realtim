@@ -1,6 +1,7 @@
 package network
 
 import (
+	"fmt"
 	"mymodule/assigner"
 	. "mymodule/elevator"
 	"mymodule/network/bcast"
@@ -17,7 +18,11 @@ type BroadcastWorld struct {
 	Map map[string]BroadcastState
 }
 
-func updateBroadcastworld(bcastWorld BroadcastWorld, broadcastStateRx chan BroadcastState) {
+type World struct {
+	Map map[string]Elev
+}
+
+func updateBroadcastworld(bcastWorld BroadcastWorld, world *assigner.World, broadcastStateRx chan BroadcastState) {
 	for {
 		//update world view
 		select {
@@ -26,13 +31,15 @@ func updateBroadcastworld(bcastWorld BroadcastWorld, broadcastStateRx chan Broad
 			if _, ok := bcastWorld.Map[bcastState.Id]; ok {
 				if bcastState.SequenceNumber > bcastWorld.Map[bcastState.Id].SequenceNumber {
 					bcastWorld.Map[bcastState.Id] = bcastState
+					world.Map[bcastState.Id] = bcastState.ElevState
 					// fmt.Println("Updated value")
 					// fmt.Printf("%+v\n", bcastWorld)
 				}
 			} else {
 				//might be unnecicary if implemented by peer functionality.
 				bcastWorld.Map[bcastState.Id] = bcastState
-				//fmt.Println("Added new element to map.")
+				world.Map[bcastState.Id] = bcastState.ElevState
+				fmt.Println("Added new element to map.")
 			}
 		}
 	}
@@ -41,14 +48,14 @@ func updateBroadcastworld(bcastWorld BroadcastWorld, broadcastStateRx chan Broad
 func StateBroadcaster(elevStateTx chan Elev, world *assigner.World, id string) {
 	//init bcast world
 	bcastWorld := BroadcastWorld{Map: make(map[string]BroadcastState)}
-
+	//using same world becuse why not?=
 	broadcastStateRx := make(chan BroadcastState)
 	broadcastStateTx := make(chan BroadcastState)
 
 	go repeater(elevStateTx, broadcastStateTx, id)
 	go bcast.Transmitter(16569, broadcastStateTx)
 	go bcast.Receiver(16569, broadcastStateRx)
-	go updateBroadcastworld(bcastWorld, broadcastStateRx)
+	go updateBroadcastworld(bcastWorld, world, broadcastStateRx)
 }
 
 func repeater(elevStateTx chan Elev, repeatedElevState chan BroadcastState, elevId string) {

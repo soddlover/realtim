@@ -3,6 +3,7 @@ package network
 import (
 	"fmt"
 	"mymodule/assigner"
+	elevatorFMS "mymodule/elevator"
 	"mymodule/network/peers"
 )
 
@@ -28,7 +29,10 @@ func peerUpdater(peerUpdateCh chan peers.PeerUpdate, world *assigner.World) {
 
 			for _, element := range p.Lost {
 				delete(world.Map, element)
-				print("element was removed from world")
+				elevator := world.Map[element]
+				elevator.State = elevatorFMS.Undefined
+				world.Map[element] = elevator
+				print("element was set as unavailable")
 			}
 
 		}

@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        #shafts {
+            display: flex; /* Add this line */
+        }
+        .shaft {
+            height: 400px;
+            width: 100px;
+            border: 1px solid black;
+            position: relative;
+            margin-right: 100px; 
+        }
+        .elevator {
+            position: absolute;
+            height: 100px;
+            width: 100px;
+            background-color: grey;
+        }
+        .direction {
+            font-size: 2em;
+            text-align: center;
+        }
+        .light {
+            position: absolute;
+            height: 20px;
+            width: 20px;
+            border-radius: 50%; /* Make the lights circles */
+            display: block;
+            margin-bottom: 10px; /* Add spacing between the lights */
+        }
+        .door {
+            position: absolute;
+            height: 100%;
+            background-color: #be9898; 
+            transition: width 0.5s; 
+            background: linear-gradient(to right, rgba(175, 81, 81, 0.5) 50%, rgba(0, 0, 0, 0) 50%, rgba(0, 0, 0, 0) 50%, rgba(175, 81, 81, 0.5) 50%);
+            background-size: 200% 100%;
+            background-position: right bottom;
+
+
+        }
+        .up {
+            right: -30px;
+        }
+
+        .down {
+            right: -60px;
+        }
+
+        .inside {
+            right: -90px;
+        }
+    </style>
+</head>
+<body>
+    <div id="shafts"></div>
+
+    <script>
+        var elevators = {
+            "lok": {floor: 1, dir: 0, state: 2, queue: [[false, true, false], [false, false, false], [false, false, false], [false, false, false]]},
+            "potet": {floor: 3, dir: -1, state: 1, queue: [[false, false, false], [false, false, false], [false, false, false], [false, false, false]]},
+            "3": {floor: 3, dir: -1, state: 1, queue: [[false, false, false], [false, false, false], [false, false, false], [false, false, false]]},
+            "4": {floor: 3, dir: -1, state: 1, queue: [[false, false, false], [false, false, false], [false, false, false], [false, false, false]]}
+
+        };
+
+        var shaftsDiv = document.getElementById("shafts");
+
+        for (var key in elevators) {
+            var shaftDiv = document.createElement("div");
+            shaftDiv.className = "shaft";
+            shaftDiv.id = key;
+
+            var elevatorDiv = document.createElement("div");
+            elevatorDiv.className = "elevator";
+            elevatorDiv.style.bottom = elevators[key].floor * 100 + "px";
+            shaftDiv.appendChild(elevatorDiv);
+
+            var directionDiv = document.createElement("div");
+            directionDiv.className = "direction";
+            if (elevators[key].dir > 0) {
+                directionDiv.textContent = "↑"; // Going up
+            } else if (elevators[key].dir < 0) {
+                directionDiv.textContent = "↓"; // Going down
+            } else {
+                directionDiv.textContent = "–"; // Standing still
+            }
+            elevatorDiv.appendChild(directionDiv);
+
+            for (var i = 0; i < 4; i++) {
+            var lightDivUp = document.createElement("div");
+            var lightDivDown = document.createElement("div");
+            var lightDivInside = document.createElement("div");
+
+            lightDivUp.className = "light up";
+            lightDivDown.className = "light down";
+            lightDivInside.className = "light inside";
+
+            lightDivUp.style.bottom = i * 100 + "px";
+            lightDivDown.style.bottom = i * 100 + "px";
+            lightDivInside.style.bottom = i * 100 + "px";
+
+            lightDivUp.style.backgroundColor = elevators[key].queue[i][0] ? "green" : "red";
+            lightDivDown.style.backgroundColor = elevators[key].queue[i][1] ? "green" : "red";
+            lightDivInside.style.backgroundColor = elevators[key].queue[i][2] ? "green" : "red";
+
+            shaftDiv.appendChild(lightDivUp);
+            shaftDiv.appendChild(lightDivDown);
+            shaftDiv.appendChild(lightDivInside);
+            }
+
+            var doorDiv = document.createElement("div");
+            doorDiv.className = "door";
+            if (elevators[key].state === 2) {
+                doorDiv.style.width = "100%"; // Door is open
+            } else {
+                doorDiv.style.width = "0"; // Door is closed
+            }
+            elevatorDiv.appendChild(doorDiv);
+            if (elevators[key].state ===1){
+                elevatorDiv.style.bottom = (elevators[key].floor * 100 + elevators[key].dir * 50) + "px";
+            }
+        
+            shaftsDiv.appendChild(shaftDiv);
+        }
+    </script>
+</body>
+<script>
+function updateElevators() {
+    fetch('elevators.json')
+        .then(response => response.json())
+        .then(data => {
+            elevators = data;
+
+            var shaftsDiv = document.getElementById("shafts");
+            shaftsDiv.innerHTML = ''; // Clear the existing shafts
+
+            for (var key in elevators) {
+                var shaftDiv = document.createElement("div");
+                shaftDiv.className = "shaft";
+                shaftDiv.id = key;
+
+                var elevatorDiv = document.createElement("div");
+                elevatorDiv.className = "elevator";
+                elevatorDiv.style.bottom = elevators[key].floor * 100 + "px";
+                shaftDiv.appendChild(elevatorDiv);
+
+                for (var i = 0; i < 4; i++) {
+                    var lightDiv = document.createElement("div");
+                    lightDiv.className = "light";
+                    lightDiv.style.bottom = i * 100 + "px";
+                    if (elevators[key].queue[i].includes(true)) {
+                        lightDiv.style.display = "block";
+                    }
+                    shaftDiv.appendChild(lightDiv);
+                }
+
+                shaftsDiv.appendChild(shaftDiv);
+            }
+        });
+}
+
+updateElevators(); // Initial update
+setInterval(updateElevators, 5000); // Update every 5 seconds
+</script>
+</html>

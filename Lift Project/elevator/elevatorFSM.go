@@ -10,10 +10,11 @@ import (
 type ElevatorState int
 
 type Channels struct {
-	ElevatorStates chan Elev
-	OrderRequest   chan Order
-	OrderComplete  chan Order
-	OrderAssigned  chan Order
+	ElevatorStates          chan Elev
+	ElevatorStatesBroadcast chan Elev
+	OrderRequest            chan Order
+	OrderComplete           chan Order
+	OrderAssigned           chan Order
 }
 
 const (
@@ -90,7 +91,7 @@ func RunElev(channels Channels, initElev Elev) {
 			elevator.Queue[order.Floor][order.Button] = true
 			switch elevator.State {
 			case EB_Idle:
-				elevator.Dir = chooseDirection(elevator)
+				elevator.Dir = ChooseDirection(elevator)
 				elevio.SetMotorDirection(elevio.MotorDirection(elevator.Dir))
 				if elevator.Dir == DirStop {
 					elevator.State = EB_DoorOpen
@@ -113,6 +114,7 @@ func RunElev(channels Channels, initElev Elev) {
 			}
 
 			channels.ElevatorStates <- elevator
+			channels.ElevatorStatesBroadcast <- elevator
 
 		/*
 			case order := <-channels.orderComplete:
@@ -122,7 +124,7 @@ func RunElev(channels Channels, initElev Elev) {
 		case elevator.Floor = <-drv_floors:
 			fmt.Println("Arrived at floor", elevator.Floor)
 			elevio.SetFloorIndicator(elevator.Floor)
-			if shouldStop(elevator) {
+			if ShouldStop(elevator) {
 				motorErrorTimer.Stop()
 				elevio.SetMotorDirection(elevio.MD_Stop)
 				elevio.SetDoorOpenLamp(true)
@@ -149,10 +151,11 @@ func RunElev(channels Channels, initElev Elev) {
 				motorErrorTimer.Reset(3 * time.Second)
 			}
 			channels.ElevatorStates <- elevator
+			channels.ElevatorStatesBroadcast <- elevator
 
 		case <-doorTimer.C:
 			elevio.SetDoorOpenLamp(false)
-			elevator.Dir = chooseDirection(elevator)
+			elevator.Dir = ChooseDirection(elevator)
 			if elevator.Dir == DirStop {
 				elevator.State = EB_Idle
 				motorErrorTimer.Stop()
@@ -162,6 +165,7 @@ func RunElev(channels Channels, initElev Elev) {
 				motorErrorTimer.Reset(3 * time.Second)
 			}
 			channels.ElevatorStates <- elevator
+			channels.ElevatorStatesBroadcast <- elevator
 		case <-motorErrorTimer.C:
 			elevio.SetMotorDirection(elevio.MD_Stop)
 			elevator.State = Undefined
@@ -175,6 +179,7 @@ func RunElev(channels Channels, initElev Elev) {
 			elevStart(drv_floors)
 			elevator.State = EB_Idle
 			channels.ElevatorStates <- elevator
+			channels.ElevatorStatesBroadcast <- elevator
 			//fullfør cab ordre
 		}
 
