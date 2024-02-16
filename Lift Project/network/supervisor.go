@@ -1,5 +1,6 @@
 package network
 
+//
 // import (
 // 	"mymodule/assigner"
 // 	. "mymodule/elevator"
