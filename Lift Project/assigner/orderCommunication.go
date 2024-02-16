@@ -14,30 +14,36 @@ type OrderCommunication struct {
 	TransmitOrderChan chan OrderMessage
 	ReiceveOrderChan  chan OrderMessage
 
-	TransmitConfirmChan chan OrderMessage
-	ReiceveConfirmChan  chan OrderMessage
+	TransmitConfirmChan chan ConfirmMessage
+	ReiceveConfirmChan  chan ConfirmMessage
 
-	Port     int
-	IPOfThis string
+	Port int
+	IP   string //adress to the computer running this code
 }
 
 type OrderMessage struct {
-	Key       string
-	IP        string
-	IP_from   string
-	Payload   OrderAndID
-	Confirmed bool
+	Key     string
+	FromIP  string
+	ToIP    string
+	Payload OrderAndID
+}
+
+type ConfirmMessage struct {
+	Key     string
+	FromIP  string
+	ToIP    string
+	Payload OrderAndID
 }
 
 func NewOrderCommunication(channels elevatorFSM.Channels, id string) OrderCommunication {
 	o := OrderCommunication{
 		TransmitOrderChan:   make(chan OrderMessage),
 		ReiceveOrderChan:    make(chan OrderMessage),
-		TransmitConfirmChan: make(chan OrderMessage),
-		ReiceveConfirmChan:  make(chan OrderMessage),
+		TransmitConfirmChan: make(chan ConfirmMessage),
+		ReiceveConfirmChan:  make(chan ConfirmMessage),
 
-		Port:     15647, //// To be fix
-		IPOfThis: id,
+		Port: 15647, //// To be fix
+		IP:   id,
 	}
 
 	go transmitter(o.Port, o.TransmitOrderChan, o.TransmitConfirmChan)
@@ -53,11 +59,10 @@ func (o OrderCommunication) sendOrder(order OrderAndID) bool {
 	randString := randomString(5)
 
 	orderMessage := OrderMessage{
-		Key:       randString,
-		IP:        order.ID, // Assuming the IP is derived from order.ID; adjust as needed
-		IP_from:   o.IPOfThis,
-		Payload:   order,
-		Confirmed: false,
+		Key:     randString,
+		ToIP:    order.ID, // Assuming the IP is derived from order.ID; adjust as needed
+		FromIP:  o.IP,
+		Payload: order,
 	}
 
 	// Start the total timeout timer for 3 seconds
@@ -70,7 +75,7 @@ func (o OrderCommunication) sendOrder(order OrderAndID) bool {
 
 		select {
 		case confirmation := <-o.ReiceveConfirmChan:
-			if confirmation.Key == orderMessage.Key && confirmation.Confirmed {
+			if confirmation.Key == orderMessage.Key {
 				fmt.Println("Order confirmed")
 				return true // Order confirmed
 			}
@@ -91,13 +96,13 @@ func (o OrderCommunication) confirmOrder(channels elevatorFSM.Channels) {
 		select {
 		case m := <-o.ReiceveOrderChan:
 			fmt.Println("Recieved an order")
-			response := OrderMessage{
-				Key:       m.Key,
-				IP:        m.IP_from,
-				IP_from:   m.IP,
-				Payload:   m.Payload,
-				Confirmed: true,
+			response := ConfirmMessage{
+				Key:     m.Key,
+				ToIP:    m.ToIP,
+				FromIP:  m.FromIP,
+				Payload: m.Payload,
 			}
+
 			fmt.Print("Comfirmed order") //It will now accept every order
 			o.TransmitConfirmChan <- response
 
@@ -135,7 +140,7 @@ func transmitter(port int, chans ...interface{}) {
 		}
 
 		// Extract IP and marshal the payload
-		ipAddr := orderMsg.IP
+		ipAddr := orderMsg.ToIP
 		addr, err := net.ResolveUDPAddr("udp4", fmt.Sprintf("%s:%d", ipAddr, port))
 		if err != nil {
 			fmt.Printf("Error resolving UDP address: %v\n", err)
@@ -176,8 +181,6 @@ func transmitter(port int, chans ...interface{}) {
 	}
 }
 
-// Matches type-tagged JSON received on `port` to element types of `chans`, then
-// sends the decoded value on the corresponding channel
 func receiver(port int, chans ...interface{}) {
 	checkArgs(chans...)
 	chansMap := make(map[string]reflect.Value)
