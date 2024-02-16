@@ -6,12 +6,8 @@ import (
 	. "mymodule/elevator/elevio"
 )
 
-func elevStart(drv_floors chan int, elevator Elev) {
-	for floor := 0; floor < N_FLOORS; floor++ {
-		for button := 0; button < N_BUTTONS; button++ {
-			SetButtonLamp(ButtonType(button), floor, false)
-		}
-	}
+func elevStart(drv_floors chan int) {
+
 	if GetFloor() == -1 {
 		SetMotorDirection(MD_Down)
 		<-drv_floors
@@ -19,7 +15,6 @@ func elevStart(drv_floors chan int, elevator Elev) {
 	}
 	SetFloorIndicator(GetFloor())
 	fmt.Println("Arrived at floor: ", GetFloor())
-	elevator.Dir = DirStop
 }
 
 func ShouldStop(elevator Elev) bool {
