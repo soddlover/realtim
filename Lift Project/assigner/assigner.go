@@ -4,7 +4,6 @@ package assigner
 
 import (
 	. "mymodule/elevator"
-	"mymodule/elevator/elevio"
 )
 
 type World struct {
@@ -69,24 +68,6 @@ type OrderAndID struct {
 // 	}
 // 	return e
 // }
-
-func TestOrderCommunication(channels Channels, world *World, id string) {
-
-	ordercom := NewOrderCommunication(channels, id)
-
-	new_order := Order{
-		Floor:  2,
-		Button: elevio.BT_HallUp,
-	}
-
-	order_and_id := OrderAndID{
-		Order: new_order,
-		ID:    id,
-	}
-
-	ordercom.sendOrder(order_and_id)
-
-}
 
 // func Assigner(channels Channels, world *World) {
 

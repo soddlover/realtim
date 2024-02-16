@@ -1,60 +1,71 @@
-package assigner
+package orderCom
 
 import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"mymodule/assigner"
 	elevatorFSM "mymodule/elevator"
+	"mymodule/elevator/elevio"
+	"mymodule/network/conn"
 	"net"
 	"reflect"
 	"time"
 )
 
 type OrderCommunication struct {
-	TransmitOrder  chan OrderMessage
-	ReiceveOrderChan chan OrderMessage
+	TransmitOrderChan chan OrderMessage
+	ReiceveOrderChan  chan OrderMessage
 
-	TransmitConfirm chan OrderMessage
-	ReiceveConfirm chan OrderMessage
+	TransmitConfirmChan chan ConfirmMessage
+	ReiceveConfirmChan  chan ConfirmMessage
 
-	Port             int
-	IPOfThis         string
+	Port int
+	IP   string //adress to the computer running this code
 }
 
 type OrderMessage struct {
-	Key       string
-	IP        string
-	IP_from   string
-	Payload   OrderAndID
-	Confirmed bool
+	Key     string
+	FromIP  string
+	ToIP    string
+	Payload assigner.OrderAndID
+}
+
+type ConfirmMessage struct {
+	Key     string
+	FromIP  string
+	ToIP    string
+	Payload assigner.OrderAndID
 }
 
 func NewOrderCommunication(channels elevatorFSM.Channels, id string) OrderCommunication {
 	o := OrderCommunication{
-		TransmitOrder: ,
+		TransmitOrderChan:   make(chan OrderMessage),
+		ReiceveOrderChan:    make(chan OrderMessage),
+		TransmitConfirmChan: make(chan ConfirmMessage),
+		ReiceveConfirmChan:  make(chan ConfirmMessage),
 
-		Port:             15647, //// To be fix
-		IPOfThis:         id,
+		Port: 15647, //// To be fix
+		IP:   id,
 	}
 
-	go transmitter(o.Port, o.TransmitterChan)
-	go receiver(o.Port, o.ReiceveOrderChan)
+	go transmitter(o.Port, o.TransmitOrderChan, o.TransmitConfirmChan)
+	go receiver(o.Port, o.ReiceveOrderChan, o.ReiceveConfirmChan)
 
 	go o.confirmOrder(channels)
 
 	return o
 }
 
-func (o OrderCommunication) sendOrder(order OrderAndID) bool {
+func (o OrderCommunication) sendOrder(order assigner.OrderAndID) bool {
 	fmt.Println("Sending order...")
 	randString := randomString(5)
 
 	orderMessage := OrderMessage{
-		Key:       randString,
-		IP:        order.ID, // Assuming the IP is derived from order.ID; adjust as needed
-		IP_from:   o.IPOfThis,
-		Payload:   order,
-		Confirmed: false,
+		Key:     randString,
+		ToIP:    order.ID, // Assuming the IP is derived from order.ID; adjust as needed
+		FromIP:  o.IP,
+		Payload: order,
 	}
 
 	// Start the total timeout timer for 3 seconds
@@ -63,11 +74,11 @@ func (o OrderCommunication) sendOrder(order OrderAndID) bool {
 
 	for attempts < 3 {
 		// Send the order
-		o.TransmitterChan <- orderMessage
+		o.TransmitOrderChan <- orderMessage
 
 		select {
-		case confirmation := <-o.ReiceveOrderChan:
-			if confirmation.Key == orderMessage.Key && confirmation.Confirmed {
+		case confirmation := <-o.ReiceveConfirmChan:
+			if confirmation.Key == orderMessage.Key {
 				fmt.Println("Order confirmed")
 				return true // Order confirmed
 			}
@@ -88,15 +99,15 @@ func (o OrderCommunication) confirmOrder(channels elevatorFSM.Channels) {
 		select {
 		case m := <-o.ReiceveOrderChan:
 			fmt.Println("Recieved an order")
-			response := OrderMessage{
-				Key:       m.Key,
-				IP:        m.IP_from,
-				IP_from:   m.IP,
-				Payload:   m.Payload,
-				Confirmed: true,
+			response := ConfirmMessage{
+				Key:     m.Key,
+				ToIP:    m.ToIP,
+				FromIP:  m.FromIP,
+				Payload: m.Payload,
 			}
+
 			fmt.Print("Comfirmed order") //It will now accept every order
-			o.TransmitterChan <- response
+			o.TransmitConfirmChan <- response
 
 			channels.OrderAssigned <- m.Payload.Order
 		}
@@ -107,9 +118,10 @@ func (o OrderCommunication) confirmOrder(channels elevatorFSM.Channels) {
 const bufSize = 1024
 
 func transmitter(port int, chans ...interface{}) {
+
 	checkArgs(chans...)
 	typeNames := make([]string, len(chans))
-	selectCases := make([]reflect.SelectCase, len(chans))
+	selectCases := make([]reflect.SelectCase, len(typeNames))
 	for i, ch := range chans {
 		selectCases[i] = reflect.SelectCase{
 			Dir:  reflect.SelectRecv,
@@ -119,112 +131,67 @@ func transmitter(port int, chans ...interface{}) {
 	}
 
 	for {
-		chosen, value, ok := reflect.Select(selectCases)
-		if !ok {
-			continue // Channel closed or other error, handle appropriately
-		}
 
-		// Type assert to OrderMessage
-		orderMsg, isOrderMsg := value.Interface().(OrderMessage)
-		if !isOrderMsg {
-			fmt.Println("Received value is not an OrderMessage")
-			continue // Or handle the error as necessary
-		}
-
-		// Extract IP and marshal the payload
-		ipAddr := orderMsg.IP
-		addr, err := net.ResolveUDPAddr("udp4", fmt.Sprintf("%s:%d", ipAddr, port))
-		if err != nil {
-			fmt.Printf("Error resolving UDP address: %v\n", err)
-			continue
-		}
-
-		conn, err := net.DialUDP("udp", nil, addr)
-		if err != nil {
-			fmt.Printf("Error dialing UDP: %v\n", err)
-			continue
-		}
-		defer conn.Close()
-
-		jsonstr, err := json.Marshal(orderMsg.Payload)
-		if err != nil {
-			fmt.Printf("Error marshaling payload: %v\n", err)
-			continue
-		}
-
-		ttj, err := json.Marshal(typeTaggedJSON{
+		chosen, value, _ := reflect.Select(selectCases)
+		jsonstr, _ := json.Marshal(value.Interface())
+		ttj, _ := json.Marshal(typeTaggedJSON{
 			TypeId: typeNames[chosen],
 			JSON:   jsonstr,
 		})
-		if err != nil {
-			fmt.Printf("Error marshaling typeTaggedJSON: %v\n", err)
-			continue
-		}
-
 		if len(ttj) > bufSize {
-			fmt.Printf("Message longer than buffer size (length: %d, buffer size: %d)\n", len(ttj), bufSize)
-			continue // Or handle the error as necessary
+			panic(fmt.Sprintf(
+				"Tried to send a message longer than the buffer size (length: %d, buffer size: %d)\n\t'%s'\n"+
+					"Either send smaller packets, or go to network/bcast/bcast.go and increase the buffer size",
+				len(ttj), bufSize, string(ttj)))
 		}
 
-		_, err = conn.Write(ttj)
-		if err != nil {
-			fmt.Printf("Error sending data: %v\n", err)
-		}
+		// Unmarshal ttj back into typeTaggedJSON struct to access the JSON field
+		var wrapped typeTaggedJSON
+		json.Unmarshal(ttj, &wrapped)
+
+		// Unmarshal the JSON field into a map to access the ToIP field
+		var originalObject map[string]interface{}
+		json.Unmarshal(wrapped.JSON, &originalObject)
+
+		// Extract the ToIP field
+		toIP := originalObject["ToIP"].(string)
+		fmt.Println(toIP)
+
+		conn := conn.DialBroadcastUDP(port)
+		addr, err := net.ResolveUDPAddr("udp4", fmt.Sprintf("%s:%d", toIP, port))
+		fmt.Println(err)
+		conn.WriteTo(ttj, addr)
+
 	}
 }
 
-// Matches type-tagged JSON received on `port` to element types of `chans`, then
-// sends the decoded value on the corresponding channel
 func receiver(port int, chans ...interface{}) {
 	checkArgs(chans...)
-	chansMap := make(map[string]reflect.Value)
+	chansMap := make(map[string]interface{})
 	for _, ch := range chans {
-		chansMap[reflect.TypeOf(ch).Elem().String()] = reflect.ValueOf(ch)
+		chansMap[reflect.TypeOf(ch).Elem().String()] = ch
 	}
-
-	addr, err := net.ResolveUDPAddr("udp4", fmt.Sprintf(":%d", port))
-	if err != nil {
-		fmt.Printf("Error resolving UDP address: %v\n", err)
-		return
-	}
-
-	conn, err := net.ListenUDP("udp", addr)
-	if err != nil {
-		fmt.Printf("Error listening on UDP: %v\n", err)
-		return
-	}
-	defer conn.Close()
 
 	var buf [bufSize]byte
+	conn := conn.DialBroadcastUDP(port)
 	for {
-		n, _, err := conn.ReadFromUDP(buf[:])
-		if err != nil {
-			fmt.Printf("Receiver(%d, ...): ReadFromUDP() failed: \"%+v\"\n", port, err)
-			continue
+		n, _, e := conn.ReadFrom(buf[0:])
+		if e != nil {
+			fmt.Printf("bcast.Receiver(%d, ...):ReadFrom() failed: \"%+v\"\n", port, e)
 		}
 
 		var ttj typeTaggedJSON
-		if err := json.Unmarshal(buf[:n], &ttj); err != nil {
-			fmt.Printf("Error unmarshalling JSON: %v\n", err)
-			continue
-		}
-
+		json.Unmarshal(buf[0:n], &ttj)
 		ch, ok := chansMap[ttj.TypeId]
 		if !ok {
-			fmt.Printf("No channel found for type: %s\n", ttj.TypeId)
 			continue
 		}
-
-		v := reflect.New(reflect.TypeOf(ch.Interface()).Elem())
-		if err := json.Unmarshal(ttj.JSON, v.Interface()); err != nil {
-			fmt.Printf("Error unmarshalling to type: %v\n", err)
-			continue
-		}
-
+		v := reflect.New(reflect.TypeOf(ch).Elem())
+		json.Unmarshal(ttj.JSON, v.Interface())
 		reflect.Select([]reflect.SelectCase{{
 			Dir:  reflect.SelectSend,
-			Chan: ch,
-			Send: v.Elem(),
+			Chan: reflect.ValueOf(ch),
+			Send: reflect.Indirect(v),
 		}})
 	}
 }
@@ -305,4 +272,22 @@ func randomString(n int) string {
 		b[i] = letters[rand.Intn(len(letters))]
 	}
 	return string(b)
+}
+
+func TestOrderCommunication(channels elevatorFSM.Channels, world *assigner.World, id string) {
+
+	ordercom := NewOrderCommunication(channels, id)
+
+	new_order := elevatorFSM.Order{
+		Floor:  2,
+		Button: elevio.BT_HallUp,
+	}
+
+	order_and_id := assigner.OrderAndID{
+		Order: new_order,
+		ID:    id,
+	}
+
+	ordercom.sendOrder(order_and_id)
+
 }
