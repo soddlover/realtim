@@ -4,7 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"mymodule/assigner"
-	. "mymodule/elevator"
+	elev "mymodule/elevator"
+	orderCom "mymodule/orderCommunication"
 
 	//. "mymodule/network"
 	"mymodule/network/localip"
@@ -13,7 +14,7 @@ import (
 )
 
 func main() {
-	fmt.Println("main running.")
+	fmt.Println("main")
 
 	var id string
 	flag.StringVar(&id, "id", "", "id of this peer")
@@ -29,16 +30,16 @@ func main() {
 	}
 
 	world := &assigner.World{
-		Map: make(map[string]Elev),
+		Map: make(map[string]elev.Elev),
 	}
 
-	channels := Channels{
-		ElevatorStates: make(chan Elev),
-		OrderRequest:   make(chan Order),
-		OrderComplete:  make(chan Order),
-		OrderAssigned:  make(chan Order),
+	channels := elev.Channels{
+		ElevatorStates: make(chan elev.Elev),
+		OrderRequest:   make(chan elev.Order),
+		OrderComplete:  make(chan elev.Order),
+		OrderAssigned:  make(chan elev.Order),
 	}
-	assigner.TestOrderCommunication(channels, world, id)
+	orderCom.TestOrderCommunication(channels, world, id)
 
 	// testchan := make(chan Elev)
 	// go SendRandomShitMotherFucker(testchan)
@@ -49,11 +50,11 @@ func main() {
 	select {}
 }
 
-func SendRandomShitMotherFucker(outputChan chan<- Elev) {
+func SendRandomShitMotherFucker(outputChan chan<- elev.Elev) {
 	for {
-		elevatorState := Elev{
-			State: EB_Idle,
-			Dir:   DirStop,
+		elevatorState := elev.Elev{
+			State: elev.EB_Idle,
+			Dir:   elev.DirStop,
 			Floor: 0,
 			Queue: [4][3]bool{},
 		}

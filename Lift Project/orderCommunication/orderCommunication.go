@@ -1,10 +1,12 @@
-package assigner
+package orderCom
 
 import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"mymodule/assigner"
 	elevatorFSM "mymodule/elevator"
+	"mymodule/elevator/elevio"
 	"mymodule/network/conn"
 	"net"
 	"reflect"
@@ -26,14 +28,14 @@ type OrderMessage struct {
 	Key     string
 	FromIP  string
 	ToIP    string
-	Payload OrderAndID
+	Payload assigner.OrderAndID
 }
 
 type ConfirmMessage struct {
 	Key     string
 	FromIP  string
 	ToIP    string
-	Payload OrderAndID
+	Payload assigner.OrderAndID
 }
 
 func NewOrderCommunication(channels elevatorFSM.Channels, id string) OrderCommunication {
@@ -55,7 +57,7 @@ func NewOrderCommunication(channels elevatorFSM.Channels, id string) OrderCommun
 	return o
 }
 
-func (o OrderCommunication) sendOrder(order OrderAndID) bool {
+func (o OrderCommunication) sendOrder(order assigner.OrderAndID) bool {
 	fmt.Println("Sending order...")
 	randString := randomString(5)
 
@@ -115,7 +117,7 @@ func (o OrderCommunication) confirmOrder(channels elevatorFSM.Channels) {
 
 const bufSize = 1024
 
-func Transmitter(port int, chans ...interface{}) {
+func transmitter(port int, chans ...interface{}) {
 
 	checkArgs(chans...)
 	typeNames := make([]string, len(chans))
@@ -143,9 +145,21 @@ func Transmitter(port int, chans ...interface{}) {
 				len(ttj), bufSize, string(ttj)))
 		}
 
+		// Unmarshal ttj back into typeTaggedJSON struct to access the JSON field
+		var wrapped typeTaggedJSON
+		json.Unmarshal(ttj, &wrapped)
+
+		// Unmarshal the JSON field into a map to access the ToIP field
+		var originalObject map[string]interface{}
+		json.Unmarshal(wrapped.JSON, &originalObject)
+
+		// Extract the ToIP field
+		toIP := originalObject["ToIP"].(string)
+		fmt.Println(toIP)
+
 		conn := conn.DialBroadcastUDP(port)
-		ipAddr := value.Interface().ToIP
-		addr, _ := net.ResolveUDPAddr("udp4", fmt.Sprintf(ipAddr, port))
+		addr, err := net.ResolveUDPAddr("udp4", fmt.Sprintf("%s:%d", toIP, port))
+		fmt.Println(err)
 		conn.WriteTo(ttj, addr)
 
 	}
@@ -153,54 +167,31 @@ func Transmitter(port int, chans ...interface{}) {
 
 func receiver(port int, chans ...interface{}) {
 	checkArgs(chans...)
-	chansMap := make(map[string]reflect.Value)
+	chansMap := make(map[string]interface{})
 	for _, ch := range chans {
-		chansMap[reflect.TypeOf(ch).Elem().String()] = reflect.ValueOf(ch)
+		chansMap[reflect.TypeOf(ch).Elem().String()] = ch
 	}
-
-	addr, err := net.ResolveUDPAddr("udp4", fmt.Sprintf(":%d", port))
-	if err != nil {
-		fmt.Printf("Error resolving UDP address: %v\n", err)
-		return
-	}
-
-	conn, err := net.ListenUDP("udp", addr)
-	if err != nil {
-		fmt.Printf("Error listening on UDP: %v\n", err)
-		return
-	}
-	defer conn.Close()
 
 	var buf [bufSize]byte
+	conn := conn.DialBroadcastUDP(port)
 	for {
-		n, _, err := conn.ReadFromUDP(buf[:])
-		if err != nil {
-			fmt.Printf("Receiver(%d, ...): ReadFromUDP() failed: \"%+v\"\n", port, err)
-			continue
+		n, _, e := conn.ReadFrom(buf[0:])
+		if e != nil {
+			fmt.Printf("bcast.Receiver(%d, ...):ReadFrom() failed: \"%+v\"\n", port, e)
 		}
 
 		var ttj typeTaggedJSON
-		if err := json.Unmarshal(buf[:n], &ttj); err != nil {
-			fmt.Printf("Error unmarshalling JSON: %v\n", err)
-			continue
-		}
-
+		json.Unmarshal(buf[0:n], &ttj)
 		ch, ok := chansMap[ttj.TypeId]
 		if !ok {
-			fmt.Printf("No channel found for type: %s\n", ttj.TypeId)
 			continue
 		}
-
-		v := reflect.New(reflect.TypeOf(ch.Interface()).Elem())
-		if err := json.Unmarshal(ttj.JSON, v.Interface()); err != nil {
-			fmt.Printf("Error unmarshalling to type: %v\n", err)
-			continue
-		}
-
+		v := reflect.New(reflect.TypeOf(ch).Elem())
+		json.Unmarshal(ttj.JSON, v.Interface())
 		reflect.Select([]reflect.SelectCase{{
 			Dir:  reflect.SelectSend,
-			Chan: ch,
-			Send: v.Elem(),
+			Chan: reflect.ValueOf(ch),
+			Send: reflect.Indirect(v),
 		}})
 	}
 }
@@ -281,4 +272,22 @@ func randomString(n int) string {
 		b[i] = letters[rand.Intn(len(letters))]
 	}
 	return string(b)
+}
+
+func TestOrderCommunication(channels elevatorFSM.Channels, world *assigner.World, id string) {
+
+	ordercom := NewOrderCommunication(channels, id)
+
+	new_order := elevatorFSM.Order{
+		Floor:  2,
+		Button: elevio.BT_HallUp,
+	}
+
+	order_and_id := assigner.OrderAndID{
+		Order: new_order,
+		ID:    id,
+	}
+
+	ordercom.sendOrder(order_and_id)
+
 }
