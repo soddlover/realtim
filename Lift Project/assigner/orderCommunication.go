@@ -11,14 +11,14 @@ import (
 )
 
 type OrderCommunication struct {
-	TransmitOrder  chan OrderMessage
-	ReiceveOrderChan chan OrderMessage
+	TransmitOrderChan chan OrderMessage
+	ReiceveOrderChan  chan OrderMessage
 
-	TransmitConfirm chan OrderMessage
-	ReiceveConfirm chan OrderMessage
+	TransmitConfirmChan chan OrderMessage
+	ReiceveConfirmChan  chan OrderMessage
 
-	Port             int
-	IPOfThis         string
+	Port     int
+	IPOfThis string
 }
 
 type OrderMessage struct {
@@ -31,14 +31,17 @@ type OrderMessage struct {
 
 func NewOrderCommunication(channels elevatorFSM.Channels, id string) OrderCommunication {
 	o := OrderCommunication{
-		TransmitOrder: ,
+		TransmitOrderChan:   make(chan OrderMessage),
+		ReiceveOrderChan:    make(chan OrderMessage),
+		TransmitConfirmChan: make(chan OrderMessage),
+		ReiceveConfirmChan:  make(chan OrderMessage),
 
-		Port:             15647, //// To be fix
-		IPOfThis:         id,
+		Port:     15647, //// To be fix
+		IPOfThis: id,
 	}
 
-	go transmitter(o.Port, o.TransmitterChan)
-	go receiver(o.Port, o.ReiceveOrderChan)
+	go transmitter(o.Port, o.TransmitOrderChan, o.TransmitConfirmChan)
+	go receiver(o.Port, o.ReiceveOrderChan, o.ReiceveConfirmChan)
 
 	go o.confirmOrder(channels)
 
@@ -63,10 +66,10 @@ func (o OrderCommunication) sendOrder(order OrderAndID) bool {
 
 	for attempts < 3 {
 		// Send the order
-		o.TransmitterChan <- orderMessage
+		o.TransmitOrderChan <- orderMessage
 
 		select {
-		case confirmation := <-o.ReiceveOrderChan:
+		case confirmation := <-o.ReiceveConfirmChan:
 			if confirmation.Key == orderMessage.Key && confirmation.Confirmed {
 				fmt.Println("Order confirmed")
 				return true // Order confirmed
@@ -96,7 +99,7 @@ func (o OrderCommunication) confirmOrder(channels elevatorFSM.Channels) {
 				Confirmed: true,
 			}
 			fmt.Print("Comfirmed order") //It will now accept every order
-			o.TransmitterChan <- response
+			o.TransmitConfirmChan <- response
 
 			channels.OrderAssigned <- m.Payload.Order
 		}
