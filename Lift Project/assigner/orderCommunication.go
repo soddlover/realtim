@@ -128,8 +128,6 @@ func Transmitter(port int, chans ...interface{}) {
 		typeNames[i] = reflect.TypeOf(ch).Elem().String()
 	}
 
-	conn := conn.DialBroadcastUDP(port)
-	addr, _ := net.ResolveUDPAddr("udp4", fmt.Sprintf("255.255.255.255:%d", port))
 	for {
 
 		chosen, value, _ := reflect.Select(selectCases)
@@ -144,6 +142,10 @@ func Transmitter(port int, chans ...interface{}) {
 					"Either send smaller packets, or go to network/bcast/bcast.go and increase the buffer size",
 				len(ttj), bufSize, string(ttj)))
 		}
+
+		conn := conn.DialBroadcastUDP(port)
+		ipAddr := value.Interface().ToIP
+		addr, _ := net.ResolveUDPAddr("udp4", fmt.Sprintf(ipAddr, port))
 		conn.WriteTo(ttj, addr)
 
 	}
