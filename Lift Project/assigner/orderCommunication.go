@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	elevatorFSM "mymodule/elevator"
+	"mymodule/network/conn"
 	"net"
 	"reflect"
 	"time"
@@ -114,10 +115,11 @@ func (o OrderCommunication) confirmOrder(channels elevatorFSM.Channels) {
 
 const bufSize = 1024
 
-func transmitter(port int, chans ...interface{}) {
+func Transmitter(port int, chans ...interface{}) {
+
 	checkArgs(chans...)
 	typeNames := make([]string, len(chans))
-	selectCases := make([]reflect.SelectCase, len(chans))
+	selectCases := make([]reflect.SelectCase, len(typeNames))
 	for i, ch := range chans {
 		selectCases[i] = reflect.SelectCase{
 			Dir:  reflect.SelectRecv,
@@ -126,58 +128,24 @@ func transmitter(port int, chans ...interface{}) {
 		typeNames[i] = reflect.TypeOf(ch).Elem().String()
 	}
 
+	conn := conn.DialBroadcastUDP(port)
+	addr, _ := net.ResolveUDPAddr("udp4", fmt.Sprintf("255.255.255.255:%d", port))
 	for {
-		chosen, value, ok := reflect.Select(selectCases)
-		if !ok {
-			continue // Channel closed or other error, handle appropriately
-		}
 
-		// Type assert to OrderMessage
-		orderMsg, isOrderMsg := value.Interface().(OrderMessage)
-		if !isOrderMsg {
-			fmt.Println("Received value is not an OrderMessage")
-			continue // Or handle the error as necessary
-		}
-
-		// Extract IP and marshal the payload
-		ipAddr := orderMsg.ToIP
-		addr, err := net.ResolveUDPAddr("udp4", fmt.Sprintf("%s:%d", ipAddr, port))
-		if err != nil {
-			fmt.Printf("Error resolving UDP address: %v\n", err)
-			continue
-		}
-
-		conn, err := net.DialUDP("udp", nil, addr)
-		if err != nil {
-			fmt.Printf("Error dialing UDP: %v\n", err)
-			continue
-		}
-		defer conn.Close()
-
-		jsonstr, err := json.Marshal(orderMsg.Payload)
-		if err != nil {
-			fmt.Printf("Error marshaling payload: %v\n", err)
-			continue
-		}
-
-		ttj, err := json.Marshal(typeTaggedJSON{
+		chosen, value, _ := reflect.Select(selectCases)
+		jsonstr, _ := json.Marshal(value.Interface())
+		ttj, _ := json.Marshal(typeTaggedJSON{
 			TypeId: typeNames[chosen],
 			JSON:   jsonstr,
 		})
-		if err != nil {
-			fmt.Printf("Error marshaling typeTaggedJSON: %v\n", err)
-			continue
-		}
-
 		if len(ttj) > bufSize {
-			fmt.Printf("Message longer than buffer size (length: %d, buffer size: %d)\n", len(ttj), bufSize)
-			continue // Or handle the error as necessary
+			panic(fmt.Sprintf(
+				"Tried to send a message longer than the buffer size (length: %d, buffer size: %d)\n\t'%s'\n"+
+					"Either send smaller packets, or go to network/bcast/bcast.go and increase the buffer size",
+				len(ttj), bufSize, string(ttj)))
 		}
+		conn.WriteTo(ttj, addr)
 
-		_, err = conn.Write(ttj)
-		if err != nil {
-			fmt.Printf("Error sending data: %v\n", err)
-		}
 	}
 }
 
