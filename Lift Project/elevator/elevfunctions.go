@@ -5,7 +5,7 @@ import (
 	. "mymodule/elevator/elevio"
 )
 
-func elevStart(drv_floors chan int, elevator Elev) {
+func ElevStart(drv_floors chan int, elevator Elev) {
 	for floor := 0; floor < N_FLOORS; floor++ {
 		for button := 0; button < N_BUTTONS; button++ {
 			SetButtonLamp(ButtonType(button), floor, false)
@@ -20,7 +20,7 @@ func elevStart(drv_floors chan int, elevator Elev) {
 	elevator.Dir = DirStop
 }
 
-func shouldStop(elevator Elev) bool {
+func ShouldStop(elevator Elev) bool {
 	switch elevator.Dir {
 	case DirUp:
 		return elevator.Queue[elevator.Floor][BT_HallUp] ||
@@ -36,7 +36,7 @@ func shouldStop(elevator Elev) bool {
 	return false
 }
 
-func chooseDirection(elevator Elev) ElevatorDirection {
+func ChooseDirection(elevator Elev) ElevatorDirection {
 	switch elevator.Dir {
 	case DirStop:
 		if ordersAbove(elevator) {
