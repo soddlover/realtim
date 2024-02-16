@@ -27,8 +27,8 @@ type ElevatorDirection int
 
 const (
 	DirUp   ElevatorDirection = 1
-	DirDown                   = -1
-	DirStop                   = 0
+	DirDown ElevatorDirection = -1
+	DirStop ElevatorDirection = 0
 )
 
 type Elev struct {
@@ -43,49 +43,51 @@ type Order struct {
 	Button elevio.ButtonType
 }
 
-func RunElev(channels Channels) {
+func RunElev(channels Channels, initElev Elev) {
 	elevio.Init("localhost:15657", N_FLOORS)
 
-	elevator := Elev{
-		State: EB_Idle,
-		Dir:   DirStop,
-		Floor: elevio.GetFloor(),
-		Queue: [N_FLOORS][N_BUTTONS]bool{},
+	elevator := initElev
+	if (elevator == Elev{}) {
+		elevator = Elev{
+			State: EB_Idle,
+			Dir:   DirStop,
+			Floor: elevio.GetFloor(),
+			Queue: [N_FLOORS][N_BUTTONS]bool{},
+		}
 	}
+
 	doorTimer := time.NewTimer(3 * time.Second)
 	doorTimer.Stop()
 	motorErrorTimer := time.NewTimer(3 * time.Second)
 	motorErrorTimer.Stop()
 
-	drv_buttons := make(chan elevio.ButtonEvent)
-	drv_floors := make(chan int)
-	drv_obstr := make(chan bool)
-	drv_stop := make(chan bool)
-	elevator_states := make(chan Elev)
-	OrderRequest := make(chan Order)
-	orderComplete := make(chan Order)
-	OrderAssigned := make(chan Order)
+	drv_buttons := make(chan elevio.ButtonEvent, 10)
+	drv_floors := make(chan int, 10)
+	drv_obstr := make(chan bool, 10)
+	drv_stop := make(chan bool, 10)
 
 	go elevio.PollButtons(drv_buttons)
 	go elevio.PollFloorSensor(drv_floors)
 	go elevio.PollObstructionSwitch(drv_obstr)
 	go elevio.PollStopButton(drv_stop)
+	go updateLights(&elevator)
 
-	elevStart(drv_floors, elevator)
+	elevStart(drv_floors)
+	elevio.SetMotorDirection(elevio.MotorDirection(ChooseDirection(elevator)))
 
 	for {
 		select {
 		case buttonEvent := <-drv_buttons:
-			fmt.Println("Button event at floor", buttonEvent.Floor+1, "button", buttonEvent.Button)
-			if buttonEvent.Button == elevio.BT_Cab {
-				elevator.Queue[buttonEvent.Floor][buttonEvent.Button] = true
-				elevio.SetButtonLamp(buttonEvent.Button, buttonEvent.Floor, true)
-			} else {
-				OrderRequest <- Order{buttonEvent.Floor, buttonEvent.Button}
-			}
+			fmt.Println("Button event at floor", buttonEvent.Floor, "button", buttonEvent.Button)
+
+			channels.OrderRequest <- Order{buttonEvent.Floor, buttonEvent.Button}
+
 			//elevator.Queue[buttonEvent.Floor][buttonEvent.Button] = true
 			//elevio.SetButtonLamp(buttonEvent.Button, buttonEvent.Floor, true)
 
+		case order := <-channels.OrderAssigned:
+			fmt.Println("Order assigned: ", order)
+			elevator.Queue[order.Floor][order.Button] = true
 			switch elevator.State {
 			case EB_Idle:
 				elevator.Dir = chooseDirection(elevator)
@@ -99,46 +101,54 @@ func RunElev(channels Channels) {
 					elevator.State = EB_Moving
 					motorErrorTimer.Reset(3 * time.Second)
 				}
-				elevator_states <- elevator
-
 			case EB_Moving:
 			case EB_DoorOpen:
-				if elevator.Floor == buttonEvent.Floor {
-					elevator.Queue[buttonEvent.Floor][buttonEvent.Button] = false
-					elevio.SetButtonLamp(buttonEvent.Button, buttonEvent.Floor, false)
+				if elevator.Floor == order.Floor {
+					elevator.Queue[order.Floor][order.Button] = false
 					doorTimer.Reset(3 * time.Second)
 				}
-				elevator_states <- elevator
 			case Undefined:
 			default:
 				fmt.Println("Undefined state WTF")
 			}
-		case order := <-OrderAssigned:
-			elevator.Queue[order.Floor][order.Button] = true
-			elevator_states <- elevator
-		case order := <-OrderRequest:
-			elevio.SetButtonLamp(order.Button, order.Floor, true)
-		case order := <-orderComplete:
-			elevio.SetButtonLamp(order.Button, order.Floor, false)
-			//add func for only one way clearing later
+
+			channels.ElevatorStates <- elevator
+
+		/*
+			case order := <-channels.orderComplete:
+				elevio.SetButtonLamp(order.Button, order.Floor, false)
+				//add func for only one way clearing later
+		*/
 		case elevator.Floor = <-drv_floors:
-			fmt.Println("Arrived at floor", elevator.Floor+1)
+			fmt.Println("Arrived at floor", elevator.Floor)
 			elevio.SetFloorIndicator(elevator.Floor)
 			if shouldStop(elevator) {
 				motorErrorTimer.Stop()
 				elevio.SetMotorDirection(elevio.MD_Stop)
 				elevio.SetDoorOpenLamp(true)
 				doorTimer.Reset(3 * time.Second)
-				elevator.Queue[elevator.Floor] = [N_BUTTONS]bool{}
-				elevio.SetButtonLamp(elevio.BT_Cab, elevator.Floor, false)
+				//clear only orders in correct direction
+				if elevator.Dir == DirUp {
+					elevator.Queue[elevator.Floor][elevio.BT_HallUp] = false
+					if elevator.Floor == (N_FLOORS - 1) {
+						elevator.Queue[elevator.Floor][elevio.BT_HallDown] = false
+					}
+				} else if elevator.Dir == DirDown {
+					elevator.Queue[elevator.Floor][elevio.BT_HallDown] = false
+					if elevator.Floor == 0 {
+						elevator.Queue[elevator.Floor][elevio.BT_HallUp] = false
+					}
+				}
+
+				elevator.Queue[elevator.Floor][elevio.BT_Cab] = false
 				//same here add one way clearing later
-				orderComplete <- Order{elevator.Floor, elevio.BT_HallUp}
-				orderComplete <- Order{elevator.Floor, elevio.BT_HallDown}
+				//channels.orderComplete <- Order{elevator.Floor, elevio.BT_HallUp}
+				//channels.orderComplete <- Order{elevator.Floor, elevio.BT_HallDown}
 				elevator.State = EB_DoorOpen
 			} else if elevator.State == EB_Moving {
 				motorErrorTimer.Reset(3 * time.Second)
 			}
-			elevator_states <- elevator
+			channels.ElevatorStates <- elevator
 
 		case <-doorTimer.C:
 			elevio.SetDoorOpenLamp(false)
@@ -151,7 +161,7 @@ func RunElev(channels Channels) {
 				elevio.SetMotorDirection(elevio.MotorDirection(elevator.Dir))
 				motorErrorTimer.Reset(3 * time.Second)
 			}
-			elevator_states <- elevator
+			channels.ElevatorStates <- elevator
 		case <-motorErrorTimer.C:
 			elevio.SetMotorDirection(elevio.MD_Stop)
 			elevator.State = Undefined
@@ -162,11 +172,21 @@ func RunElev(channels Channels) {
 				elevio.SetStopLamp(false)
 				time.Sleep(500 * time.Millisecond)
 			}
-			elevStart(drv_floors, elevator)
+			elevStart(drv_floors)
 			elevator.State = EB_Idle
-			elevator_states <- elevator
+			channels.ElevatorStates <- elevator
 			//fullfør cab ordre
-
 		}
+
+	}
+}
+func updateLights(elevator *Elev) {
+	for {
+		for floor := 0; floor < N_FLOORS; floor++ {
+			for button := 0; button < N_BUTTONS; button++ {
+				elevio.SetButtonLamp(elevio.ButtonType(button), floor, elevator.Queue[floor][button])
+			}
+		}
+		time.Sleep(100 * time.Millisecond)
 	}
 }

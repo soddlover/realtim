@@ -74,6 +74,7 @@ func SetStopLamp(value bool) {
 }
 
 func PollButtons(receiver chan<- ButtonEvent) {
+
 	prev := make([][3]bool, _numFloors)
 	for {
 		time.Sleep(_pollRate)
@@ -96,6 +97,7 @@ func PollFloorSensor(receiver chan<- int) {
 		v := GetFloor()
 		if v != prev && v != -1 {
 			receiver <- v
+
 		}
 		prev = v
 	}

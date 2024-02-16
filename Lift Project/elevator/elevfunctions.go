@@ -1,23 +1,20 @@
 package elevatorFSM
 
 import (
+	"fmt"
 	. "mymodule/config"
 	. "mymodule/elevator/elevio"
 )
 
-func ElevStart(drv_floors chan int, elevator Elev) {
-	for floor := 0; floor < N_FLOORS; floor++ {
-		for button := 0; button < N_BUTTONS; button++ {
-			SetButtonLamp(ButtonType(button), floor, false)
-		}
-	}
+func elevStart(drv_floors chan int) {
+
 	if GetFloor() == -1 {
 		SetMotorDirection(MD_Down)
 		<-drv_floors
 		SetMotorDirection(MD_Stop)
 	}
 	SetFloorIndicator(GetFloor())
-	elevator.Dir = DirStop
+	fmt.Println("Arrived at floor: ", GetFloor())
 }
 
 func ShouldStop(elevator Elev) bool {
