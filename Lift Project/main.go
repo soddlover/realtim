@@ -69,8 +69,12 @@ func printWorld(world *network.World) {
 	for {
 		select {
 		case <-ticker.C:
-			for key, value := range world.Map {
-				fmt.Println("Key:", key, "Value:", value)
+			for _, value := range world.Map {
+				//fmt.Println("Key:", key, "Value:", value)
+				fmt.Println("Direction:", value.Dir)
+				fmt.Println("Floor:", value.Floor)
+				//fmt.Println("Queue:", value.Queue)
+				fmt.Println("State:", value.State)
 			}
 		}
 	}

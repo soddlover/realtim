@@ -22,49 +22,51 @@ func ShouldStop(elevator Elev) bool {
 	case DirUp:
 		return elevator.Queue[elevator.Floor][BT_HallUp] ||
 			elevator.Queue[elevator.Floor][BT_Cab] ||
-			!ordersAbove(elevator)
+			!OrdersAbove(elevator)
 	case DirDown:
 		return elevator.Queue[elevator.Floor][BT_HallDown] ||
 			elevator.Queue[elevator.Floor][BT_Cab] ||
-			!ordersBelow(elevator)
+			!OrdersBelow(elevator)
 	case DirStop:
+		return true //??
 	default:
+		return true
 	}
-	return false
 }
 
 func ChooseDirection(elevator Elev) ElevatorDirection {
 	switch elevator.Dir {
 	case DirStop:
-		if ordersAbove(elevator) {
+		if OrdersAbove(elevator) {
 			return DirUp
-		} else if ordersBelow(elevator) {
+		} else if OrdersBelow(elevator) {
 			return DirDown
 		} else {
 			return DirStop
 		}
 	case DirUp:
-		if ordersAbove(elevator) {
+		if OrdersAbove(elevator) {
 			return DirUp
-		} else if ordersBelow(elevator) {
+		} else if OrdersBelow(elevator) {
 			return DirDown
 		} else {
 			return DirStop
 		}
 
 	case DirDown:
-		if ordersBelow(elevator) {
+		if OrdersBelow(elevator) {
 			return DirDown
-		} else if ordersAbove(elevator) {
+		} else if OrdersAbove(elevator) {
 			return DirUp
 		} else {
 			return DirStop
 		}
+	default:
+		return DirStop
 	}
-	return DirStop
 }
 
-func ordersAbove(elevator Elev) bool {
+func OrdersAbove(elevator Elev) bool {
 	for floor := elevator.Floor + 1; floor < N_FLOORS; floor++ {
 		for btn := 0; btn < N_BUTTONS; btn++ {
 			if elevator.Queue[floor][btn] {
@@ -75,7 +77,7 @@ func ordersAbove(elevator Elev) bool {
 	return false
 }
 
-func ordersBelow(elevator Elev) bool {
+func OrdersBelow(elevator Elev) bool {
 	for floor := 0; floor < elevator.Floor; floor++ {
 		for btn := 0; btn < N_BUTTONS; btn++ {
 			if elevator.Queue[floor][btn] {

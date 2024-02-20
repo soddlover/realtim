@@ -141,7 +141,9 @@ func timeToServeRequestWithTimeout(e_old Elev, b elevio.ButtonType, f int) int {
 	case result := <-resultChan:
 		return result
 	case <-time.After(50 * time.Millisecond):
+		fmt.Println("********************************************")
 		fmt.Println("Timeout in timeToServeRequestWithTimeout")
+		fmt.Println("******************************************** \n \n ")
 		return 0
 	}
 }
@@ -171,6 +173,9 @@ func timeToServeRequest(e_old Elev, b elevio.ButtonType, f int) int { //FIX THIS
 		e.Floor += int(e.Dir)
 	case EB_DoorOpen:
 		duration -= config.DOOR_OPEN_TIME / 2
+		if !OrdersAbove(e) && !OrdersBelow(e) {
+			return duration
+		}
 	}
 
 	for {

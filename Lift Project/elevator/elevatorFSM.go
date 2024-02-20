@@ -34,6 +34,32 @@ const (
 	DirStop ElevatorDirection = 0
 )
 
+func elevatorDirToString(dir ElevatorDirection) string {
+	switch dir {
+	case DirUp:
+		return "Up"
+	case DirDown:
+		return "Down"
+	case DirStop:
+		return "Stop"
+	default:
+		return "Undefined"
+	}
+}
+
+func elevatorStateToString(stat ElevatorState) string {
+	switch stat {
+	case EB_Idle:
+		return "Idle"
+	case EB_Moving:
+		return "Moving"
+	case EB_DoorOpen:
+		return "DoorOpen"
+	default:
+		return "Undefined"
+	}
+}
+
 type Elev struct {
 	State ElevatorState
 	Dir   ElevatorDirection
@@ -77,7 +103,7 @@ func RunElev(channels Channels, initElev Elev) {
 	go elevio.PollObstructionSwitch(drv_obstr)
 	go elevio.PollStopButton(drv_stop)
 	go updateLights(&elevator)
-
+	//go printElevator(&elevator)
 	elevStart(drv_floors)
 	elevio.SetMotorDirection(elevio.MotorDirection(ChooseDirection(elevator)))
 
@@ -137,12 +163,12 @@ func RunElev(channels Channels, initElev Elev) {
 				//clear only orders in correct direction
 				if elevator.Dir == DirUp {
 					elevator.Queue[elevator.Floor][elevio.BT_HallUp] = false
-					if !ordersAbove(elevator) {
+					if !OrdersAbove(elevator) {
 						elevator.Queue[elevator.Floor][elevio.BT_HallDown] = false
 					}
 				} else if elevator.Dir == DirDown {
 					elevator.Queue[elevator.Floor][elevio.BT_HallDown] = false
-					if !ordersBelow(elevator) {
+					if !OrdersBelow(elevator) {
 						elevator.Queue[elevator.Floor][elevio.BT_HallUp] = false
 					}
 				}
@@ -199,5 +225,16 @@ func updateLights(elevator *Elev) {
 			}
 		}
 		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+func printElevator(elevator *Elev) {
+	ticker := time.NewTicker(3 * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		fmt.Println("Direction:", elevatorDirToString(elevator.Dir))
+		fmt.Println("Floor:", elevator.Floor)
+		fmt.Println("State:", elevatorStateToString(elevator.State))
 	}
 }

@@ -42,7 +42,12 @@ func listenForConnections(incomingOrder chan Orderstatus) {
 			fmt.Println("Error accepting connection:", err)
 			continue
 		}
-		Connections[strings.Split(conn.RemoteAddr().String(), ":")[0]] = conn
+		if _, ok := Connections[strings.Split(conn.RemoteAddr().String(), ":")[0]+":1"]; ok {
+			Connections[strings.Split(conn.RemoteAddr().String(), ":")[0]+":2"] = conn
+		} else {
+			Connections[strings.Split(conn.RemoteAddr().String(), ":")[0]+":1"] = conn
+		}
+
 		fmt.Println("Accepted connection from", conn.RemoteAddr())
 		go ReceiveMessage(conn, incomingOrder)
 
@@ -83,8 +88,11 @@ func listenForConnections(incomingOrder chan Orderstatus) {
 // }
 
 func SendMessage(peer string, order Orderstatus) (bool, error) {
-	ip := strings.Split(peer, ":")[0]
-	conn, ok := Connections[ip]
+	//ip := strings.Split(peer, ":")[0]
+	fmt.Println("Connections:", Connections)
+	fmt.Println("Peer:", peer)
+	conn, ok := Connections[peer]
+
 	if !ok {
 		return false, fmt.Errorf("no connection to peer %s", peer)
 	}
