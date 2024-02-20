@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
-	"mymodule/assigner"
 	elevatorFSM "mymodule/elevator"
 	"mymodule/elevator/elevio"
+	"mymodule/network"
 	"mymodule/network/conn"
 	"net"
 	"reflect"
@@ -28,14 +28,14 @@ type OrderMessage struct {
 	Key     string
 	FromIP  string
 	ToIP    string
-	Payload assigner.OrderAndID
+	Payload network.OrderAndID
 }
 
 type ConfirmMessage struct {
 	Key     string
 	FromIP  string
 	ToIP    string
-	Payload assigner.OrderAndID
+	Payload network.OrderAndID
 }
 
 func NewOrderCommunication(channels elevatorFSM.Channels, id string) OrderCommunication {
@@ -57,7 +57,7 @@ func NewOrderCommunication(channels elevatorFSM.Channels, id string) OrderCommun
 	return o
 }
 
-func (o OrderCommunication) sendOrder(order assigner.OrderAndID) bool {
+func (o OrderCommunication) sendOrder(order network.OrderAndID) bool {
 	fmt.Println("Sending order...")
 	randString := randomString(5)
 
@@ -274,7 +274,7 @@ func randomString(n int) string {
 	return string(b)
 }
 
-func TestOrderCommunication(channels elevatorFSM.Channels, world *assigner.World, id string) {
+func TestOrderCommunication(channels elevatorFSM.Channels, world network.World, id string) {
 
 	ordercom := NewOrderCommunication(channels, id)
 
@@ -283,7 +283,7 @@ func TestOrderCommunication(channels elevatorFSM.Channels, world *assigner.World
 		Button: elevio.BT_HallUp,
 	}
 
-	order_and_id := assigner.OrderAndID{
+	order_and_id := network.OrderAndID{
 		Order: new_order,
 		ID:    id,
 	}

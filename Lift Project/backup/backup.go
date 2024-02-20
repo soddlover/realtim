@@ -3,12 +3,11 @@ package backup
 import (
 	"encoding/json"
 	"fmt"
-	"log"
+	"mymodule/config"
 	. "mymodule/config"
 	elevatorFSM "mymodule/elevator"
 	"mymodule/elevator/elevio"
 	"os"
-	"os/exec"
 	"time"
 )
 
@@ -16,7 +15,7 @@ func Backup(fresh bool) elevatorFSM.Elev {
 	// Get the initial file info
 
 	if fresh {
-		os.Remove("backup.txt")
+		os.Remove("backup" + config.Self_nr + ".txt")
 		return takeControl()
 	}
 	// Start a ticker that checks the file every second
@@ -26,7 +25,7 @@ func Backup(fresh bool) elevatorFSM.Elev {
 		<-ticker.C
 
 		// Get the current file info
-		fileInfo, err := os.Stat("backup.txt")
+		fileInfo, err := os.Stat("backup" + config.Self_nr + ".txt")
 		if err != nil {
 			fmt.Println("Error getting file info:", err)
 			return takeControl()
@@ -59,7 +58,7 @@ func WriteBackup(elevChan chan elevatorFSM.Elev) {
 			fmt.Println("Error marshalling json:", err)
 			continue
 		}
-		err = os.WriteFile("backup.txt", stateJson, 0644)
+		err = os.WriteFile("backup"+config.Self_nr+".txt", stateJson, 0644)
 		if err != nil {
 			fmt.Println("Error writing to file:", err)
 			continue
@@ -71,7 +70,7 @@ func WriteBackup(elevChan chan elevatorFSM.Elev) {
 func takeControl() elevatorFSM.Elev {
 	fmt.Println("Backup is taking over.")
 
-	stateJson, err := os.ReadFile("backup.txt")
+	stateJson, err := os.ReadFile("backup" + config.Self_nr + ".txt")
 	if err != nil {
 		fmt.Println("Error reading file:", err)
 	}
@@ -89,12 +88,13 @@ func takeControl() elevatorFSM.Elev {
 			}
 		}
 	}
-	cmd := exec.Command("gnome-terminal", "--", "go", "run", "main.go")
-	err = cmd.Run()
-	if err != nil {
-		fmt.Println("THis sucks")
-		log.Fatal(err)
-	}
+
+	// cmd := exec.Command("gnome-terminal", "--", "go", "run", "main.go")
+	// err = cmd.Run()
+	// if err != nil {
+	// 	fmt.Println("THis sucks")
+	// 	log.Fatal(err)
+	// }
 	// Here you can add the code for the backup to take over
 	return elev
 }

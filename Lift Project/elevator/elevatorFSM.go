@@ -2,8 +2,10 @@ package elevatorFSM
 
 import (
 	"fmt"
+	"mymodule/config"
 	. "mymodule/config"
 	"mymodule/elevator/elevio"
+	"strconv"
 	"time"
 )
 
@@ -45,7 +47,10 @@ type Order struct {
 }
 
 func RunElev(channels Channels, initElev Elev) {
-	elevio.Init("localhost:15657", N_FLOORS)
+	idInt, _ := strconv.Atoi(config.Self_nr)
+	port := 15657 + idInt
+	addr := "localhost:" + fmt.Sprint(port)
+	elevio.Init(addr, N_FLOORS)
 
 	elevator := initElev
 	if (elevator == Elev{}) {
@@ -132,15 +137,16 @@ func RunElev(channels Channels, initElev Elev) {
 				//clear only orders in correct direction
 				if elevator.Dir == DirUp {
 					elevator.Queue[elevator.Floor][elevio.BT_HallUp] = false
-					if elevator.Floor == (N_FLOORS - 1) {
+					if !ordersAbove(elevator) {
 						elevator.Queue[elevator.Floor][elevio.BT_HallDown] = false
 					}
 				} else if elevator.Dir == DirDown {
 					elevator.Queue[elevator.Floor][elevio.BT_HallDown] = false
-					if elevator.Floor == 0 {
+					if !ordersBelow(elevator) {
 						elevator.Queue[elevator.Floor][elevio.BT_HallUp] = false
 					}
 				}
+				elevator.Dir = DirStop
 
 				elevator.Queue[elevator.Floor][elevio.BT_Cab] = false
 				//same here add one way clearing later

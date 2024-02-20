@@ -2,7 +2,7 @@ package network
 
 import (
 	"fmt"
-	"mymodule/assigner"
+	"mymodule/config"
 	. "mymodule/elevator"
 	"mymodule/network/bcast"
 	"time"
@@ -18,11 +18,7 @@ type BroadcastWorld struct {
 	Map map[string]BroadcastState
 }
 
-type World struct {
-	Map map[string]Elev
-}
-
-func updateBroadcastworld(bcastWorld BroadcastWorld, world *assigner.World, broadcastStateRx chan BroadcastState) {
+func updateBroadcastworld(bcastWorld BroadcastWorld, world *World, broadcastStateRx chan BroadcastState) {
 	for {
 		//update world view
 		select {
@@ -45,7 +41,7 @@ func updateBroadcastworld(bcastWorld BroadcastWorld, world *assigner.World, broa
 	}
 }
 
-func StateBroadcaster(elevStateTx chan Elev, world *assigner.World, id string) {
+func StateBroadcaster(elevStateTx chan Elev, world *World, id string) {
 	//init bcast world
 	bcastWorld := BroadcastWorld{Map: make(map[string]BroadcastState)}
 	//using same world becuse why not?=
@@ -53,8 +49,8 @@ func StateBroadcaster(elevStateTx chan Elev, world *assigner.World, id string) {
 	broadcastStateTx := make(chan BroadcastState)
 
 	go repeater(elevStateTx, broadcastStateTx, id)
-	go bcast.Transmitter(16569, broadcastStateTx)
-	go bcast.Receiver(16569, broadcastStateRx)
+	go bcast.Transmitter(config.Broadcast_state_port, broadcastStateTx)
+	go bcast.Receiver(config.Broadcast_state_port, broadcastStateRx)
 	go updateBroadcastworld(bcastWorld, world, broadcastStateRx)
 }
 

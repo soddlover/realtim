@@ -40,7 +40,6 @@ func Transmitter(port int, chans ...interface{}) {
 					"Either send smaller packets, or go to network/bcast/bcast.go and increase the buffer size",
 				len(ttj), bufSize, string(ttj)))
 		}
-		fmt.Println("Transmitting: ")
 		conn.WriteTo(ttj, addr)
 
 	}

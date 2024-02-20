@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	. "mymodule/assigner"
 	"mymodule/backup"
 	"mymodule/config"
 	. "mymodule/elevator"
@@ -14,22 +13,26 @@ import (
 )
 
 func main() {
-
+	// WHen starting
 	var id string
 	flag.StringVar(&id, "id", "", "id of this peer")
 	fresh := flag.Bool("fresh", false, "Start a fresh elevator")
 	flag.Parse()
-
+	localIP, err := localip.LocalIP()
+	if err != nil {
+		fmt.Println(err)
+		localIP = "DISCONNECTED"
+	}
 	if id == "" {
-		localIP, err := localip.LocalIP()
-		if err != nil {
-			fmt.Println(err)
-			localIP = "DISCONNECTED"
-		}
-		//id = fmt.Sprintf("peer-%s-%d", localIP, os.Getpid())
-		id = localIP
+		id = localIP + ":0"
+		config.Self_nr = "0"
+	} else {
+		config.Self_nr = id
+		id = localIP + ":" + id
+
 	}
 	config.Self_id = id
+
 	initElev := backup.Backup(*fresh)
 
 	if (initElev == Elev{}) {
@@ -37,7 +40,7 @@ func main() {
 
 	}
 
-	world := &World{
+	world := &network.World{
 		Map: make(map[string]Elev),
 	}
 
@@ -51,18 +54,18 @@ func main() {
 
 	//fmt.Print("Hello, World!")
 	// go RunElev(channels)
-	go network.PeerConnector(id, world)
+	go network.PeerConnector(id, world, channels)
 	go network.StateBroadcaster(channels.ElevatorStatesBroadcast, world, id)
 	// go PeerConnector(id, world)
 	go backup.WriteBackup(channels.ElevatorStates)
 	go RunElev(channels, initElev)
-	go Assigner(channels, world)
-	go printWorld(world)
+	//go Assigner(channels, world)
+	//go printWorld(world)
 	select {}
 }
 
-func printWorld(world *World) {
-	ticker := time.NewTicker(5 * time.Second)
+func printWorld(world *network.World) {
+	ticker := time.NewTicker(10 * time.Second)
 	for {
 		select {
 		case <-ticker.C:
