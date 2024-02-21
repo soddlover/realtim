@@ -1,4 +1,4 @@
-package supervisor
+package sheriff
 
 import (
 	"bufio"
@@ -12,6 +12,11 @@ import (
 	"strings"
 )
 
+type Message struct {
+	Type string          `json:"type"`
+	Data json.RawMessage `json:"data"`
+}
+
 type Orderstatus struct {
 	Owner   string
 	OrderID string
@@ -22,12 +27,33 @@ type Orderstatus struct {
 
 var NodeOrders = make(map[string]Orderstatus)
 var Connections = make(map[string]net.Conn)
+var DeputyID = ""
+var DeputyUpdateChan = make(chan bool)
 
-func Supervisor(incomingOrder chan Orderstatus) {
+func Sheriff(incomingOrder chan Orderstatus) {
 	ipID := strings.Split(string(config.Self_id), ":")
-	go peers.Transmitter(config.Supervisor_port, ipID[0], make(chan bool)) //channel for turning off supervisor transmitt?
+	go peers.Transmitter(config.Sheriff_port, ipID[0], make(chan bool)) //channel for turning off sheriff transmitt?
 	//go peers.Receiver(15647, peerUpdateCh)
 	go listenForConnections(incomingOrder)
+	go deputyUpdater()
+}
+
+func deputyUpdater() {
+	for {
+		select {
+		case <-DeputyUpdateChan:
+			if DeputyID == "" {
+				for k := range Connections {
+					DeputyID = k
+					fmt.Println("The new deputy is:", DeputyID)
+					break
+				}
+			}
+
+			//send all orders to deputy
+			SendDeputyMessage(DeputyID, NodeOrders)
+		}
+	}
 }
 
 func listenForConnections(incomingOrder chan Orderstatus) {
@@ -49,12 +75,13 @@ func listenForConnections(incomingOrder chan Orderstatus) {
 		}
 
 		fmt.Println("Accepted connection from", conn.RemoteAddr())
+		DeputyUpdateChan <- true
 		go ReceiveMessage(conn, incomingOrder)
 
 	}
 }
 
-// func supervisorUpdater(peerUpdateCh chan peers.PeerUpdate, world *assigner.World) {
+// func sheriffUpdater(peerUpdateCh chan peers.PeerUpdate, world *assigner.World) {
 
 // 	for {
 // 		select {
@@ -87,13 +114,14 @@ func listenForConnections(incomingOrder chan Orderstatus) {
 // 	}
 // }
 
-func SendMessage(peer string, order Orderstatus) (bool, error) {
+func SendOrderMessage(peer string, order Orderstatus) (bool, error) {
 	//ip := strings.Split(peer, ":")[0]
 	fmt.Println("Connections:", Connections)
 	fmt.Println("Peer:", peer)
 	conn, ok := Connections[peer]
 
 	if !ok {
+		fmt.Println("No connection to peer", peer)
 		return false, fmt.Errorf("no connection to peer %s", peer)
 	}
 
@@ -104,7 +132,19 @@ func SendMessage(peer string, order Orderstatus) (bool, error) {
 		return false, err
 	}
 
-	_, err = fmt.Fprintln(conn, string(orderJSON))
+	// Create a new message with type "order"
+	msg := Message{
+		Type: "order",
+		Data: orderJSON,
+	}
+
+	// Convert the message to JSON
+	msgJSON, err := json.Marshal(msg)
+	if err != nil {
+		// ...
+	}
+
+	_, err = fmt.Fprintln(conn, string(msgJSON))
 	if err != nil {
 		fmt.Println("Error sending order:", err)
 		return false, err
@@ -125,12 +165,66 @@ func SendMessage(peer string, order Orderstatus) (bool, error) {
 	return true, nil
 }
 
+func SendDeputyMessage(peer string, nodeOrders map[string]Orderstatus) (bool, error) {
+
+	conn, ok := Connections[peer]
+
+	if !ok {
+		fmt.Println("No connection to peer", peer)
+		return false, fmt.Errorf("no connection to peer %s", peer)
+	}
+
+	//convert the map to JSON
+	nodeOrdersJSON, err := json.Marshal(nodeOrders)
+	if err != nil {
+		fmt.Println("Error marshalling node orders to be sent to deputy:", err)
+		return false, err
+	}
+
+	// Create a new message with type "deputy"
+	msg := Message{
+		Type: "deputyMessage",
+		Data: nodeOrdersJSON,
+	}
+
+	// Convert the message to JSON
+	msgJSON, err := json.Marshal(msg)
+	if err != nil {
+		fmt.Println("Error marshalling deputy message:", err)
+	}
+
+	_, err = fmt.Fprintln(conn, string(msgJSON))
+	if err != nil {
+		fmt.Println("Error sending node orders to deputy:", err)
+		return false, err
+	}
+
+	fmt.Println("Sent node orders to deputy.", peer)
+	return true, nil
+
+}
+
 func ReceiveMessage(conn net.Conn, incomingOrder chan Orderstatus) (Orderstatus, error) {
 	for {
 		reader := bufio.NewReader(conn)
 		message, err := reader.ReadString('\n')
 		if err != nil {
-			fmt.Println("Error reading from connection:", err)
+
+			if err.Error() == "EOF" {
+				fmt.Println("Connection closed by", conn.RemoteAddr())
+
+				//check if the connection is the deputy
+				if conn.RemoteAddr().String() == DeputyID {
+					DeputyID = ""
+					DeputyUpdateChan <- true
+				}
+
+				conn.Close()
+				delete(Connections, conn.RemoteAddr().String())
+				return Orderstatus{}, nil
+			} else {
+				fmt.Println("Error reading from connection:", err)
+			}
 			continue
 		}
 
@@ -150,7 +244,13 @@ func ReceiveMessage(conn net.Conn, incomingOrder chan Orderstatus) (Orderstatus,
 		// }
 		NodeOrders[order.Owner] = order
 		fmt.Println("Received order from", conn.RemoteAddr(), "order:", order)
-		incomingOrder <- order
+
+		DeputyUpdateChan <- true
+
+		if order.Status == false {
+			incomingOrder <- order
+		}
+
 	}
 
 }
