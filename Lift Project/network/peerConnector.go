@@ -8,7 +8,7 @@ import (
 	elevatorFSM "mymodule/elevator"
 	"mymodule/elevator/elevio"
 	"mymodule/network/peers"
-	"mymodule/network/supervisor"
+	"mymodule/network/sheriff"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,43 +23,44 @@ type World struct {
 	Map map[string]elevatorFMS.Elev
 }
 
-var IsSuper bool = false
+var IsSheriff bool = false
 var OnlineElevators = make(map[string]bool)
 
 func PeerConnector(id string, world *World, channels elevatorFMS.Channels) {
 
 	peerUpdateCh := make(chan peers.PeerUpdate)
 	peerTxEnable := make(chan bool)
-	peerUpdateSupervisor := make(chan peers.PeerUpdate)
+
+	peerUpdateSheriff := make(chan peers.PeerUpdate)
 	println("PeerConnector started, transmitting id: ", id)
 	go peers.Transmitter(config.Peer_port, id, peerTxEnable)
 	go peers.Receiver(config.Peer_port, peerUpdateCh)
-	go peerUpdater(peerUpdateCh, world, peerUpdateSupervisor)
+	go peerUpdater(peerUpdateCh, world, peerUpdateSheriff)
 	//on startup wait for connections then check if only one is online
 
-	incomingOrder := make(chan supervisor.Orderstatus, 10)
+	incomingOrder := make(chan sheriff.Orderstatus, 10)
 	//OutgoingOrder := make(chan elevatorFMS.Order)
 
-	sIP := supervisor.GetSupervisorIP()
+	sIP := sheriff.GetSheriffIP()
 	if sIP == "" {
 		fmt.Println("I am the only one")
-		go supervisor.Supervisor(incomingOrder)
+		go sheriff.Sheriff(incomingOrder)
 		go orderForwarder(channels, incomingOrder)
 		go Assigner(incomingOrder, channels.OrderAssigned, world)
-		IsSuper = true
+		IsSheriff = true
 
 	} else {
 		fmt.Println("I am not the only one connecting to SUPE")
-		if supervisor.ConnectToSupervisor(sIP) {
-			fmt.Println("Connected to supervisor")
-			go supervisor.ReceiveOrderFromSupervisor(channels.OrderAssigned)
+		if sheriff.ConnectToSheriff(sIP) {
+			fmt.Println("Connected to Sheriff")
+			go sheriff.ReceiveMessageFromSheriff(channels.OrderAssigned)
 			go orderForwarder(channels, incomingOrder)
 		}
 	}
 
 }
 
-func peerUpdater(peerUpdateCh chan peers.PeerUpdate, world *World, peerUpdateSupervisor chan peers.PeerUpdate) {
+func peerUpdater(peerUpdateCh chan peers.PeerUpdate, world *World, peerUpdateSheriff chan peers.PeerUpdate) {
 	for {
 		select {
 		case p := <-peerUpdateCh:
@@ -71,6 +72,7 @@ func peerUpdater(peerUpdateCh chan peers.PeerUpdate, world *World, peerUpdateSup
 				OnlineElevators[peer] = true
 			}
 			for _, element := range p.Lost {
+				OnlineElevators[element] = false
 				delete(world.Map, element)
 				elevator := world.Map[element]
 				elevator.State = elevatorFMS.Undefined
@@ -82,7 +84,7 @@ func peerUpdater(peerUpdateCh chan peers.PeerUpdate, world *World, peerUpdateSup
 	}
 }
 
-func orderForwarder(channels Channels, incomingOrder chan supervisor.Orderstatus) {
+func orderForwarder(channels Channels, incomingOrder chan sheriff.Orderstatus) {
 	for {
 		select {
 		case order := <-channels.OrderRequest:
@@ -91,18 +93,18 @@ func orderForwarder(channels Channels, incomingOrder chan supervisor.Orderstatus
 				continue
 			}
 			ID := uuid.New().String()
-			orderstat := supervisor.Orderstatus{OrderID: ID, Owner: config.Self_id, Floor: order.Floor, Button: order.Button, Status: false}
-			if IsSuper {
+			orderstat := sheriff.Orderstatus{OrderID: ID, Owner: config.Self_id, Floor: order.Floor, Button: order.Button, Status: false}
+			if IsSheriff {
 				incomingOrder <- orderstat
 			} else {
-				supervisor.SendOrderToSupervisor(orderstat)
+				sheriff.SendOrderToSheriff(orderstat)
 			}
 		}
 	}
 
 }
 
-func Assigner(incomingOrder chan supervisor.Orderstatus, orderAssigned chan elevatorFSM.Order, world *World) {
+func Assigner(incomingOrder chan sheriff.Orderstatus, orderAssigned chan elevatorFSM.Order, world *World) {
 
 	for {
 		select {
@@ -125,7 +127,7 @@ func Assigner(incomingOrder chan supervisor.Orderstatus, orderAssigned chan elev
 				orderAssigned <- Order{Floor: order.Floor, Button: order.Button}
 			} else {
 				fmt.Println("Sending order to elevator with id: ", best_id)
-				go supervisor.SendMessage(best_id, order)
+				go sheriff.SendOrderMessage(best_id, order)
 			}
 
 		}

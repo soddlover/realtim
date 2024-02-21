@@ -8,7 +8,7 @@ const (
 
 const TRAVEL_TIME = 2
 const DOOR_OPEN_TIME = 3
-const Supervisor_port = 20000
+const Sheriff_port = 20000
 const Broadcast_state_port = 16569
 const Peer_port = 15647
 const TCP_port = 16000
