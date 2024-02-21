@@ -137,6 +137,7 @@ func RunElev(channels Channels, initElev Elev) {
 			case EB_DoorOpen:
 				if elevator.Floor == order.Floor {
 					elevator.Queue[order.Floor][order.Button] = false
+
 					doorTimer.Reset(3 * time.Second)
 				}
 			case Undefined:

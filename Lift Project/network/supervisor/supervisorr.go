@@ -154,3 +154,9 @@ func ReceiveMessage(conn net.Conn, incomingOrder chan Orderstatus) (Orderstatus,
 	}
 
 }
+
+func CreateOrderStatusList() {
+	for _, peer := range peers {
+		NodeOrders[peer] = Orderstatus{}
+	}
+}

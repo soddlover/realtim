@@ -11,7 +11,14 @@ import (
 	"time"
 )
 
+type OrderInfo struct {
+	Completed  bool
+	Floor      int
+	ButtonType elevatorFSM.ButtonType //Hvorfor er dette feil?
+}
+
 var superVisorConn net.Conn
+var ordersMap = make(map[string]OrderInfo) // string is used for the order ID, dårlig navn i guess
 
 // ConnectToSupervisor connects to the supervisor and returns the connection
 func ConnectToSupervisor(supervisorIP string) bool {
@@ -102,5 +109,17 @@ func ReceiveOrderFromSupervisor(orderAssigned chan elevatorFSM.Order) (Orderstat
 
 		fmt.Println("Order received from supervisor:", order)
 		orderAssigned <- elevatorFSM.Order{Floor: order.Floor, Button: order.Button} // Send the order to the elevator
+		ordersMap[order.OrderID] = OrderInfo{
+			Completed:  false,
+			Floor:      order.Floor,
+			ButtonType: order.Button,
+		}
+	}
+}
+
+func MarkOrderAsCompleted(orderID string) {
+	if orderInfo, exists := ordersMap[orderID]; exists {
+		orderInfo.Completed = true
+		ordersMap[orderID] = orderInfo
 	}
 }
