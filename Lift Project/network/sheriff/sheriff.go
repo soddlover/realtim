@@ -65,13 +65,14 @@ func listenForConnections(incomingOrder chan Orderstatus) {
 			fmt.Println("Error accepting connection:", err)
 			continue
 		}
+
 		var peerID string
 		if _, ok := Connections[strings.Split(conn.RemoteAddr().String(), ":")[0]+":1"]; ok {
-			Connections[strings.Split(conn.RemoteAddr().String(), ":")[0]+":2"] = conn
 			peerID = strings.Split(conn.RemoteAddr().String(), ":")[0] + ":2"
+			Connections[peerID] = conn
 		} else {
-			Connections[strings.Split(conn.RemoteAddr().String(), ":")[0]+":1"] = conn
 			peerID = strings.Split(conn.RemoteAddr().String(), ":")[0] + ":1"
+			Connections[peerID] = conn
 		}
 
 		fmt.Println("Accepted connection from", conn.RemoteAddr())
