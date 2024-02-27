@@ -5,7 +5,6 @@ import (
 	"mymodule/config"
 	. "mymodule/elevator"
 	elevatorFMS "mymodule/elevator"
-	elevatorFSM "mymodule/elevator"
 	"mymodule/elevator/elevio"
 	"mymodule/network/peers"
 	"mymodule/network/sheriff"
@@ -23,6 +22,7 @@ type World struct {
 	Map map[string]elevatorFMS.Elev
 }
 
+var NetworkOrders = make(map[string]config.Orderstatus)
 var IsSheriff bool = false
 var OnlineElevators = make(map[string]bool)
 
@@ -38,7 +38,7 @@ func PeerConnector(id string, world *World, channels elevatorFMS.Channels) {
 	go peerUpdater(peerUpdateCh, world, peerUpdateSheriff)
 	//on startup wait for connections then check if only one is online
 
-	incomingOrder := make(chan sheriff.Orderstatus, 10)
+	incomingOrder := make(chan config.Orderstatus, 10)
 	//OutgoingOrder := make(chan elevatorFMS.Order)
 
 	sIP := sheriff.GetSheriffIP()
@@ -84,32 +84,45 @@ func peerUpdater(peerUpdateCh chan peers.PeerUpdate, world *World, peerUpdateShe
 	}
 }
 
-func orderForwarder(channels Channels, incomingOrder chan sheriff.Orderstatus) {
+func orderForwarder(channels Channels, incomingOrder chan config.Orderstatus) {
 	for {
 		select {
 		case order := <-channels.OrderRequest:
+
+			ID := uuid.New().String()
+			orderstat := config.Orderstatus{OrderID: ID, Owner: config.Self_id, Floor: order.Floor, Button: order.Button, Status: false}
 			if order.Button == elevio.BT_Cab {
-				channels.OrderAssigned <- order
+				channels.OrderAssigned <- orderstat
 				continue
 			}
-			ID := uuid.New().String()
-			orderstat := sheriff.Orderstatus{OrderID: ID, Owner: config.Self_id, Floor: order.Floor, Button: order.Button, Status: false}
 			if IsSheriff {
 				incomingOrder <- orderstat
 			} else {
 				sheriff.SendOrderToSheriff(orderstat)
 			}
+		case orderstat := <-channels.OrderDelete:
+			if IsSheriff {
+				incomingOrder <- orderstat
+			} else {
+				sheriff.SendOrderToSheriff(orderstat)
+			}
+
 		}
 	}
 
 }
 
-func Assigner(incomingOrder chan sheriff.Orderstatus, orderAssigned chan elevatorFSM.Order, world *World) {
+func Assigner(incomingOrder chan config.Orderstatus, orderAssigned chan config.Orderstatus, world *World) {
 
 	for {
 		select {
 		case order := <-incomingOrder:
 			//channels.OrderAssigned <- order
+			if order.Status {
+				fmt.Println("Order being deletetet")
+				delete(NetworkOrders, order.OrderID)
+				continue
+			}
 			best_id := ""
 			best_duration := 1000000
 			for id, elevator := range world.Map {
@@ -123,8 +136,10 @@ func Assigner(incomingOrder chan sheriff.Orderstatus, orderAssigned chan elevato
 				}
 			}
 			fmt.Println("Assigning order to elevator with id: ", best_id)
+			order.Owner = best_id
+			NetworkOrders[order.OrderID] = order
 			if best_id == config.Self_id {
-				orderAssigned <- Order{Floor: order.Floor, Button: order.Button}
+				orderAssigned <- order
 			} else {
 				fmt.Println("Sending order to elevator with id: ", best_id)
 				go sheriff.SendOrderMessage(best_id, order)

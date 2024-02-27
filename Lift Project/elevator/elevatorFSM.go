@@ -16,7 +16,8 @@ type Channels struct {
 	ElevatorStatesBroadcast chan Elev
 	OrderRequest            chan Order
 	OrderComplete           chan Order
-	OrderAssigned           chan Order
+	OrderAssigned           chan config.Orderstatus
+	OrderDelete             chan config.Orderstatus
 }
 
 const (
@@ -97,6 +98,8 @@ func RunElev(channels Channels, initElev Elev) {
 	drv_floors := make(chan int, 10)
 	drv_obstr := make(chan bool, 10)
 	drv_stop := make(chan bool, 10)
+	ordersToQueue := make(chan Order, 10)
+	go saveLocalOrder(channels, ordersToQueue)
 
 	go elevio.PollButtons(drv_buttons)
 	go elevio.PollFloorSensor(drv_floors)
@@ -117,7 +120,7 @@ func RunElev(channels Channels, initElev Elev) {
 			//elevator.Queue[buttonEvent.Floor][buttonEvent.Button] = true
 			//elevio.SetButtonLamp(buttonEvent.Button, buttonEvent.Floor, true)
 
-		case order := <-channels.OrderAssigned:
+		case order := <-ordersToQueue:
 			fmt.Println("Order assigned: ", order)
 			elevator.Queue[order.Floor][order.Button] = true
 			switch elevator.State {
@@ -129,6 +132,8 @@ func RunElev(channels Channels, initElev Elev) {
 					doorTimer.Reset(3 * time.Second)
 					elevio.SetDoorOpenLamp(true)
 					elevator.Queue[elevator.Floor] = [N_BUTTONS]bool{}
+					channels.OrderComplete <- Order{elevator.Floor, elevio.BT_HallUp}
+					channels.OrderComplete <- Order{elevator.Floor, elevio.BT_HallDown}
 				} else {
 					elevator.State = EB_Moving
 					motorErrorTimer.Reset(3 * time.Second)
@@ -137,6 +142,7 @@ func RunElev(channels Channels, initElev Elev) {
 			case EB_DoorOpen:
 				if elevator.Floor == order.Floor {
 					elevator.Queue[order.Floor][order.Button] = false
+					channels.OrderComplete <- order
 					doorTimer.Reset(3 * time.Second)
 				}
 			case Undefined:
@@ -161,15 +167,20 @@ func RunElev(channels Channels, initElev Elev) {
 				elevio.SetDoorOpenLamp(true)
 				doorTimer.Reset(3 * time.Second)
 				//clear only orders in correct direction
+				//maybe put this in a function
 				if elevator.Dir == DirUp {
 					elevator.Queue[elevator.Floor][elevio.BT_HallUp] = false
+					channels.OrderComplete <- Order{elevator.Floor, elevio.BT_HallUp}
 					if !OrdersAbove(elevator) {
 						elevator.Queue[elevator.Floor][elevio.BT_HallDown] = false
+						channels.OrderComplete <- Order{elevator.Floor, elevio.BT_HallDown}
 					}
 				} else if elevator.Dir == DirDown {
 					elevator.Queue[elevator.Floor][elevio.BT_HallDown] = false
+					channels.OrderComplete <- Order{elevator.Floor, elevio.BT_HallDown}
 					if !OrdersBelow(elevator) {
 						elevator.Queue[elevator.Floor][elevio.BT_HallUp] = false
+						channels.OrderComplete <- Order{elevator.Floor, elevio.BT_HallUp}
 					}
 				}
 				elevator.Dir = DirStop
@@ -237,4 +248,35 @@ func printElevator(elevator *Elev) {
 		fmt.Println("Floor:", elevator.Floor)
 		fmt.Println("State:", elevatorStateToString(elevator.State))
 	}
+}
+
+func saveLocalOrder(channels Channels, OrdersToQueoe chan Order) {
+	var localOrders [N_FLOORS][N_BUTTONS][]Orderstatus
+	for {
+		select {
+		case order := <-channels.OrderAssigned:
+			//save order to local queue
+			if order.Button == elevio.BT_Cab {
+				OrdersToQueoe <- Order{order.Floor, order.Button}
+				continue
+			}
+			fmt.Println("Order added to me: ")
+			localOrders[order.Floor][order.Button] = append(localOrders[order.Floor][order.Button], order)
+			OrdersToQueoe <- Order{order.Floor, order.Button}
+
+		case order := <-channels.OrderComplete:
+			fmt.Println("Order completed removing from local list")
+			completedOrderList := localOrders[order.Floor][order.Button]
+			//find order in queue based on floor and button
+			localOrders[order.Floor][order.Button] = []Orderstatus{}
+			for _, order := range completedOrderList {
+				order.Status = true
+				fmt.Println("Order completed deletet from list and sent to sherr or myself: ")
+
+				//what if sherriff disconnect while sending this?=?!
+				channels.OrderDelete <- order
+			}
+		}
+	}
+
 }
