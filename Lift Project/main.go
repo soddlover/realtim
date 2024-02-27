@@ -49,7 +49,8 @@ func main() {
 		ElevatorStatesBroadcast: make(chan Elev, 10),
 		OrderRequest:            make(chan Order, 10),
 		OrderComplete:           make(chan Order, 10),
-		OrderAssigned:           make(chan Order, 10),
+		OrderAssigned:           make(chan Orderstatus, 10),
+		OrderDelete:             make(chan Orderstatus, 10),
 	}
 
 	//fmt.Print("Hello, World!")

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"mymodule/config"
-	elevatorFSM "mymodule/elevator"
+	elev "mymodule/elevator"
 	"mymodule/network/conn"
 	"net"
 	"time"
@@ -41,8 +41,9 @@ func GetSheriffIP() string {
 }
 
 // SendOrderToSheriff sends an order to the sheriff and waits for an acknowledgement
-func SendOrderToSheriff(order Orderstatus) (bool, error) {
+func SendOrderToSheriff(order elev.Orderstatus) (bool, error) {
 	// Convert the order to JSON
+
 	orderJSON, err := json.Marshal(order)
 	if err != nil {
 		fmt.Println("Error marshalling order:", err)
@@ -76,7 +77,7 @@ func SendOrderToSheriff(order Orderstatus) (bool, error) {
 }
 
 // ReceiveMessageFromsheriff receives an order from the sheriff and sends an acknowledgement
-func ReceiveMessageFromSheriff(orderAssigned chan elevatorFSM.Order) (Orderstatus, error) {
+func ReceiveMessageFromSheriff(orderAssigned chan elev.Orderstatus) (elev.Orderstatus, error) {
 	for {
 		reader := bufio.NewReader(sheriffConn)
 		message, err := reader.ReadString('\n')
@@ -96,7 +97,7 @@ func ReceiveMessageFromSheriff(orderAssigned chan elevatorFSM.Order) (Orderstatu
 
 		switch msg.Type {
 		case "order":
-			var order Orderstatus
+			var order elev.Orderstatus
 			err = json.Unmarshal(msg.Data, &order)
 			if err != nil {
 				fmt.Println("Error parsing order:", err)
@@ -104,10 +105,10 @@ func ReceiveMessageFromSheriff(orderAssigned chan elevatorFSM.Order) (Orderstatu
 			}
 
 			fmt.Println("Order received from sheriff:", order)
-			orderAssigned <- elevatorFSM.Order{Floor: order.Floor, Button: order.Button} // Send the order to the elevator
+			orderAssigned <- order // Send the order to the elevator
 
 		case "deputyMessage":
-			var deputyNodeOrders map[string]Orderstatus
+			var deputyNodeOrders map[string]elev.Orderstatus
 			err = json.Unmarshal(msg.Data, &deputyNodeOrders)
 			if err != nil {
 				fmt.Println("Error parsing deputy message:", err)

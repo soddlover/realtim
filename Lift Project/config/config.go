@@ -17,3 +17,5 @@ type Button int
 
 var Self_id string = ""
 var Self_nr string = "0"
+
+//this really should not be here right?
