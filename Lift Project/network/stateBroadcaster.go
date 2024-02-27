@@ -1,7 +1,6 @@
 package network
 
 import (
-	"fmt"
 	"mymodule/config"
 	. "mymodule/elevator"
 	"mymodule/network/bcast"
@@ -35,7 +34,7 @@ func updateBroadcastworld(bcastWorld BroadcastWorld, world *World, broadcastStat
 				//might be unnecicary if implemented by peer functionality.
 				bcastWorld.Map[bcastState.Id] = bcastState
 				world.Map[bcastState.Id] = bcastState.ElevState
-				fmt.Println("Added new element to map.")
+				//fmt.Println("Added new element to map.")
 			}
 		}
 	}
