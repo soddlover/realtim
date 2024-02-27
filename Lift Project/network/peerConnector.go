@@ -44,7 +44,7 @@ func PeerConnector(id string, world *World, channels elev.Channels) {
 	sIP := sheriff.GetSheriffIP()
 	if sIP == "" {
 		fmt.Println("I am the only one")
-		go sheriff.Sheriff(incomingOrder)
+		go sheriff.Sheriff(incomingOrder, NetworkOrders)
 		go orderForwarder(channels, incomingOrder)
 		go Assigner(incomingOrder, channels.OrderAssigned, world)
 		IsSheriff = true

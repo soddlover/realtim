@@ -17,20 +17,19 @@ type Message struct {
 	Data json.RawMessage `json:"data"`
 }
 
-var NodeOrders = make(map[string]elev.Orderstatus)
 var Connections = make(map[string]net.Conn)
 var DeputyIDChan = make(chan string)
 var DeputyUpdateChan = make(chan bool)
 
-func Sheriff(incomingOrder chan elev.Orderstatus) {
+func Sheriff(incomingOrder chan elev.Orderstatus, networkOrders map[string]elev.Orderstatus) {
 	ipID := strings.Split(string(config.Self_id), ":")
 	go peers.Transmitter(config.Sheriff_port, ipID[0], make(chan bool)) //channel for turning off sheriff transmitt?
 	//go peers.Receiver(15647, peerUpdateCh)
-	go deputyUpdater()
+	go deputyUpdater(networkOrders)
 	go listenForConnections(incomingOrder)
 }
 
-func deputyUpdater() {
+func deputyUpdater(networkOrders map[string]elev.Orderstatus) {
 	var deputyID string
 	for {
 		select {
@@ -40,7 +39,7 @@ func deputyUpdater() {
 				deputyID = ChooseNewDeputy()
 			}
 			//send all orders to deputy
-			SendDeputyMessage(deputyID, NodeOrders)
+			SendDeputyMessage(deputyID, networkOrders)
 		}
 	}
 }
@@ -209,8 +208,9 @@ func ReceiveMessage(conn net.Conn, incomingOrder chan elev.Orderstatus, peerID s
 
 				conn.Close()
 				DeputyUpdateChan <- true
-				return elev.Orderstatus{}, nil
 				delete(Connections, peerID)
+				return elev.Orderstatus{}, nil
+
 			} else {
 				fmt.Println("Error reading from connection:", err)
 			}
@@ -231,7 +231,7 @@ func ReceiveMessage(conn net.Conn, incomingOrder chan elev.Orderstatus, peerID s
 		// 	fmt.Println("Error sending acknowledgement:", err)
 		// 	continue
 		// }
-		NodeOrders[order.Owner] = order
+
 		fmt.Println("Received order from", peerID)
 
 		DeputyUpdateChan <- true
