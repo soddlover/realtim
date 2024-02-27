@@ -80,7 +80,7 @@ func ReceiveMessageFromSheriff(orderAssigned chan elevatorFSM.Order) (Orderstatu
 	for {
 		reader := bufio.NewReader(sheriffConn)
 		message, err := reader.ReadString('\n')
-		fmt.Println("Received message from sheriff:", message)
+		//fmt.Println("Received message from sheriff:", message)
 		if err != nil {
 			fmt.Println("Error reading from sheriff:", err)
 			time.Sleep(5 * time.Second)
@@ -114,7 +114,7 @@ func ReceiveMessageFromSheriff(orderAssigned chan elevatorFSM.Order) (Orderstatu
 				continue
 			}
 			// Handle deputy message...
-			fmt.Println("Received deputy message from sheriff:", deputyNodeOrders)
+			fmt.Println("Received deputy message from sheriff")
 
 		default:
 			fmt.Println("Unknown message type:", msg.Type)
