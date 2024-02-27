@@ -16,8 +16,16 @@ type Channels struct {
 	ElevatorStatesBroadcast chan Elev
 	OrderRequest            chan Order
 	OrderComplete           chan Order
-	OrderAssigned           chan config.Orderstatus
-	OrderDelete             chan config.Orderstatus
+	OrderAssigned           chan Orderstatus
+	OrderDelete             chan Orderstatus
+}
+
+type Orderstatus struct {
+	Owner   string
+	OrderID string
+	Floor   int
+	Button  elevio.ButtonType
+	Status  bool
 }
 
 const (

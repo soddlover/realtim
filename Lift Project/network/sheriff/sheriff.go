@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"mymodule/config"
+	elev "mymodule/elevator"
 	"mymodule/network/peers"
 	"net"
 	"strconv"
@@ -16,12 +17,12 @@ type Message struct {
 	Data json.RawMessage `json:"data"`
 }
 
-var NodeOrders = make(map[string]config.Orderstatus)
+var NodeOrders = make(map[string]elev.Orderstatus)
 var Connections = make(map[string]net.Conn)
 var DeputyID = ""
 var DeputyUpdateChan = make(chan bool)
 
-func Sheriff(incomingOrder chan config.Orderstatus) {
+func Sheriff(incomingOrder chan elev.Orderstatus) {
 	ipID := strings.Split(string(config.Self_id), ":")
 	go peers.Transmitter(config.Sheriff_port, ipID[0], make(chan bool)) //channel for turning off sheriff transmitt?
 	//go peers.Receiver(15647, peerUpdateCh)
@@ -47,7 +48,7 @@ func deputyUpdater() {
 	}
 }
 
-func listenForConnections(incomingOrder chan config.Orderstatus) {
+func listenForConnections(incomingOrder chan elev.Orderstatus) {
 	ln, err := net.Listen("tcp", ":"+strconv.Itoa(config.TCP_port))
 	if err != nil {
 		fmt.Println("Error listening for connections:", err)
@@ -105,7 +106,7 @@ func listenForConnections(incomingOrder chan config.Orderstatus) {
 // 	}
 // }
 
-func SendOrderMessage(peer string, order config.Orderstatus) (bool, error) {
+func SendOrderMessage(peer string, order elev.Orderstatus) (bool, error) {
 	//ip := strings.Split(peer, ":")[0]
 	fmt.Println("Connections:", Connections)
 	fmt.Println("Peer:", peer)
@@ -156,7 +157,7 @@ func SendOrderMessage(peer string, order config.Orderstatus) (bool, error) {
 	return true, nil
 }
 
-func SendDeputyMessage(peer string, nodeOrders map[string]config.Orderstatus) (bool, error) {
+func SendDeputyMessage(peer string, nodeOrders map[string]elev.Orderstatus) (bool, error) {
 
 	conn, ok := Connections[peer]
 
@@ -195,7 +196,7 @@ func SendDeputyMessage(peer string, nodeOrders map[string]config.Orderstatus) (b
 
 }
 
-func ReceiveMessage(conn net.Conn, incomingOrder chan config.Orderstatus) (config.Orderstatus, error) {
+func ReceiveMessage(conn net.Conn, incomingOrder chan elev.Orderstatus) (elev.Orderstatus, error) {
 	for {
 		reader := bufio.NewReader(conn)
 		message, err := reader.ReadString('\n')
@@ -212,15 +213,15 @@ func ReceiveMessage(conn net.Conn, incomingOrder chan config.Orderstatus) (confi
 
 				conn.Close()
 				delete(Connections, conn.RemoteAddr().String())
-				return config.Orderstatus{}, nil
+				return elev.Orderstatus{}, nil
 			} else {
 				fmt.Println("Error reading from connection:", err)
 			}
 			continue
 		}
 
-		// Convert the message from JSON to config.Orderstatus
-		var order config.Orderstatus
+		// Convert the message from JSON to elev.Orderstatus
+		var order elev.Orderstatus
 		err = json.Unmarshal([]byte(message), &order)
 		if err != nil {
 			fmt.Println("Error unmarshalling order:", err)

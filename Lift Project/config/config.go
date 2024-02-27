@@ -1,9 +1,5 @@
 package config
 
-import (
-	elevio "mymodule/elevator/elevio"
-)
-
 const (
 	N_FLOORS    = 4
 	N_ELEVATORS = 1
@@ -21,13 +17,5 @@ type Button int
 
 var Self_id string = ""
 var Self_nr string = "0"
-
-type Orderstatus struct {
-	Owner   string
-	OrderID string
-	Floor   int
-	Button  elevio.ButtonType
-	Status  bool
-}
 
 //this really should not be here right?
