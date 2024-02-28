@@ -23,7 +23,11 @@ func updateBroadcastworld(bcastWorld BroadcastWorld, world *World, broadcastStat
 		select {
 		case bcastState := <-broadcastStateRx:
 			// elev := bcastState.ElevState
+			if _, ok := world.Map[bcastState.Id]; !ok {
+				delete(bcastWorld.Map, bcastState.Id)
+			}
 			if _, ok := bcastWorld.Map[bcastState.Id]; ok {
+
 				if bcastState.SequenceNumber > bcastWorld.Map[bcastState.Id].SequenceNumber {
 					bcastWorld.Map[bcastState.Id] = bcastState
 					world.Map[bcastState.Id] = bcastState.ElevState
