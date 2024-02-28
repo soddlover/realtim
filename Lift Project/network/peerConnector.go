@@ -5,6 +5,7 @@ import (
 	"mymodule/config"
 	. "mymodule/elevator"
 	elev "mymodule/elevator"
+	elevatorFSM "mymodule/elevator"
 	"mymodule/elevator/elevio"
 	"mymodule/network/peers"
 	"mymodule/network/sheriff"
@@ -44,9 +45,13 @@ func PeerConnector(id string, world *World, channels elev.Channels) {
 	sIP := sheriff.GetSheriffIP()
 	if sIP == "" {
 		fmt.Println("I am the only one")
-		go sheriff.Sheriff(incomingOrder, NetworkOrders)
+
+		nodeLeftNetwork := make(chan string)
+
+		go sheriff.Sheriff(incomingOrder, NetworkOrders, nodeLeftNetwork)
 		go orderForwarder(channels, incomingOrder)
 		go Assigner(incomingOrder, channels.OrderAssigned, world)
+		go redistributer(nodeLeftNetwork, incomingOrder, world)
 		IsSheriff = true
 
 	} else {
@@ -68,20 +73,41 @@ func peerUpdater(peerUpdateCh chan peers.PeerUpdate, world *World, peerUpdateShe
 			fmt.Printf("  Peers:    %q\n", p.Peers)
 			fmt.Printf("  New:      %q\n", p.New)
 			fmt.Printf("  Lost:     %q\n", p.Lost)
-			for _, peer := range p.Peers {
-				OnlineElevators[peer] = true
-			}
-			for _, element := range p.Lost {
-				OnlineElevators[element] = false
-				delete(world.Map, element)
-				elevator := world.Map[element]
-				elevator.State = elev.Undefined
-				world.Map[element] = elevator
-				print("element was set as unavailable")
-			}
+			// for _, peer := range p.Peers {
+			// 	OnlineElevators[peer] = true
+			// }
+			// for _, element := range p.Lost {
+			// 	//OnlineElevators[element] = false
+			// 	//delete(world.Map, element)
+			// 	//elevator := world.Map[element]
+			// 	//elevator.State = elev.Undefined
+			// 	//world.Map[element] = elevator
+			// 	//print("element was set as unavailable")
+			// }
 
 		}
 	}
+}
+
+func redistributer(nodeLeftNetwork chan string, incomingOrder chan elevatorFSM.Orderstatus, world *World) {
+	for {
+		select {
+		case peerid := <-nodeLeftNetwork:
+			delete(world.Map, peerid)
+			fmt.Println("Node left network, redistributing orders")
+			//check for orders owned by the leaving node
+			for _, order := range NetworkOrders {
+				if order.Owner == peerid {
+					//send to assigner for reassignment
+					if order.Status {
+						fmt.Println("Something is horribly wrong if you read this")
+					}
+					incomingOrder <- order
+				}
+			}
+		}
+	}
+
 }
 
 func orderForwarder(channels Channels, incomingOrder chan elev.Orderstatus) {

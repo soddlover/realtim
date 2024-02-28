@@ -21,12 +21,12 @@ var Connections = make(map[string]net.Conn)
 var DeputyIDChan = make(chan string)
 var DeputyUpdateChan = make(chan bool)
 
-func Sheriff(incomingOrder chan elev.Orderstatus, networkOrders map[string]elev.Orderstatus) {
+func Sheriff(incomingOrder chan elev.Orderstatus, networkOrders map[string]elev.Orderstatus, nodeLeftNetwork chan string) {
 	ipID := strings.Split(string(config.Self_id), ":")
 	go peers.Transmitter(config.Sheriff_port, ipID[0], make(chan bool)) //channel for turning off sheriff transmitt?
 	//go peers.Receiver(15647, peerUpdateCh)
 	go deputyUpdater(networkOrders)
-	go listenForConnections(incomingOrder)
+	go listenForConnections(incomingOrder, nodeLeftNetwork)
 }
 
 func deputyUpdater(networkOrders map[string]elev.Orderstatus) {
@@ -44,7 +44,7 @@ func deputyUpdater(networkOrders map[string]elev.Orderstatus) {
 	}
 }
 
-func listenForConnections(incomingOrder chan elev.Orderstatus) {
+func listenForConnections(incomingOrder chan elev.Orderstatus, nodeLeftNetwork chan string) {
 	ln, err := net.Listen("tcp", ":"+strconv.Itoa(config.TCP_port))
 	if err != nil {
 		fmt.Println("Error listening for connections:", err)
@@ -67,8 +67,8 @@ func listenForConnections(incomingOrder chan elev.Orderstatus) {
 		}
 
 		fmt.Println("Accepted connection from", conn.RemoteAddr())
-		DeputyUpdateChan <- true
-		go ReceiveMessage(conn, incomingOrder, peerID)
+		//DeputyUpdateChan <- true
+		go ReceiveMessage(conn, incomingOrder, peerID, nodeLeftNetwork)
 
 	}
 }
@@ -197,7 +197,7 @@ func SendDeputyMessage(peer string, nodeOrders map[string]elev.Orderstatus) (boo
 
 }
 
-func ReceiveMessage(conn net.Conn, incomingOrder chan elev.Orderstatus, peerID string) (elev.Orderstatus, error) {
+func ReceiveMessage(conn net.Conn, incomingOrder chan elev.Orderstatus, peerID string, nodeLeftNetwork chan string) (elev.Orderstatus, error) {
 	for {
 		reader := bufio.NewReader(conn)
 		message, err := reader.ReadString('\n')
@@ -207,7 +207,8 @@ func ReceiveMessage(conn net.Conn, incomingOrder chan elev.Orderstatus, peerID s
 				fmt.Println("Connection closed by", peerID)
 
 				conn.Close()
-				DeputyUpdateChan <- true
+				//DeputyUpdateChan <- true
+				nodeLeftNetwork <- peerID
 				delete(Connections, peerID)
 				return elev.Orderstatus{}, nil
 
@@ -234,11 +235,9 @@ func ReceiveMessage(conn net.Conn, incomingOrder chan elev.Orderstatus, peerID s
 
 		fmt.Println("Received order from", peerID)
 
-		DeputyUpdateChan <- true
+		//DeputyUpdateChan <- true
 
-		if order.Status == false {
-			incomingOrder <- order
-		}
+		incomingOrder <- order
 
 	}
 
