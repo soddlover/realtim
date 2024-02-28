@@ -149,10 +149,13 @@ func Assigner(incomingOrder chan elev.Orderstatus, orderAssigned chan elev.Order
 				delete(NetworkOrders, order.OrderID)
 				continue
 			}
-			best_id := ""
+			best_id := config.Self_id
 			best_duration := 1000000
 			for id, elevator := range world.Map {
-				if elevator.State == Undefined {
+				if elevator.Obstr {
+					fmt.Println("Elevator with id: ", id, " is obstructed")
+				}
+				if elevator.State == Undefined || elevator.Obstr {
 					continue
 				}
 				duration := timeToServeRequestWithTimeout(elevator, order.Button, order.Floor)

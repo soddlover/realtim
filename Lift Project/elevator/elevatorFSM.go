@@ -74,6 +74,7 @@ type Elev struct {
 	Dir   ElevatorDirection
 	Floor int
 	Queue [N_FLOORS][N_BUTTONS]bool
+	Obstr bool
 }
 
 type Order struct {
@@ -94,6 +95,7 @@ func RunElev(channels Channels, initElev Elev) {
 			Dir:   DirStop,
 			Floor: elevio.GetFloor(),
 			Queue: [N_FLOORS][N_BUTTONS]bool{},
+			Obstr: false,
 		}
 	}
 
@@ -205,6 +207,14 @@ func RunElev(channels Channels, initElev Elev) {
 			channels.ElevatorStatesBroadcast <- elevator
 
 		case <-doorTimer.C:
+			if elevio.GetObstruction() {
+				doorTimer.Reset(3 * time.Second)
+				elevator.Obstr = true
+				fmt.Println("Obstruction detected")
+				channels.ElevatorStates <- elevator
+				channels.ElevatorStatesBroadcast <- elevator
+				continue
+			}
 			elevio.SetDoorOpenLamp(false)
 			elevator.Dir = ChooseDirection(elevator)
 			if elevator.Dir == DirStop {
@@ -231,7 +241,15 @@ func RunElev(channels Channels, initElev Elev) {
 			elevator.State = EB_Idle
 			channels.ElevatorStates <- elevator
 			channels.ElevatorStatesBroadcast <- elevator
-			//fullfør cab ordre
+		//fullfør cab ordre
+		case obstruction := <-drv_obstr:
+			if !obstruction && elevator.Obstr {
+				doorTimer.Reset(3 * time.Second)
+				elevator.Obstr = false
+				channels.ElevatorStates <- elevator
+				channels.ElevatorStatesBroadcast <- elevator
+			}
+
 		}
 
 	}
