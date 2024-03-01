@@ -46,7 +46,7 @@ func sheriffHandler() {
 
 		case <-sheriffDisconnected:
 			fmt.Println("Sheriff disconnected")
-			becomeSheriff(deputyNodeOrders)
+			becomeSheriff(deputyNodeOrders) // How to become sheriff?
 
 		}
 	}
@@ -95,5 +95,5 @@ func becomeSheriff(deputyNodeOrders map[string]elev.Orderstatus) {
 	//Dont know how right now
 	fmt.Println("Theres a new sheriff in town, I killed the old one")
 	fmt.Println("but I dont know how to become the sheriff yet.....")
-	DeputyBecomeSheriff <- deputyNodeOrders
+	DeputyBecomeSheriff <- deputyNodeOrders // Not sure if this is the right way to do it
 }

@@ -13,6 +13,8 @@ import (
 	"time"
 )
 
+const DEPUTY_SEND_FREQ = 3 * time.Second
+
 type Message struct {
 	Type string          `json:"type"`
 	Data json.RawMessage `json:"data"`
@@ -20,13 +22,8 @@ type Message struct {
 
 var WranglerConnections = make(map[string]net.Conn)
 
-// var DeputyIDChan = make(chan string)
-// var DeputyUpdateChan = make(chan bool)
 var NewDeputyConnChan = make(chan net.TCPConn)
 var DeputyDisconnectChan = make(chan net.TCPConn)
-var NewWranglerConnChan = make(chan net.Conn)
-
-const DEPUTY_SEND_FREQ = 3 * time.Second
 
 func Sheriff(incomingOrder chan elev.Orderstatus, networkOrders map[string]elev.Orderstatus) {
 	ipID := strings.Split(string(config.Self_id), ":")
@@ -35,33 +32,7 @@ func Sheriff(incomingOrder chan elev.Orderstatus, networkOrders map[string]elev.
 	//go deputyUpdater(networkOrders)
 	go deputyHandeler(networkOrders)
 	go listenForWranglerConnections(incomingOrder)
-	//go listenForDeputyConnection()
-
 }
-
-// func deputyUpdater(networkOrders map[string]elev.Orderstatus) {
-// 	var deputyID string
-// 	ticker := time.NewTicker(7 * time.Second)
-// 	defer ticker.Stop()
-
-// 	for {
-// 		select {
-
-// 		case newDeputyConn := <-NewDeputyConnChan:
-
-// 		case <-DeputyUpdateChan:
-// 			//check if deputy is in the list of connections
-// 			if _, ok := Connections[deputyID]; !ok {
-// 				deputyID = ChooseNewDeputy()
-// 			}
-// 			//send all orders to deputy
-// 			SendDeputyMessage(deputyID, networkOrders)
-// 		case <-ticker.C:
-// 			//send all orders to deputy every 7 seconds
-// 			SendDeputyMessage(deputyID, networkOrders)
-// 		}
-// 	}
-// }
 
 func deputyHandeler(nodeOrders map[string]elev.Orderstatus) {
 	var deputyConn net.TCPConn
@@ -69,8 +40,6 @@ func deputyHandeler(nodeOrders map[string]elev.Orderstatus) {
 	ticker = time.NewTicker(DEPUTY_SEND_FREQ)
 	ticker.Stop()
 	tickerRunning := false
-
-	//deputyConn = <-NewDeputyConnChan
 
 	for {
 		select {
@@ -100,7 +69,7 @@ func deputyHandeler(nodeOrders map[string]elev.Orderstatus) {
 }
 
 func initFirstDeputy(wranglerConn net.Conn) {
-	sendRequestToBecomeDeputy(wranglerConn)
+	go sendRequestToBecomeDeputy(wranglerConn)
 	go listenForDeputyConnection()
 }
 
@@ -152,10 +121,7 @@ func listenForWranglerConnections(incomingOrder chan elev.Orderstatus) {
 		}
 
 		fmt.Println("Accepted Wrangler", conn.RemoteAddr())
-		// DeputyUpdateChan <- true
 		go ReceiveMessage(conn, incomingOrder, peerID)
-
-		//NewWranglerConnChan <- conn
 
 		if len(WranglerConnections) == 1 {
 			go initFirstDeputy(conn)
@@ -238,7 +204,8 @@ func SendOrderMessage(peer string, order elev.Orderstatus) (bool, error) {
 	conn, ok := WranglerConnections[peer]
 
 	if !ok {
-		fmt.Println("No connection to peer", peer)
+		fmt.Println("No connection to ", peer)
+
 		return false, fmt.Errorf("no connection to peer %s", peer)
 	}
 
@@ -264,6 +231,8 @@ func SendOrderMessage(peer string, order elev.Orderstatus) (bool, error) {
 	_, err = fmt.Fprintln(conn, string(msgJSON))
 	if err != nil {
 		fmt.Println("Error sending order:", err)
+		conn.Close()
+		delete(WranglerConnections, peer)
 		return false, err
 	}
 
@@ -376,9 +345,5 @@ func ChooseNewDeputy() (net.Conn, error) {
 		fmt.Println("The new deputy is:", k)
 		return WranglerConnections[k], nil
 	}
-	fmt.Println("No wrangler connections!!!!")
-
-	err := fmt.Errorf("no wrangler connections")
-	fmt.Println(err)
-	return nil, err
+	return nil, fmt.Errorf("no wrangler connections")
 }
