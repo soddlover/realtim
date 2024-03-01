@@ -43,16 +43,16 @@ func PeerConnector(id string, world *World, channels elev.Channels) {
 
 	sIP := sheriff.GetSheriffIP()
 	if sIP == "" {
-		fmt.Println("I am the only one")
+		fmt.Println("I am the only Wrangler in town, I am the Sheriff!")
 		go sheriff.Sheriff(incomingOrder, NetworkOrders)
 		go orderForwarder(channels, incomingOrder)
 		go Assigner(incomingOrder, channels.OrderAssigned, world)
 		IsSheriff = true
 
 	} else {
-		fmt.Println("I am not the only one connecting to SUPE")
-		if sheriff.ConnectToSheriff(sIP) {
-			fmt.Println("Connected to Sheriff")
+		fmt.Println("I am not the only Wrangler in town, connecting to Sheriff:")
+		if sheriff.ConnectWranglerToSheriff(sIP) {
+			fmt.Println("Me, a Wrangler connected to Sheriff")
 			go sheriff.ReceiveMessageFromSheriff(channels.OrderAssigned)
 			go orderForwarder(channels, incomingOrder)
 		}
@@ -77,9 +77,8 @@ func peerUpdater(peerUpdateCh chan peers.PeerUpdate, world *World, peerUpdateShe
 				elevator := world.Map[element]
 				elevator.State = elev.Undefined
 				world.Map[element] = elevator
-				print("element was set as unavailable")
+				fmt.Println("element was set as unavailable")
 			}
-
 		}
 	}
 }
