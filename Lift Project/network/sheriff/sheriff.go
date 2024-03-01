@@ -49,8 +49,8 @@ func deputyHandeler(nodeOrders map[string]elev.Orderstatus) {
 				tickerRunning = false
 			}
 			if len(WranglerConnections) != 0 {
-				wranglerConn, _ := ChooseNewDeputy()
-				go initFirstDeputy(wranglerConn)
+				wranglerConn, peer, _ := ChooseNewDeputy()
+				go initFirstDeputy(wranglerConn, peer)
 			} else {
 				fmt.Println("No wrangler connections")
 			}
@@ -68,12 +68,12 @@ func deputyHandeler(nodeOrders map[string]elev.Orderstatus) {
 	}
 }
 
-func initFirstDeputy(wranglerConn net.Conn) {
-	go sendRequestToBecomeDeputy(wranglerConn)
+func initFirstDeputy(wranglerConn net.Conn, peer string) {
+	go sendRequestToBecomeDeputy(wranglerConn, peer)
 	go listenForDeputyConnection()
 }
 
-func sendRequestToBecomeDeputy(wranglerConn net.Conn) {
+func sendRequestToBecomeDeputy(wranglerConn net.Conn, peer string) {
 
 	msg := Message{
 		Type: "requestToBecomeDeputy",
@@ -87,11 +87,12 @@ func sendRequestToBecomeDeputy(wranglerConn net.Conn) {
 	}
 
 	_, err = fmt.Fprintln(wranglerConn, string(msgJSON))
-	// if err != nil {
-	// 	fmt.Println("Error sending node orders to deputy, he might be dead:", err)
-
-	// 	return false, err
-	// }
+	if err != nil {
+		fmt.Println("Error sending request to wrangler to become deputy, he might be dead:", err)
+		wranglerConn.Close()
+		delete(WranglerConnections, peer)
+		return
+	}
 
 	fmt.Println("Sent request to wrangler to become deputy")
 	// return true, nil
@@ -124,7 +125,7 @@ func listenForWranglerConnections(incomingOrder chan elev.Orderstatus) {
 		go ReceiveMessage(conn, incomingOrder, peerID)
 
 		if len(WranglerConnections) == 1 {
-			go initFirstDeputy(conn)
+			go initFirstDeputy(conn, peerID)
 		}
 	}
 }
@@ -235,18 +236,6 @@ func SendOrderMessage(peer string, order elev.Orderstatus) (bool, error) {
 		delete(WranglerConnections, peer)
 		return false, err
 	}
-
-	// // Wait for an acknowledgement
-	// reader := bufio.NewReader(conn)
-	// acknowledgement, err := reader.ReadString('\n')
-	// if err != nil {
-	// 	return false, err
-	// }
-
-	// // Check the acknowledgement
-	// if strings.TrimSpace(acknowledgement) != "ACK" {
-	// 	return false, fmt.Errorf("unexpected acknowledgement: %s", acknowledgement)
-	// }
 	fmt.Println("successs Sent order to", peer, "order:", order)
 	return true, nil
 }
@@ -322,13 +311,6 @@ func ReceiveMessage(conn net.Conn, incomingOrder chan elev.Orderstatus, peerID s
 			continue
 		}
 
-		// // Send an acknowledgement
-		// _, err = fmt.Fprintln(conn, "ACK")
-		// if err != nil {
-		// 	fmt.Println("Error sending acknowledgement:", err)
-		// 	continue
-		// }
-
 		fmt.Println("Received order from", peerID)
 
 		//DeputyUpdateChan <- true
@@ -339,11 +321,11 @@ func ReceiveMessage(conn net.Conn, incomingOrder chan elev.Orderstatus, peerID s
 	}
 }
 
-func ChooseNewDeputy() (net.Conn, error) {
+func ChooseNewDeputy() (net.Conn, string, error) {
 	//fmt.Println("Choosing new deputy")
 	for k := range WranglerConnections {
 		fmt.Println("The new deputy is:", k)
-		return WranglerConnections[k], nil
+		return WranglerConnections[k], k, nil
 	}
-	return nil, fmt.Errorf("no wrangler connections")
+	return nil, "", fmt.Errorf("no wrangler connections")
 }
