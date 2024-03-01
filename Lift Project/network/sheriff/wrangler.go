@@ -59,7 +59,6 @@ func SendOrderToSheriff(order elev.Orderstatus) (bool, error) {
 	return true, nil
 }
 
-// ReceiveMessageFromsheriff receives an order from the sheriff and sends an acknowledgement
 func ReceiveMessageFromSheriff(orderAssigned chan elev.Orderstatus) (elev.Orderstatus, error) {
 	for {
 		reader := bufio.NewReader(sheriffConn)
@@ -92,7 +91,7 @@ func ReceiveMessageFromSheriff(orderAssigned chan elev.Orderstatus) (elev.Orders
 
 		case "requestToBecomeDeputy":
 			fmt.Println("Received request to become deputy from sheriff")
-			go initDeputy()
+			initDeputy() //not sure if it should be go'ed or not
 
 		default:
 			fmt.Println("Unknown message type:", msg.Type)
