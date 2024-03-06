@@ -221,14 +221,13 @@ func Assigner(channels Channels, world *World, NetworkOrders map[string]Ordersta
 					best_id = id
 				}
 			}
-			fmt.Println("Assigning order to elevator with id: ", best_id)
 			order.Owner = best_id
 			NetworkOrders[order.OrderID] = order
-			fmt.Println("NetworkOrders: ", NetworkOrders)
+			fmt.Println("Added to NetworkOrders maps")
+			fmt.Println("NetworkOrders: ", len(NetworkOrders))
 			if best_id == config.Self_id {
 				channels.OrderAssigned <- order
 			} else {
-				fmt.Println("Sending order to elevator with id: ", best_id)
 				go sheriff.SendOrderMessage(best_id, order)
 			}
 

@@ -45,6 +45,9 @@ func RunElev(channels Channels, initElev Elev) {
 	//go printElevator(&elevator)
 	elevStart(drv_floors)
 	elevio.SetMotorDirection(elevio.MotorDirection(ChooseDirection(elevator)))
+	elevator.Dir = DirStop
+	channels.ElevatorStates <- elevator
+	channels.ElevatorStatesBroadcast <- elevator
 
 	for {
 		select {
