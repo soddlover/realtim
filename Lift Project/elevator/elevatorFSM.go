@@ -3,7 +3,6 @@ package elevatorFSM
 import (
 	"fmt"
 	"mymodule/config"
-	. "mymodule/config"
 	"mymodule/elevator/elevio"
 	. "mymodule/types"
 	"strconv"
@@ -14,7 +13,7 @@ func RunElev(channels Channels, initElev Elev) {
 	idInt, _ := strconv.Atoi(config.Self_nr)
 	port := 15657 + idInt
 	addr := "localhost:" + fmt.Sprint(port)
-	elevio.Init(addr, N_FLOORS)
+	elevio.Init(addr, config.N_FLOORS)
 
 	elevator := initElev
 	if (elevator == Elev{}) {
@@ -22,7 +21,7 @@ func RunElev(channels Channels, initElev Elev) {
 			State: EB_Idle,
 			Dir:   DirStop,
 			Floor: elevio.GetFloor(),
-			Queue: [N_FLOORS][N_BUTTONS]bool{},
+			Queue: [config.N_FLOORS][config.N_BUTTONS]bool{},
 			Obstr: false,
 		}
 	}
@@ -53,7 +52,7 @@ func RunElev(channels Channels, initElev Elev) {
 		case buttonEvent := <-drv_buttons:
 			fmt.Println("Button event at floor", buttonEvent.Floor, "button", buttonEvent.Button)
 
-			channels.OrderRequest <- Order{buttonEvent.Floor, buttonEvent.Button}
+			channels.OrderRequest <- Order{Floor: buttonEvent.Floor, Button: buttonEvent.Button}
 
 			//elevator.Queue[buttonEvent.Floor][buttonEvent.Button] = true
 			//elevio.SetButtonLamp(buttonEvent.Button, buttonEvent.Floor, true)
@@ -69,9 +68,9 @@ func RunElev(channels Channels, initElev Elev) {
 					elevator.State = EB_DoorOpen
 					doorTimer.Reset(3 * time.Second)
 					elevio.SetDoorOpenLamp(true)
-					elevator.Queue[elevator.Floor] = [N_BUTTONS]bool{}
-					channels.OrderComplete <- Order{elevator.Floor, elevio.BT_HallUp}
-					channels.OrderComplete <- Order{elevator.Floor, elevio.BT_HallDown}
+					elevator.Queue[elevator.Floor] = [config.N_BUTTONS]bool{}
+					channels.OrderComplete <- Order{Floor: elevator.Floor, Button: elevio.BT_HallUp}
+					channels.OrderComplete <- Order{Floor: elevator.Floor, Button: elevio.BT_HallDown}
 				} else {
 					elevator.State = EB_Moving
 					motorErrorTimer.Reset(3 * time.Second)
@@ -108,25 +107,25 @@ func RunElev(channels Channels, initElev Elev) {
 				//maybe put this in a function
 				if elevator.Dir == DirUp {
 					elevator.Queue[elevator.Floor][elevio.BT_HallUp] = false
-					channels.OrderComplete <- Order{elevator.Floor, elevio.BT_HallUp}
+					channels.OrderComplete <- Order{Floor: elevator.Floor, Button: elevio.BT_HallUp}
 					if !OrdersAbove(elevator) {
 						elevator.Queue[elevator.Floor][elevio.BT_HallDown] = false
-						channels.OrderComplete <- Order{elevator.Floor, elevio.BT_HallDown}
+						channels.OrderComplete <- Order{Floor: elevator.Floor, Button: elevio.BT_HallDown}
 					}
 				} else if elevator.Dir == DirDown {
 					elevator.Queue[elevator.Floor][elevio.BT_HallDown] = false
-					channels.OrderComplete <- Order{elevator.Floor, elevio.BT_HallDown}
+					channels.OrderComplete <- Order{Floor: elevator.Floor, Button: elevio.BT_HallDown}
 					if !OrdersBelow(elevator) {
 						elevator.Queue[elevator.Floor][elevio.BT_HallUp] = false
-						channels.OrderComplete <- Order{elevator.Floor, elevio.BT_HallUp}
+						channels.OrderComplete <- Order{Floor: elevator.Floor, Button: elevio.BT_HallUp}
 					}
 				}
 				elevator.Dir = DirStop
 
 				elevator.Queue[elevator.Floor][elevio.BT_Cab] = false
 				//same here add one way clearing later
-				//channels.orderComplete <- Order{elevator.Floor, elevio.BT_HallUp}
-				//channels.orderComplete <- Order{elevator.Floor, elevio.BT_HallDown}
+				//channels.orderComplete <- Order{Floor: elevator.Floor,Button: elevio.BT_HallUp}
+				//channels.orderComplete <- Order{Floor:elevator.Floor,Button: elevio.BT_HallDown}
 				elevator.State = EB_DoorOpen
 			} else if elevator.State == EB_Moving {
 				motorErrorTimer.Reset(3 * time.Second)
@@ -184,8 +183,8 @@ func RunElev(channels Channels, initElev Elev) {
 }
 func updateLights(elevator *Elev) {
 	for {
-		for floor := 0; floor < N_FLOORS; floor++ {
-			for button := 0; button < N_BUTTONS; button++ {
+		for floor := 0; floor < config.N_FLOORS; floor++ {
+			for button := 0; button < config.N_BUTTONS; button++ {
 				elevio.SetButtonLamp(elevio.ButtonType(button), floor, elevator.Queue[floor][button])
 			}
 		}
@@ -194,18 +193,18 @@ func updateLights(elevator *Elev) {
 }
 
 func saveLocalOrder(channels Channels, OrdersToQueoe chan Order) {
-	var localOrders [N_FLOORS][N_BUTTONS][]Orderstatus
+	var localOrders [config.N_FLOORS][config.N_BUTTONS][]Orderstatus
 	for {
 		select {
 		case order := <-channels.OrderAssigned:
 			//save order to local queue
 			if order.Button == elevio.BT_Cab {
-				OrdersToQueoe <- Order{order.Floor, order.Button}
+				OrdersToQueoe <- Order{Floor: order.Floor, Button: order.Button}
 				continue
 			}
 			fmt.Println("Order added to me: ")
 			localOrders[order.Floor][order.Button] = append(localOrders[order.Floor][order.Button], order)
-			OrdersToQueoe <- Order{order.Floor, order.Button}
+			OrdersToQueoe <- Order{Floor: order.Floor, Button: order.Button}
 
 		case order := <-channels.OrderComplete:
 			fmt.Println("Order completed removing from local list")

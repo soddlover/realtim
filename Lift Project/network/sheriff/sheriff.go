@@ -35,8 +35,7 @@ func Sheriff(incomingOrder chan Orderstatus, networkOrders map[string]Orderstatu
 
 func deputyHandeler(nodeOrders map[string]Orderstatus) {
 	var deputyConn net.TCPConn
-	var ticker *time.Ticker
-	ticker = time.NewTicker(DEPUTY_SEND_FREQ)
+	var ticker *time.Ticker = time.NewTicker(DEPUTY_SEND_FREQ)
 	ticker.Stop()
 	tickerRunning := false
 

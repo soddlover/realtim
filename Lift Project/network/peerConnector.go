@@ -8,7 +8,6 @@ import (
 	"mymodule/network/peers"
 	"mymodule/network/sheriff"
 	. "mymodule/types"
-	"time"
 
 	"github.com/google/uuid"
 )
@@ -22,7 +21,6 @@ type World struct {
 	Map map[string]Elev
 }
 
-var NetworkOrders = make(map[string]Orderstatus)
 var IsSheriff bool = false
 var OnlineElevators = make(map[string]bool)
 
@@ -38,27 +36,34 @@ func PeerConnector(id string, world *World, channels Channels) {
 	go peerUpdater(peerUpdateCh, world, peerUpdateSheriff)
 	//on startup wait for connections then check if only one is online
 
-	incomingOrder := make(chan Orderstatus, 10)
+	listenForSheriffIP(channels, world)
 	//OutgoingOrder := make(chan Order)
 
+}
+
+func listenForSheriffIP(channels Channels, world *World) {
 	sIP := sheriff.GetSheriffIP()
 	if sIP == "" {
-		fmt.Println("I am the only Wrangler in town, I am the Sheriff!")
-		nodeLeftNetwork := make(chan string)
-		go sheriff.Sheriff(incomingOrder, NetworkOrders, nodeLeftNetwork)
-		go orderForwarder(channels, incomingOrder)
-		go Assigner(incomingOrder, channels.OrderAssigned, world)
-		go redistributer(nodeLeftNetwork, incomingOrder, world)
-		IsSheriff = true
-
+		NetworkOrders := make(map[string]Orderstatus)
+		InitSherrif(channels, world, NetworkOrders)
 	} else {
 		fmt.Println("I am not the only Wrangler in town, connecting to Sheriff:")
 		if sheriff.ConnectWranglerToSheriff(sIP) {
 			fmt.Println("Me, a Wrangler connected to Sheriff")
 			go sheriff.ReceiveMessageFromSheriff(channels.OrderAssigned)
-			go orderForwarder(channels, incomingOrder)
+			go orderForwarder(channels)
 		}
 	}
+}
+
+func InitSherrif(channels Channels, world *World, NetworkOrders map[string]Orderstatus) {
+	fmt.Println("I am the only Wrangler in town, I am the Sheriff!")
+	nodeLeftNetwork := make(chan string)
+	go sheriff.Sheriff(channels.IncomingOrder, NetworkOrders, nodeLeftNetwork)
+	go orderForwarder(channels)
+	go Assigner(channels, world, NetworkOrders)
+	go redistributer(nodeLeftNetwork, channels.IncomingOrder, world, NetworkOrders)
+	IsSheriff = true
 
 }
 
@@ -86,7 +91,7 @@ func peerUpdater(peerUpdateCh chan peers.PeerUpdate, world *World, peerUpdateShe
 	}
 }
 
-func redistributer(nodeLeftNetwork chan string, incomingOrder chan Orderstatus, world *World) {
+func redistributer(nodeLeftNetwork chan string, incomingOrder chan Orderstatus, world *World, NetworkOrders map[string]Orderstatus) {
 	for {
 		select {
 		case peerid := <-nodeLeftNetwork:
@@ -107,7 +112,7 @@ func redistributer(nodeLeftNetwork chan string, incomingOrder chan Orderstatus, 
 
 }
 
-func orderForwarder(channels Channels, incomingOrder chan Orderstatus) {
+func orderForwarder(channels Channels) {
 	for {
 		select {
 		case order := <-channels.OrderRequest:
@@ -119,13 +124,13 @@ func orderForwarder(channels Channels, incomingOrder chan Orderstatus) {
 				continue
 			}
 			if IsSheriff {
-				incomingOrder <- orderstat
+				channels.IncomingOrder <- orderstat
 			} else {
 				sheriff.SendOrderToSheriff(orderstat)
 			}
 		case orderstat := <-channels.OrderDelete:
 			if IsSheriff {
-				incomingOrder <- orderstat
+				channels.IncomingOrder <- orderstat
 			} else {
 				sheriff.SendOrderToSheriff(orderstat)
 			}
@@ -135,11 +140,11 @@ func orderForwarder(channels Channels, incomingOrder chan Orderstatus) {
 
 }
 
-func Assigner(incomingOrder chan Orderstatus, orderAssigned chan Orderstatus, world *World) {
+func Assigner(channels Channels, world *World, NetworkOrders map[string]Orderstatus) {
 
 	for {
 		select {
-		case order := <-incomingOrder:
+		case order := <-channels.IncomingOrder:
 			//channels.OrderAssigned <- order
 			if order.Status {
 				fmt.Println("Order being deletetet")
@@ -155,7 +160,7 @@ func Assigner(incomingOrder chan Orderstatus, orderAssigned chan Orderstatus, wo
 				if elevator.State == Undefined || elevator.Obstr {
 					continue
 				}
-				duration := timeToServeRequestWithTimeout(elevator, order.Button, order.Floor)
+				duration := timeToServeRequest(elevator, order.Button, order.Floor)
 				if duration < best_duration {
 					best_duration = duration
 					best_id = id
@@ -166,29 +171,13 @@ func Assigner(incomingOrder chan Orderstatus, orderAssigned chan Orderstatus, wo
 			NetworkOrders[order.OrderID] = order
 			fmt.Println("NetworkOrders: ", NetworkOrders)
 			if best_id == config.Self_id {
-				orderAssigned <- order
+				channels.OrderAssigned <- order
 			} else {
 				fmt.Println("Sending order to elevator with id: ", best_id)
 				go sheriff.SendOrderMessage(best_id, order)
 			}
 
 		}
-	}
-}
-func timeToServeRequestWithTimeout(e_old Elev, b elevio.ButtonType, f int) int {
-	resultChan := make(chan int)
-	go func() {
-		resultChan <- timeToServeRequest(e_old, b, f)
-	}()
-
-	select {
-	case result := <-resultChan:
-		return result
-	case <-time.After(50 * time.Millisecond):
-		fmt.Println("********************************************")
-		fmt.Println("Timeout in timeToServeRequestWithTimeout")
-		fmt.Println("******************************************** \n \n ")
-		return 0
 	}
 }
 

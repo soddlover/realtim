@@ -52,6 +52,7 @@ func main() {
 		OrderComplete:           make(chan Order, 10),
 		OrderAssigned:           make(chan Orderstatus, 10),
 		OrderDelete:             make(chan Orderstatus, 10),
+		IncomingOrder:           make(chan Orderstatus, 10),
 	}
 
 	//fmt.Print("Hello, World!")

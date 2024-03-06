@@ -14,6 +14,7 @@ type Channels struct {
 	OrderComplete           chan Order
 	OrderAssigned           chan Orderstatus
 	OrderDelete             chan Orderstatus
+	IncomingOrder           chan Orderstatus
 }
 
 type Orderstatus struct {
