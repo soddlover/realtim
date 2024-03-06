@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"mymodule/backup"
 	"mymodule/config"
-	. "mymodule/elevator"
+	elev "mymodule/elevator"
 	"mymodule/network"
 	"mymodule/network/localip"
+	. "mymodule/types"
 	"time"
 	//. "mymodule/network"
 )
@@ -59,7 +60,7 @@ func main() {
 	go network.StateBroadcaster(channels.ElevatorStatesBroadcast, world, id)
 	// go PeerConnector(id, world)
 	go backup.WriteBackup(channels.ElevatorStates)
-	go RunElev(channels, initElev)
+	go elev.RunElev(channels, initElev)
 	//go Assigner(channels, world)
 	//go printWorld(world)
 	select {}

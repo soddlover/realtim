@@ -5,82 +5,10 @@ import (
 	"mymodule/config"
 	. "mymodule/config"
 	"mymodule/elevator/elevio"
+	. "mymodule/types"
 	"strconv"
 	"time"
 )
-
-type ElevatorState int
-
-type Channels struct {
-	ElevatorStates          chan Elev
-	ElevatorStatesBroadcast chan Elev
-	OrderRequest            chan Order
-	OrderComplete           chan Order
-	OrderAssigned           chan Orderstatus
-	OrderDelete             chan Orderstatus
-}
-
-type Orderstatus struct {
-	Owner   string
-	OrderID string
-	Floor   int
-	Button  elevio.ButtonType
-	Status  bool
-}
-
-const (
-	EB_Idle ElevatorState = iota
-	EB_Moving
-	EB_DoorOpen
-	Undefined
-)
-
-type ElevatorDirection int
-
-const (
-	DirUp   ElevatorDirection = 1
-	DirDown ElevatorDirection = -1
-	DirStop ElevatorDirection = 0
-)
-
-func elevatorDirToString(dir ElevatorDirection) string {
-	switch dir {
-	case DirUp:
-		return "Up"
-	case DirDown:
-		return "Down"
-	case DirStop:
-		return "Stop"
-	default:
-		return "Undefined"
-	}
-}
-
-func elevatorStateToString(stat ElevatorState) string {
-	switch stat {
-	case EB_Idle:
-		return "Idle"
-	case EB_Moving:
-		return "Moving"
-	case EB_DoorOpen:
-		return "DoorOpen"
-	default:
-		return "Undefined"
-	}
-}
-
-type Elev struct {
-	State ElevatorState
-	Dir   ElevatorDirection
-	Floor int
-	Queue [N_FLOORS][N_BUTTONS]bool
-	Obstr bool
-}
-
-type Order struct {
-	Floor  int
-	Button elevio.ButtonType
-}
 
 func RunElev(channels Channels, initElev Elev) {
 	idInt, _ := strconv.Atoi(config.Self_nr)
@@ -262,17 +190,6 @@ func updateLights(elevator *Elev) {
 			}
 		}
 		time.Sleep(100 * time.Millisecond)
-	}
-}
-
-func printElevator(elevator *Elev) {
-	ticker := time.NewTicker(3 * time.Second)
-	defer ticker.Stop()
-
-	for range ticker.C {
-		fmt.Println("Direction:", elevatorDirToString(elevator.Dir))
-		fmt.Println("Floor:", elevator.Floor)
-		fmt.Println("State:", elevatorStateToString(elevator.State))
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	. "mymodule/config"
 	. "mymodule/elevator/elevio"
+	. "mymodule/types"
 )
 
 func elevStart(drv_floors chan int) {

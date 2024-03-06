@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"mymodule/config"
 	. "mymodule/config"
-	elevatorFSM "mymodule/elevator"
 	"mymodule/elevator/elevio"
+	. "mymodule/types"
 	"os"
 	"time"
 )
 
-func Backup(fresh bool) elevatorFSM.Elev {
+func Backup(fresh bool) Elev {
 	// Get the initial file info
 
 	if fresh {
@@ -44,9 +44,9 @@ func Backup(fresh bool) elevatorFSM.Elev {
 	}
 }
 
-func WriteBackup(elevChan chan elevatorFSM.Elev) {
+func WriteBackup(elevChan chan Elev) {
 	ticker := time.NewTicker(5 * time.Second)
-	var elev elevatorFSM.Elev
+	var elev Elev
 
 	for {
 		select {
@@ -67,14 +67,14 @@ func WriteBackup(elevChan chan elevatorFSM.Elev) {
 	}
 }
 
-func takeControl() elevatorFSM.Elev {
+func takeControl() Elev {
 	fmt.Println("Backup is taking over.")
 
 	stateJson, err := os.ReadFile("backup" + config.Self_nr + ".txt")
 	if err != nil {
 		fmt.Println("Error reading file:", err)
 	}
-	elev := elevatorFSM.Elev{}
+	elev := Elev{}
 	err = json.Unmarshal(stateJson, &elev)
 	if err != nil {
 		fmt.Println("Error unmarshalling json:", err)

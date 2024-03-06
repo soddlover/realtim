@@ -1,3 +1,0 @@
-package assigner
-
-//fuck this

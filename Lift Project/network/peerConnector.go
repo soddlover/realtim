@@ -4,11 +4,10 @@ import (
 	"fmt"
 	"mymodule/config"
 	. "mymodule/elevator"
-	elev "mymodule/elevator"
-	elevatorFSM "mymodule/elevator"
 	"mymodule/elevator/elevio"
 	"mymodule/network/peers"
 	"mymodule/network/sheriff"
+	. "mymodule/types"
 	"time"
 
 	"github.com/google/uuid"
@@ -20,14 +19,14 @@ type OrderAndID struct {
 }
 
 type World struct {
-	Map map[string]elev.Elev
+	Map map[string]Elev
 }
 
-var NetworkOrders = make(map[string]elev.Orderstatus)
+var NetworkOrders = make(map[string]Orderstatus)
 var IsSheriff bool = false
 var OnlineElevators = make(map[string]bool)
 
-func PeerConnector(id string, world *World, channels elev.Channels) {
+func PeerConnector(id string, world *World, channels Channels) {
 
 	peerUpdateCh := make(chan peers.PeerUpdate)
 	peerTxEnable := make(chan bool)
@@ -39,8 +38,8 @@ func PeerConnector(id string, world *World, channels elev.Channels) {
 	go peerUpdater(peerUpdateCh, world, peerUpdateSheriff)
 	//on startup wait for connections then check if only one is online
 
-	incomingOrder := make(chan elev.Orderstatus, 10)
-	//OutgoingOrder := make(chan elev.Order)
+	incomingOrder := make(chan Orderstatus, 10)
+	//OutgoingOrder := make(chan Order)
 
 	sIP := sheriff.GetSheriffIP()
 	if sIP == "" {
@@ -80,7 +79,7 @@ func peerUpdater(peerUpdateCh chan peers.PeerUpdate, world *World, peerUpdateShe
 			// 	//OnlineElevators[element] = false
 			// 	//delete(world.Map, element)
 			// 	//elevator := world.Map[element]
-			// 	//elevator.State = elev.Undefined
+			// 	//elevator.State = Undefined
 			// 	//world.Map[element] = elevator
 			// 	//print("element was set as unavailable")
 			// }
@@ -89,7 +88,7 @@ func peerUpdater(peerUpdateCh chan peers.PeerUpdate, world *World, peerUpdateShe
 	}
 }
 
-func redistributer(nodeLeftNetwork chan string, incomingOrder chan elevatorFSM.Orderstatus, world *World) {
+func redistributer(nodeLeftNetwork chan string, incomingOrder chan Orderstatus, world *World) {
 	for {
 		select {
 		case peerid := <-nodeLeftNetwork:
@@ -110,13 +109,13 @@ func redistributer(nodeLeftNetwork chan string, incomingOrder chan elevatorFSM.O
 
 }
 
-func orderForwarder(channels Channels, incomingOrder chan elev.Orderstatus) {
+func orderForwarder(channels Channels, incomingOrder chan Orderstatus) {
 	for {
 		select {
 		case order := <-channels.OrderRequest:
 
 			ID := uuid.New().String()
-			orderstat := elev.Orderstatus{OrderID: ID, Owner: config.Self_id, Floor: order.Floor, Button: order.Button, Status: false}
+			orderstat := Orderstatus{OrderID: ID, Owner: config.Self_id, Floor: order.Floor, Button: order.Button, Status: false}
 			if order.Button == elevio.BT_Cab {
 				channels.OrderAssigned <- orderstat
 				continue
@@ -138,7 +137,7 @@ func orderForwarder(channels Channels, incomingOrder chan elev.Orderstatus) {
 
 }
 
-func Assigner(incomingOrder chan elev.Orderstatus, orderAssigned chan elev.Orderstatus, world *World) {
+func Assigner(incomingOrder chan Orderstatus, orderAssigned chan Orderstatus, world *World) {
 
 	for {
 		select {

@@ -2,8 +2,8 @@ package network
 
 import (
 	"mymodule/config"
-	. "mymodule/elevator"
 	"mymodule/network/bcast"
+	. "mymodule/types"
 	"time"
 )
 
