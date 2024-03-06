@@ -88,3 +88,22 @@ func OrdersBelow(elevator Elev) bool {
 	}
 	return false
 }
+
+func clearAtFloor(elevator *Elev, channels Channels) {
+	elevator.Queue[elevator.Floor][BT_Cab] = false
+	if elevator.Dir == DirUp {
+		elevator.Queue[elevator.Floor][BT_HallUp] = false
+		channels.OrderComplete <- Order{Floor: elevator.Floor, Button: BT_HallUp}
+		if !OrdersAbove(*elevator) {
+			elevator.Queue[elevator.Floor][BT_HallDown] = false
+			channels.OrderComplete <- Order{Floor: elevator.Floor, Button: BT_HallDown}
+		}
+	} else if elevator.Dir == DirDown {
+		elevator.Queue[elevator.Floor][BT_HallDown] = false
+		channels.OrderComplete <- Order{Floor: elevator.Floor, Button: BT_HallDown}
+		if !OrdersBelow(*elevator) {
+			elevator.Queue[elevator.Floor][BT_HallUp] = false
+			channels.OrderComplete <- Order{Floor: elevator.Floor, Button: BT_HallUp}
+		}
+	}
+}

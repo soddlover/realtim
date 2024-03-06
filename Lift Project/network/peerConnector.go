@@ -8,6 +8,7 @@ import (
 	"mymodule/network/peers"
 	"mymodule/network/sheriff"
 	. "mymodule/types"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -21,8 +22,71 @@ type World struct {
 	Map map[string]Elev
 }
 
-var IsSheriff bool = false
+type State int
+
+const (
+	initial State = iota
+	sherriff
+	deputy
+	wrangler
+	recovery
+)
+
 var OnlineElevators = make(map[string]bool)
+var state State
+
+func NetworkFSM(channels Channels, world *World) {
+	state = initial
+	for {
+		switch state {
+		case initial:
+			sIP := sheriff.GetSheriffIP()
+			if sIP == "" {
+				NetworkOrders := make(map[string]Orderstatus)
+				InitSherrif(channels, world, NetworkOrders)
+				state = sherriff
+			} else {
+				fmt.Println("I am not the only Wrangler in town, connecting to Sheriff:")
+				if sheriff.ConnectWranglerToSheriff(sIP) {
+					fmt.Println("Me, a Wrangler connected to Sheriff")
+					go sheriff.ReceiveMessageFromSheriff(channels.OrderAssigned)
+					go orderForwarder(channels)
+					state = wrangler
+				}
+			}
+		case sherriff:
+			//im jamming
+		case deputy:
+			select {
+			case <-deputyPromotion:
+				initSheriff()
+				state = sherriff
+			}
+
+		case wrangler:
+			select {
+			case <-wranglerPromotion:
+				initDeputy()
+				state = deputy
+			}
+
+			//listen for incoming orders
+			//listen for new peers
+			//listen for lost peers
+			//listen for orders to delete
+			//listen for orders to assign
+		case recovery:
+
+			//listen for incoming orders
+			//listen for new peers
+			//listen for lost peers
+			//listen for orders to delete
+			//listen for orders to assign
+
+		}
+	}
+
+}
 
 func PeerConnector(id string, world *World, channels Channels) {
 
@@ -34,26 +98,11 @@ func PeerConnector(id string, world *World, channels Channels) {
 	go peers.Transmitter(config.Peer_port, id, peerTxEnable)
 	go peers.Receiver(config.Peer_port, peerUpdateCh)
 	go peerUpdater(peerUpdateCh, world, peerUpdateSheriff)
+	go NetworkFSM(channels, world)
 	//on startup wait for connections then check if only one is online
 
-	listenForSheriffIP(channels, world)
 	//OutgoingOrder := make(chan Order)
 
-}
-
-func listenForSheriffIP(channels Channels, world *World) {
-	sIP := sheriff.GetSheriffIP()
-	if sIP == "" {
-		NetworkOrders := make(map[string]Orderstatus)
-		InitSherrif(channels, world, NetworkOrders)
-	} else {
-		fmt.Println("I am not the only Wrangler in town, connecting to Sheriff:")
-		if sheriff.ConnectWranglerToSheriff(sIP) {
-			fmt.Println("Me, a Wrangler connected to Sheriff")
-			go sheriff.ReceiveMessageFromSheriff(channels.OrderAssigned)
-			go orderForwarder(channels)
-		}
-	}
 }
 
 func InitSherrif(channels Channels, world *World, NetworkOrders map[string]Orderstatus) {
@@ -63,7 +112,6 @@ func InitSherrif(channels Channels, world *World, NetworkOrders map[string]Order
 	go orderForwarder(channels)
 	go Assigner(channels, world, NetworkOrders)
 	go redistributer(nodeLeftNetwork, channels.IncomingOrder, world, NetworkOrders)
-	IsSheriff = true
 
 }
 
@@ -123,13 +171,13 @@ func orderForwarder(channels Channels) {
 				channels.OrderAssigned <- orderstat
 				continue
 			}
-			if IsSheriff {
+			if state == sherriff {
 				channels.IncomingOrder <- orderstat
 			} else {
 				sheriff.SendOrderToSheriff(orderstat)
 			}
 		case orderstat := <-channels.OrderDelete:
-			if IsSheriff {
+			if state == sherriff {
 				channels.IncomingOrder <- orderstat
 			} else {
 				sheriff.SendOrderToSheriff(orderstat)
@@ -152,7 +200,7 @@ func Assigner(channels Channels, world *World, NetworkOrders map[string]Ordersta
 				continue
 			}
 			best_id := config.Self_id
-			best_duration := 1000000
+			best_duration := 1000000 * time.Second
 			for id, elevator := range world.Map {
 				if elevator.Obstr {
 					fmt.Println("Elevator with id: ", id, " is obstructed")
@@ -181,7 +229,7 @@ func Assigner(channels Channels, world *World, NetworkOrders map[string]Ordersta
 	}
 }
 
-func timeToServeRequest(e_old Elev, b elevio.ButtonType, f int) int { //FIX THIS FUCKING FUNCTION
+func timeToServeRequest(e_old Elev, b elevio.ButtonType, f int) time.Duration { //FIX THIS FUCKING FUNCTION
 	e := e_old
 	e.Queue[f][b] = true
 
@@ -193,7 +241,7 @@ func timeToServeRequest(e_old Elev, b elevio.ButtonType, f int) int { //FIX THIS
 		}
 	}
 
-	duration := 0
+	duration := 0 * time.Second
 
 	switch e.State {
 	case EB_Idle:

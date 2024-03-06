@@ -1,18 +1,21 @@
 package config
 
-const (
-	N_FLOORS    = 4
-	N_ELEVATORS = 1
-	N_BUTTONS   = 3
-)
+import "time"
 
-const TRAVEL_TIME = 2
-const DOOR_OPEN_TIME = 3
-const Sheriff_port = 20000
-const Broadcast_state_port = 16569
-const Peer_port = 15647
-const TCP_port = 16000
-const Sheriff_deputy_port = 16001
+const (
+	N_FLOORS             = 4
+	N_ELEVATORS          = 1
+	N_BUTTONS            = 3
+	TRAVEL_TIME          = 2
+	DOOR_OPEN_TIME       = 3 * time.Second
+	MOTOR_ERROR_TIME     = 3 * time.Second
+	Sheriff_port         = 20000
+	Broadcast_state_port = 16569
+	Peer_port            = 15647
+	TCP_port             = 16000
+	Sheriff_deputy_port  = 16001
+	SimulatorPort        = 15657
+)
 
 type Button int
 

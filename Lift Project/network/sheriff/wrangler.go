@@ -29,7 +29,7 @@ func GetSheriffIP() string {
 
 	conn := conn.DialBroadcastUDP(config.Sheriff_port)
 	defer conn.Close()
-	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	conn.SetReadDeadline(time.Now().Add(10 * time.Second))
 	n, _, err := conn.ReadFrom(buf[0:])
 	if err != nil {
 		fmt.Println("Error reading from sheriff:", err)
