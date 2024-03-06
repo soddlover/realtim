@@ -1,4 +1,4 @@
-package sheriff
+package wrangler
 
 import (
 	"bufio"
@@ -6,12 +6,15 @@ import (
 	"fmt"
 	"mymodule/config"
 	"mymodule/network/conn"
+	"mymodule/types"
 	. "mymodule/types"
 	"net"
 	"time"
 )
 
 var sheriffConn net.Conn
+var SheriffDisconnectedFromWrangler = make(chan bool)
+var WranglerPromotion = make(chan bool)
 
 func ConnectWranglerToSheriff(sheriffIP string) bool {
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", sheriffIP, config.TCP_port))
@@ -60,18 +63,20 @@ func SendOrderToSheriff(order Orderstatus) (bool, error) {
 }
 
 // ReceiveMessageFromsheriff receives an order from the sheriff and sends an acknowledgement
-func ReceiveMessageFromSheriff(orderAssigned chan Orderstatus) (Orderstatus, error) {
-	for {
+func ReceiveMessageFromSheriff(orderAssigned chan Orderstatus) {
+	readErrors := 0
+	for readErrors < 3 {
 		reader := bufio.NewReader(sheriffConn)
 		message, err := reader.ReadString('\n')
 		//fmt.Println("Received message from sheriff:", message)
 		if err != nil {
 			fmt.Println("Error reading from sheriff:", err)
 			time.Sleep(5 * time.Second)
+			readErrors++
 			continue
 		}
 
-		var msg Message
+		var msg types.Message
 		err = json.Unmarshal([]byte(message), &msg)
 		if err != nil {
 			fmt.Println("Error parsing message:", err)
@@ -92,7 +97,8 @@ func ReceiveMessageFromSheriff(orderAssigned chan Orderstatus) (Orderstatus, err
 
 		case "requestToBecomeDeputy":
 			fmt.Println("Received request to become deputy from sheriff")
-			initDeputy() //not sure if it should be go'ed or not
+			//initDeputy() //not sure if it should be go'ed or not
+			WranglerPromotion <- true
 
 		default:
 			fmt.Println("Unknown message type:", msg.Type)

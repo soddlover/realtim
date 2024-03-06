@@ -1,10 +1,12 @@
-package sheriff
+package deputy
 
 import (
 	"bufio"
 	"encoding/json"
 	"fmt"
 	"mymodule/config"
+	"mymodule/network/conn"
+	"mymodule/types"
 	. "mymodule/types"
 	"net"
 	"time"
@@ -46,7 +48,9 @@ func sheriffHandler() {
 
 		case <-sheriffDisconnected:
 			fmt.Println("Sheriff disconnected")
-			becomeSheriff(deputyNodeOrders) // How to become sheriff?
+			fmt.Println("Theres a new sheriff in town, I killed the old one")
+			fmt.Println("but I dont know how to become the sheriff yet.....")
+			DeputyBecomeSheriff <- deputyNodeOrders // Not sure if this is the right way to do it
 
 		}
 	}
@@ -65,7 +69,7 @@ func receiveDeputyMessage(deputyToSheriffConn net.Conn) {
 			continue
 		}
 
-		var msg Message
+		var msg types.Message
 		err = json.Unmarshal([]byte(message), &msg)
 		if err != nil {
 			fmt.Println("Error parsing message:", err)
@@ -91,9 +95,17 @@ func receiveDeputyMessage(deputyToSheriffConn net.Conn) {
 	sheriffDisconnected <- deputyToSheriffConn
 }
 
-func becomeSheriff(deputyNodeOrders map[string]Orderstatus) {
-	//Dont know how right now
-	fmt.Println("Theres a new sheriff in town, I killed the old one")
-	fmt.Println("but I dont know how to become the sheriff yet.....")
-	DeputyBecomeSheriff <- deputyNodeOrders // Not sure if this is the right way to do it
+func GetSheriffIP() string {
+	var buf [1024]byte
+
+	conn := conn.DialBroadcastUDP(config.Sheriff_port)
+	defer conn.Close()
+	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	n, _, err := conn.ReadFrom(buf[0:])
+	if err != nil {
+		fmt.Println("Error reading from sheriff:", err)
+		return ""
+	}
+	return string(buf[:n])
+
 }

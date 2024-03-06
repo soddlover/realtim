@@ -15,11 +15,6 @@ import (
 
 const DEPUTY_SEND_FREQ = 3 * time.Second
 
-type Message struct {
-	Type string          `json:"type"`
-	Data json.RawMessage `json:"data"`
-}
-
 var WranglerConnections = make(map[string]net.Conn)
 
 var NewDeputyConnChan = make(chan net.TCPConn)
