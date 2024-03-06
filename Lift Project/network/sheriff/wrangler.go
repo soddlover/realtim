@@ -13,8 +13,7 @@ import (
 
 var sheriffConn net.Conn
 
-// ConnectToSheriff connects to the sheriff and returns the connection
-func ConnectToSheriff(sheriffIP string) bool {
+func ConnectWranglerToSheriff(sheriffIP string) bool {
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", sheriffIP, config.TCP_port))
 	if err != nil {
 		fmt.Println("Error connecting to sheriff:", err)
@@ -56,22 +55,6 @@ func SendOrderToSheriff(order Orderstatus) (bool, error) {
 		return false, err
 	}
 
-	// Wait for an acknowledgement
-	// sheriffConn.SetReadDeadline(time.Now().Add(5 * time.Second))
-	// reader := bufio.NewReader(sheriffConn)
-	// acknowledgement, err := reader.ReadString('\n')
-	// sheriffConn.SetReadDeadline(time.Time{})
-	// if err != nil {
-	// 	if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-	// 		return false, fmt.Errorf("acknowledgement timed out")
-	// 	}
-	// 	return false, err
-	// }
-
-	// // Check the acknowledgement
-	// if strings.TrimSpace(acknowledgement) != "ACK" {
-	// 	return false, fmt.Errorf("unexpected acknowledgement: %s", acknowledgement)
-	// }
 	fmt.Println("Order sent to sheriff:", order)
 	return true, nil
 }
@@ -107,26 +90,12 @@ func ReceiveMessageFromSheriff(orderAssigned chan Orderstatus) (Orderstatus, err
 			fmt.Println("Order received from sheriff:", order)
 			orderAssigned <- order // Send the order to the elevator
 
-		case "deputyMessage":
-			var deputyNodeOrders map[string]Orderstatus
-			err = json.Unmarshal(msg.Data, &deputyNodeOrders)
-			if err != nil {
-				fmt.Println("Error parsing deputy message:", err)
-				continue
-			}
-			// Handle deputy message...
-			fmt.Println("Received deputy message from sheriff")
+		case "requestToBecomeDeputy":
+			fmt.Println("Received request to become deputy from sheriff")
+			initDeputy() //not sure if it should be go'ed or not
 
 		default:
 			fmt.Println("Unknown message type:", msg.Type)
 		}
-
-		// // Send an acknowledgement
-		// _, err = fmt.Fprintln(sheriffConn, "ACK")
-		// if err != nil {
-		// 	fmt.Println("Error sending acknowledgement:", err)
-		// 	continue
-		// }
-
 	}
 }

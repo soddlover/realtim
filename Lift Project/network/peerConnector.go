@@ -43,10 +43,8 @@ func PeerConnector(id string, world *World, channels Channels) {
 
 	sIP := sheriff.GetSheriffIP()
 	if sIP == "" {
-		fmt.Println("I am the only one")
-
+		fmt.Println("I am the only Wrangler in town, I am the Sheriff!")
 		nodeLeftNetwork := make(chan string)
-
 		go sheriff.Sheriff(incomingOrder, NetworkOrders, nodeLeftNetwork)
 		go orderForwarder(channels, incomingOrder)
 		go Assigner(incomingOrder, channels.OrderAssigned, world)
@@ -54,9 +52,9 @@ func PeerConnector(id string, world *World, channels Channels) {
 		IsSheriff = true
 
 	} else {
-		fmt.Println("I am not the only one connecting to SUPE")
-		if sheriff.ConnectToSheriff(sIP) {
-			fmt.Println("Connected to Sheriff")
+		fmt.Println("I am not the only Wrangler in town, connecting to Sheriff:")
+		if sheriff.ConnectWranglerToSheriff(sIP) {
+			fmt.Println("Me, a Wrangler connected to Sheriff")
 			go sheriff.ReceiveMessageFromSheriff(channels.OrderAssigned)
 			go orderForwarder(channels, incomingOrder)
 		}

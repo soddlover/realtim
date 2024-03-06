@@ -10,46 +10,99 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"time"
 )
+
+const DEPUTY_SEND_FREQ = 3 * time.Second
 
 type Message struct {
 	Type string          `json:"type"`
 	Data json.RawMessage `json:"data"`
 }
 
-var Connections = make(map[string]net.Conn)
-var DeputyIDChan = make(chan string)
-var DeputyUpdateChan = make(chan bool)
+var WranglerConnections = make(map[string]net.Conn)
 
+var NewDeputyConnChan = make(chan net.TCPConn)
+var DeputyDisconnectChan = make(chan net.TCPConn)
 func Sheriff(incomingOrder chan Orderstatus, networkOrders map[string]Orderstatus, nodeLeftNetwork chan string) {
 	ipID := strings.Split(string(config.Self_id), ":")
 	go peers.Transmitter(config.Sheriff_port, ipID[0], make(chan bool)) //channel for turning off sheriff transmitt?
 	//go peers.Receiver(15647, peerUpdateCh)
-	go deputyUpdater(networkOrders)
-	go listenForConnections(incomingOrder, nodeLeftNetwork)
+	go deputyHandeler(networkOrders)
+	go listenForWranglerConnections(incomingOrder, nodeLeftNetwork)
 }
 
-func deputyUpdater(networkOrders map[string]Orderstatus) {
-	var deputyID string
+func deputyHandeler(nodeOrders map[string]Orderstatus) {
+	var deputyConn net.TCPConn
+	var ticker *time.Ticker
+	ticker = time.NewTicker(DEPUTY_SEND_FREQ)
+	ticker.Stop()
+	tickerRunning := false
+
 	for {
 		select {
-		case <-DeputyUpdateChan:
-			//check if deputy is in the list of connections
-			if _, ok := Connections[deputyID]; !ok {
-				deputyID = ChooseNewDeputy()
+		case <-DeputyDisconnectChan:
+			if tickerRunning {
+				ticker.Stop()
+				tickerRunning = false
 			}
-			//send all orders to deputy
-			SendDeputyMessage(deputyID, networkOrders)
+			if len(WranglerConnections) != 0 {
+				wranglerConn, peer, _ := ChooseNewDeputy()
+				go initFirstDeputy(wranglerConn, peer)
+			} else {
+				fmt.Println("No wrangler connections")
+			}
+
+		case deputyConn = <-NewDeputyConnChan:
+			if !tickerRunning {
+				ticker.Reset(DEPUTY_SEND_FREQ)
+				tickerRunning = true
+			}
+
+		case <-ticker.C:
+			fmt.Println("Sending node orders to deputy")
+			go SendDeputyMessage(deputyConn, nodeOrders)
 		}
 	}
 }
 
-func listenForConnections(incomingOrder chan Orderstatus, nodeLeftNetwork chan string) {
+func initFirstDeputy(wranglerConn net.Conn, peer string) {
+	go sendRequestToBecomeDeputy(wranglerConn, peer)
+	go listenForDeputyConnection()
+}
+
+func sendRequestToBecomeDeputy(wranglerConn net.Conn, peer string) {
+
+	msg := Message{
+		Type: "requestToBecomeDeputy",
+		Data: nil,
+	}
+
+	// Convert the message to JSON
+	msgJSON, err := json.Marshal(msg)
+	if err != nil {
+		fmt.Println("Error marshalling deputy message:", err)
+	}
+
+	_, err = fmt.Fprintln(wranglerConn, string(msgJSON))
+	if err != nil {
+		fmt.Println("Error sending request to wrangler to become deputy, he might be dead:", err)
+		wranglerConn.Close()
+		delete(WranglerConnections, peer)
+		return
+	}
+
+	fmt.Println("Sent request to wrangler to become deputy")
+	// return true, nil
+}
+
+func listenForWranglerConnections(incomingOrder chan Orderstatus, nodeLeftNetwork chan string) {
 	ln, err := net.Listen("tcp", ":"+strconv.Itoa(config.TCP_port))
 	if err != nil {
 		fmt.Println("Error listening for connections:", err)
 		return
 	}
+
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
@@ -58,17 +111,54 @@ func listenForConnections(incomingOrder chan Orderstatus, nodeLeftNetwork chan s
 		}
 
 		var peerID string
-		if _, ok := Connections[strings.Split(conn.RemoteAddr().String(), ":")[0]+":1"]; ok {
+		if _, ok := WranglerConnections[strings.Split(conn.RemoteAddr().String(), ":")[0]+":1"]; ok {
 			peerID = strings.Split(conn.RemoteAddr().String(), ":")[0] + ":2"
-			Connections[peerID] = conn
+			WranglerConnections[peerID] = conn
 		} else {
 			peerID = strings.Split(conn.RemoteAddr().String(), ":")[0] + ":1"
-			Connections[peerID] = conn
+			WranglerConnections[peerID] = conn
 		}
 
-		fmt.Println("Accepted connection from", conn.RemoteAddr())
-		//DeputyUpdateChan <- true
+		fmt.Println("Accepted Wrangler", conn.RemoteAddr())
 		go ReceiveMessage(conn, incomingOrder, peerID, nodeLeftNetwork)
+
+		if len(WranglerConnections) == 1 {
+			go initFirstDeputy(conn, peerID)
+		}
+	}
+}
+
+func listenForDeputyConnection() {
+	ln, err := net.Listen("tcp", ":"+strconv.Itoa(config.Sheriff_deputy_port))
+	if err != nil {
+		fmt.Println("Error listening deputy connection:", err)
+		return
+	}
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			fmt.Println("Error accepting deputy connection:", err)
+			continue
+		}
+
+		tcpConn, ok := conn.(*net.TCPConn)
+		if !ok {
+			fmt.Println("Error casting to TCPConn")
+			continue
+		}
+
+		err = tcpConn.SetKeepAlive(true)
+		if err != nil {
+			fmt.Println("Error setting keepalive:", err)
+		}
+
+		err = tcpConn.SetKeepAlivePeriod(10 * time.Minute)
+		if err != nil {
+			fmt.Println("Error setting keepalive period:", err)
+		}
+
+		fmt.Println("Accepted deputy connection from", conn.RemoteAddr())
+		NewDeputyConnChan <- *tcpConn
 
 	}
 }
@@ -108,12 +198,13 @@ func listenForConnections(incomingOrder chan Orderstatus, nodeLeftNetwork chan s
 
 func SendOrderMessage(peer string, order Orderstatus) (bool, error) {
 	//ip := strings.Split(peer, ":")[0]
-	fmt.Println("Connections:", Connections)
+	fmt.Println("Connections:", WranglerConnections)
 	fmt.Println("Peer:", peer)
-	conn, ok := Connections[peer]
+	conn, ok := WranglerConnections[peer]
 
 	if !ok {
-		fmt.Println("No connection to peer", peer)
+		fmt.Println("No connection to ", peer)
+
 		return false, fmt.Errorf("no connection to peer %s", peer)
 	}
 
@@ -139,32 +230,22 @@ func SendOrderMessage(peer string, order Orderstatus) (bool, error) {
 	_, err = fmt.Fprintln(conn, string(msgJSON))
 	if err != nil {
 		fmt.Println("Error sending order:", err)
+		conn.Close()
+		delete(WranglerConnections, peer)
 		return false, err
 	}
-
-	// // Wait for an acknowledgement
-	// reader := bufio.NewReader(conn)
-	// acknowledgement, err := reader.ReadString('\n')
-	// if err != nil {
-	// 	return false, err
-	// }
-
-	// // Check the acknowledgement
-	// if strings.TrimSpace(acknowledgement) != "ACK" {
-	// 	return false, fmt.Errorf("unexpected acknowledgement: %s", acknowledgement)
-	// }
 	fmt.Println("successs Sent order to", peer, "order:", order)
 	return true, nil
 }
 
 func SendDeputyMessage(peer string, nodeOrders map[string]Orderstatus) (bool, error) {
 
-	conn, ok := Connections[peer]
+	//conn, ok := Connections[peer]
 
-	if !ok {
-		fmt.Println("No connection to peer", peer)
-		return false, fmt.Errorf("no connection to peer %s", peer)
-	}
+	// if !ok {
+	// 	fmt.Println("No connection to peer", peer)
+	// 	return false, fmt.Errorf("no connection to peer %s", peer)
+	// }
 
 	//convert the map to JSON
 	nodeOrdersJSON, err := json.Marshal(nodeOrders)
@@ -185,14 +266,16 @@ func SendDeputyMessage(peer string, nodeOrders map[string]Orderstatus) (bool, er
 		fmt.Println("Error marshalling deputy message:", err)
 	}
 
-	_, err = fmt.Fprintln(conn, string(msgJSON))
+	_, err = fmt.Fprintln(&deputyConn, string(msgJSON))
 	if err != nil {
 		fmt.Println("Error sending node orders to deputy, he might be dead:", err)
+		//deputyConn.Close()
+		DeputyDisconnectChan <- deputyConn
 
 		return false, err
 	}
 
-	fmt.Println("Sent node orders to deputy.", peer)
+	fmt.Println("Sent node orders to deputy.")
 	return true, nil
 
 }
@@ -207,9 +290,8 @@ func ReceiveMessage(conn net.Conn, incomingOrder chan Orderstatus, peerID string
 				fmt.Println("Connection closed by", peerID)
 
 				conn.Close()
-				//DeputyUpdateChan <- true
 				nodeLeftNetwork <- peerID
-				delete(Connections, peerID)
+				delete(WranglerConnections, peerID)
 				return Orderstatus{}, nil
 
 			} else {
@@ -226,13 +308,6 @@ func ReceiveMessage(conn net.Conn, incomingOrder chan Orderstatus, peerID string
 			continue
 		}
 
-		// // Send an acknowledgement
-		// _, err = fmt.Fprintln(conn, "ACK")
-		// if err != nil {
-		// 	fmt.Println("Error sending acknowledgement:", err)
-		// 	continue
-		// }
-
 		fmt.Println("Received order from", peerID)
 
 		//DeputyUpdateChan <- true
@@ -240,14 +315,13 @@ func ReceiveMessage(conn net.Conn, incomingOrder chan Orderstatus, peerID string
 		incomingOrder <- order
 
 	}
-
 }
 
-func ChooseNewDeputy() string {
+func ChooseNewDeputy() (net.Conn, string, error) {
 	//fmt.Println("Choosing new deputy")
-	for k := range Connections {
+	for k := range WranglerConnections {
 		fmt.Println("The new deputy is:", k)
-		return k
+		return WranglerConnections[k], k, nil
 	}
-	return ""
+	return nil, "", fmt.Errorf("no wrangler connections")
 }
