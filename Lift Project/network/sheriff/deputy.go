@@ -5,14 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"mymodule/config"
-	elev "mymodule/elevator"
+	. "mymodule/types"
 	"net"
 	"time"
 )
 
-var receivedDeputyNodeOrders = make(chan map[string]elev.Orderstatus)
+var receivedDeputyNodeOrders = make(chan map[string]Orderstatus)
 var sheriffDisconnected = make(chan net.Conn)
-var DeputyBecomeSheriff = make(chan map[string]elev.Orderstatus)
+var DeputyBecomeSheriff = make(chan map[string]Orderstatus)
 
 func initDeputy() {
 	sheriffIP := GetSheriffIP()
@@ -37,7 +37,7 @@ func connectDeputyToSheriff(sheriffIP string) (net.Conn, error) {
 }
 
 func sheriffHandler() {
-	var deputyNodeOrders map[string]elev.Orderstatus
+	var deputyNodeOrders map[string]Orderstatus
 
 	for {
 		select {
@@ -75,7 +75,7 @@ func receiveDeputyMessage(deputyToSheriffConn net.Conn) {
 
 		switch msg.Type {
 		case "deputyMessage":
-			var deputyNodeOrders map[string]elev.Orderstatus
+			var deputyNodeOrders map[string]Orderstatus
 			err = json.Unmarshal(msg.Data, &deputyNodeOrders)
 			if err != nil {
 				fmt.Println("Error parsing deputy message:", err)
@@ -91,7 +91,7 @@ func receiveDeputyMessage(deputyToSheriffConn net.Conn) {
 	sheriffDisconnected <- deputyToSheriffConn
 }
 
-func becomeSheriff(deputyNodeOrders map[string]elev.Orderstatus) {
+func becomeSheriff(deputyNodeOrders map[string]Orderstatus) {
 	//Dont know how right now
 	fmt.Println("Theres a new sheriff in town, I killed the old one")
 	fmt.Println("but I dont know how to become the sheriff yet.....")

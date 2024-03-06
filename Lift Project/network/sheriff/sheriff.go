@@ -24,6 +24,7 @@ var WranglerConnections = make(map[string]net.Conn)
 
 var NewDeputyConnChan = make(chan net.TCPConn)
 var DeputyDisconnectChan = make(chan net.TCPConn)
+
 func Sheriff(incomingOrder chan Orderstatus, networkOrders map[string]Orderstatus, nodeLeftNetwork chan string) {
 	ipID := strings.Split(string(config.Self_id), ":")
 	go peers.Transmitter(config.Sheriff_port, ipID[0], make(chan bool)) //channel for turning off sheriff transmitt?
@@ -238,7 +239,7 @@ func SendOrderMessage(peer string, order Orderstatus) (bool, error) {
 	return true, nil
 }
 
-func SendDeputyMessage(peer string, nodeOrders map[string]Orderstatus) (bool, error) {
+func SendDeputyMessage(deputyConn net.TCPConn, nodeOrders map[string]Orderstatus) (bool, error) {
 
 	//conn, ok := Connections[peer]
 
