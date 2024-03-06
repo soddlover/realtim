@@ -27,49 +27,49 @@ type World struct {
 type State int
 
 const (
-	initial State = iota
-	sherriff
-	deputy
-	wrangler
-	recovery
+	st_initial State = iota
+	st_sherriff
+	st_deputy
+	st_wrangler
+	st_recovery
 )
 
 var OnlineElevators = make(map[string]bool)
 var state State
 
 func NetworkFSM(channels Channels, world *World) {
-	state = initial
+	state = st_initial
 	for {
 		switch state {
-		case initial:
-			sIP := sheriff.GetSheriffIP()
+		case st_initial:
+			sIP := deputy.GetSheriffIP()
 			if sIP == "" {
 				NetworkOrders := make(map[string]Orderstatus)
 				InitSherrif(channels, world, NetworkOrders)
-				state = sherriff
+				state = st_sherriff
 			} else {
 				fmt.Println("I am not the only Wrangler in town, connecting to Sheriff:")
-				if sheriff.ConnectWranglerToSheriff(sIP) {
+				if wrangler.ConnectWranglerToSheriff(sIP) {
 					fmt.Println("Me, a Wrangler connected to Sheriff")
-					go sheriff.ReceiveMessageFromSheriff(channels.OrderAssigned)
+					go wrangler.ReceiveMessageFromSheriff(channels.OrderAssigned)
 					go orderForwarder(channels)
-					state = wrangler
+					state = st_wrangler
 				}
 			}
-		case sherriff:
+		case st_sherriff:
 			//im jamming
-		case deputy:
+		case st_deputy:
 			select {
 			case <-deputyPromotion:
 				initSheriff()
-				state = sherriff
+				state = st_sherriff
 			}
 
-		case wrangler:
+		case st_wrangler:
 			select {
 			case <-wranglerPromotion:
 				initDeputy()
-				state = deputy
+				state = st_deputy
 			}
 
 			//listen for incoming orders
@@ -77,7 +77,7 @@ func NetworkFSM(channels Channels, world *World) {
 			//listen for lost peers
 			//listen for orders to delete
 			//listen for orders to assign
-		case recovery:
+		case st_recovery:
 
 			//listen for incoming orders
 			//listen for new peers
@@ -180,13 +180,13 @@ func orderForwarder(channels Channels) {
 				channels.OrderAssigned <- orderstat
 				continue
 			}
-			if state == sherriff {
+			if state == st_sherriff {
 				channels.IncomingOrder <- orderstat
 			} else {
 				wrangler.SendOrderToSheriff(orderstat)
 			}
 		case orderstat := <-channels.OrderDelete:
-			if state == sherriff {
+			if state == st_sherriff {
 				channels.IncomingOrder <- orderstat
 			} else {
 				wrangler.SendOrderToSheriff(orderstat)
