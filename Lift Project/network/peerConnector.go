@@ -101,7 +101,7 @@ func NetworkFSM(channels Channels, world *World) {
 			//listen for orders to delete
 			//listen for orders to assign
 		case st_recovery:
-			fmt.Println("i am so lonely. AKA i need to recover?")
+			state = st_initial
 			//listen for incoming orders
 			//listen for new peers
 			//listen for lost peers
