@@ -1,6 +1,7 @@
 package types
 
 import (
+	"encoding/json"
 	. "mymodule/config"
 	"mymodule/elevator/elevio"
 )
@@ -53,4 +54,9 @@ type Elev struct {
 type Order struct {
 	Floor  int
 	Button elevio.ButtonType
+}
+
+type Message struct {
+	Type string          `json:"type"`
+	Data json.RawMessage `json:"data"`
 }

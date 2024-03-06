@@ -5,8 +5,10 @@ import (
 	"mymodule/config"
 	. "mymodule/elevator"
 	"mymodule/elevator/elevio"
+	"mymodule/network/SheriffDeputyWrangler/deputy"
+	"mymodule/network/SheriffDeputyWrangler/sheriff"
+	"mymodule/network/SheriffDeputyWrangler/wrangler"
 	"mymodule/network/peers"
-	"mymodule/network/sheriff"
 	. "mymodule/types"
 	"time"
 
@@ -103,6 +105,13 @@ func PeerConnector(id string, world *World, channels Channels) {
 
 	//OutgoingOrder := make(chan Order)
 
+	//This code is just to higlight which channels are available
+	select {
+	case <-deputy.DeputyBecomeSheriff:
+	case <-wrangler.WranglerPromotion:
+	case <-wrangler.SheriffDisconnectedFromWrangler:
+	}
+
 }
 
 func InitSherrif(channels Channels, world *World, NetworkOrders map[string]Orderstatus) {
@@ -174,13 +183,13 @@ func orderForwarder(channels Channels) {
 			if state == sherriff {
 				channels.IncomingOrder <- orderstat
 			} else {
-				sheriff.SendOrderToSheriff(orderstat)
+				wrangler.SendOrderToSheriff(orderstat)
 			}
 		case orderstat := <-channels.OrderDelete:
 			if state == sherriff {
 				channels.IncomingOrder <- orderstat
 			} else {
-				sheriff.SendOrderToSheriff(orderstat)
+				wrangler.SendOrderToSheriff(orderstat)
 			}
 
 		}
