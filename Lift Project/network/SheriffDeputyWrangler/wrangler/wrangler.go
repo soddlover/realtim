@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"mymodule/config"
 	"mymodule/network/conn"
 	"mymodule/types"
@@ -22,7 +23,8 @@ func ConnectWranglerToSheriff(sheriffIP string) bool {
 		fmt.Println("Error connecting to sheriff:", err)
 		return false
 	}
-
+	fmt.Fprintf(conn, "%s\n", config.Self_id)
+	fmt.Println("sent id to sheriff:", config.Self_id)
 	sheriffConn = conn
 	return true
 }
@@ -63,45 +65,56 @@ func SendOrderToSheriff(order Orderstatus) (bool, error) {
 }
 
 // ReceiveMessageFromsheriff receives an order from the sheriff and sends an acknowledgement
-func ReceiveMessageFromSheriff(orderAssigned chan Orderstatus) {
-	readErrors := 0
-	for readErrors < 3 {
-		reader := bufio.NewReader(sheriffConn)
-		message, err := reader.ReadString('\n')
-		//fmt.Println("Received message from sheriff:", message)
-		if err != nil {
-			fmt.Println("Error reading from sheriff:", err)
-			time.Sleep(5 * time.Second)
-			readErrors++
-			continue
-		}
+func ReceiveMessageFromSheriff(orderAssigned chan Orderstatus, networkchannels NetworkChannels) {
 
-		var msg types.Message
-		err = json.Unmarshal([]byte(message), &msg)
-		if err != nil {
-			fmt.Println("Error parsing message:", err)
-			continue
-		}
+	for {
+		select {
 
-		switch msg.Type {
-		case "order":
-			var order Orderstatus
-			err = json.Unmarshal(msg.Data, &order)
+		default:
+			reader := bufio.NewReader(sheriffConn)
+			message, err := reader.ReadString('\n')
+			//fmt.Println("Received message from sheriff:", message)
 			if err != nil {
-				fmt.Println("Error parsing order:", err)
+				if err == io.EOF {
+					fmt.Println("Connection closed by sheriff in wrangler")
+					sheriffConn.Close()
+					networkchannels.SheriffDead <- true
+					fmt.Println("we did it")
+					return
+				}
+				fmt.Println("Error reading from sheriff as wrangles\r:", err)
+
+			}
+
+			var msg types.Message
+			err = json.Unmarshal([]byte(message), &msg)
+			if err != nil {
+				fmt.Println("Error parsing message:", err)
 				continue
 			}
 
-			fmt.Println("Order received from sheriff:", order)
-			orderAssigned <- order // Send the order to the elevator
+			switch msg.Type {
+			case "order":
+				var order Orderstatus
+				err = json.Unmarshal(msg.Data, &order)
+				if err != nil {
+					fmt.Println("Error parsing order:", err)
+					continue
+				}
 
-		case "requestToBecomeDeputy":
-			fmt.Println("Received request to become deputy from sheriff")
-			//initDeputy() //not sure if it should be go'ed or not
-			WranglerPromotion <- true
+				fmt.Println("Order received from sheriff:", order)
+				orderAssigned <- order // Send the order to the elevator
 
-		default:
-			fmt.Println("Unknown message type:", msg.Type)
+			case "requestToBecomeDeputy":
+				fmt.Println("Received request to become deputy from sheriff")
+				//initDeputy() //not sure if it should be go'ed or not
+				networkchannels.WranglerPromotion <- true
+
+			default:
+				fmt.Println("Unknown message type:", msg.Type)
+			}
 		}
+
 	}
+	//over 3 readerrors
 }

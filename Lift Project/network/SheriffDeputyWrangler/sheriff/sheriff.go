@@ -104,17 +104,19 @@ func listenForWranglerConnections(incomingOrder chan Orderstatus, nodeLeftNetwor
 			fmt.Println("Error accepting connection:", err)
 			continue
 		}
-
-		var peerID string
-		if _, ok := WranglerConnections[strings.Split(conn.RemoteAddr().String(), ":")[0]+":1"]; ok {
-			peerID = strings.Split(conn.RemoteAddr().String(), ":")[0] + ":2"
-			WranglerConnections[peerID] = conn
-		} else {
-			peerID = strings.Split(conn.RemoteAddr().String(), ":")[0] + ":1"
-			WranglerConnections[peerID] = conn
+		reader := bufio.NewReader(conn)
+		message, err := reader.ReadString('\n')
+		if err != nil {
+			fmt.Println("Error reading from connection:", err)
+			continue
 		}
 
-		fmt.Println("Accepted Wrangler", conn.RemoteAddr())
+		peerID := strings.TrimSpace(message)
+
+		WranglerConnections[peerID] = conn
+
+		fmt.Println("Accepted Wrangler", peerID)
+		fmt.Println(WranglerConnections)
 		go ReceiveMessage(conn, incomingOrder, peerID, nodeLeftNetwork)
 
 		if len(WranglerConnections) == 1 {
@@ -141,6 +143,7 @@ func listenForDeputyConnection() {
 			fmt.Println("Error casting to TCPConn")
 			continue
 		}
+		fmt.Fprintf(tcpConn, "%s\n", config.Self_id)
 
 		err = tcpConn.SetKeepAlive(true)
 		if err != nil {

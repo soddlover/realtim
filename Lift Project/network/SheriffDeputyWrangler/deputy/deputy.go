@@ -4,72 +4,67 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"mymodule/config"
 	"mymodule/network/conn"
-	"mymodule/types"
 	. "mymodule/types"
 	"net"
+	"strings"
 	"time"
 )
 
-var receivedDeputyNodeOrders = make(chan map[string]Orderstatus)
-var sheriffDisconnected = make(chan net.Conn)
 var DeputyBecomeSheriff = make(chan map[string]Orderstatus)
 
-func initDeputy() {
+func InitDeputy(networkchannels NetworkChannels) (bool, string) {
 	sheriffIP := GetSheriffIP()
-	dep2SherConn, err := connectDeputyToSheriff(sheriffIP)
+	dep2SherConn, err, sheriffID := connectDeputyToSheriff(sheriffIP)
 	if err != nil {
 		fmt.Println("Error connecting to sheriff:", err)
-		return
+		return false, "nil"
 	}
-	go sheriffHandler()
-	go receiveDeputyMessage(dep2SherConn)
+
+	go receiveDeputyMessage(dep2SherConn, networkchannels)
+	return true, sheriffID
 }
 
-func connectDeputyToSheriff(sheriffIP string) (net.Conn, error) {
+func connectDeputyToSheriff(sheriffIP string) (net.Conn, error, string) {
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", sheriffIP, config.Sheriff_deputy_port))
 	if err != nil {
 		fmt.Println("Error connecting to sheriff:", err)
-		return nil, err
+		return nil, err, "nil"
 	}
+	reader := bufio.NewReader(conn)
+	message, err := reader.ReadString('\n')
+	if err != nil {
+		fmt.Println("Error reading from sheriff:", err)
+		return nil, err, "nil"
+	}
+	fmt.Println("Received message from sheriff:", message)
+	sheriffID := strings.TrimSpace(message)
+
 	fmt.Println("Me, a deputy, connected to sheriff")
 
-	return conn, nil
+	return conn, nil, sheriffID
 }
 
-func sheriffHandler() {
+func receiveDeputyMessage(deputyToSheriffConn net.Conn, networkchannels NetworkChannels) {
 	var deputyNodeOrders map[string]Orderstatus
-
 	for {
-		select {
-		case orders := <-receivedDeputyNodeOrders:
-			deputyNodeOrders = orders
-
-		case <-sheriffDisconnected:
-			fmt.Println("Sheriff disconnected")
-			fmt.Println("Theres a new sheriff in town, I killed the old one")
-			fmt.Println("but I dont know how to become the sheriff yet.....")
-			DeputyBecomeSheriff <- deputyNodeOrders // Not sure if this is the right way to do it
-
-		}
-	}
-}
-
-func receiveDeputyMessage(deputyToSheriffConn net.Conn) {
-	readErrors := 0
-	for readErrors < 3 {
 		reader := bufio.NewReader(deputyToSheriffConn)
 		message, err := reader.ReadString('\n')
 		//fmt.Println("Received message from sheriff:", message)
 		if err != nil {
+			if err == io.EOF {
+				fmt.Println("Connection closed from sheriff, deputy becomes sheriff")
+				networkchannels.DeputyPromotion <- deputyNodeOrders
+				return
+			}
 			fmt.Println("Error reading from sheriff:", err)
 			time.Sleep(2 * time.Second)
-			readErrors++
 			continue
 		}
 
-		var msg types.Message
+		var msg Message
 		err = json.Unmarshal([]byte(message), &msg)
 		if err != nil {
 			fmt.Println("Error parsing message:", err)
@@ -79,12 +74,13 @@ func receiveDeputyMessage(deputyToSheriffConn net.Conn) {
 
 		switch msg.Type {
 		case "deputyMessage":
-			var deputyNodeOrders map[string]Orderstatus
-			err = json.Unmarshal(msg.Data, &deputyNodeOrders)
+			var orders map[string]Orderstatus
+			err = json.Unmarshal(msg.Data, &orders)
 			if err != nil {
 				fmt.Println("Error parsing deputy message:", err)
 				continue
 			}
+			deputyNodeOrders = orders
 			// Handle deputy message...
 			fmt.Println("Received deputy message from sheriff")
 
@@ -92,7 +88,7 @@ func receiveDeputyMessage(deputyToSheriffConn net.Conn) {
 			fmt.Println("Unknown message type:", msg.Type)
 		}
 	}
-	sheriffDisconnected <- deputyToSheriffConn
+
 }
 
 func GetSheriffIP() string {

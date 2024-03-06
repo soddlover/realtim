@@ -36,40 +36,63 @@ const (
 
 var OnlineElevators = make(map[string]bool)
 var state State
+var sheriffID string
 
 func NetworkFSM(channels Channels, world *World) {
+	networkChannels := NetworkChannels{
+		DeputyPromotion:   make(chan map[string]Orderstatus),
+		WranglerPromotion: make(chan bool),
+		SheriffDead:       make(chan bool),
+		RelievedOfDuty:    make(chan bool),
+	}
 	state = st_initial
+
 	for {
 		switch state {
 		case st_initial:
 			sIP := deputy.GetSheriffIP()
 			if sIP == "" {
 				NetworkOrders := make(map[string]Orderstatus)
-				InitSherrif(channels, world, NetworkOrders)
+				InitSherrif(channels, world, NetworkOrders, "")
 				state = st_sherriff
+				fmt.Println("I am the only Wrangler in town, I am the Sheriff!")
 			} else {
 				fmt.Println("I am not the only Wrangler in town, connecting to Sheriff:")
 				if wrangler.ConnectWranglerToSheriff(sIP) {
 					fmt.Println("Me, a Wrangler connected to Sheriff")
-					go wrangler.ReceiveMessageFromSheriff(channels.OrderAssigned)
-					go orderForwarder(channels)
+					go wrangler.ReceiveMessageFromSheriff(channels.OrderAssigned, networkChannels)
 					state = st_wrangler
 				}
 			}
+			go orderForwarder(channels)
+
 		case st_sherriff:
 			//im jamming
+			//sheriff Conflict
+			//Shootout
+			//Fastest trigger in the west?
 		case st_deputy:
 			select {
-			case <-deputyPromotion:
-				initSheriff()
+			case orders := <-networkChannels.DeputyPromotion:
+				InitSherrif(channels, world, orders, sheriffID)
 				state = st_sherriff
+				fmt.Println("Scareyblock?")
+				<-networkChannels.SheriffDead
+				fmt.Println("Scareyblock!")
 			}
 
 		case st_wrangler:
 			select {
-			case <-wranglerPromotion:
-				initDeputy()
-				state = st_deputy
+			case <-networkChannels.WranglerPromotion:
+				var connected bool
+				connected, sheriffID = deputy.InitDeputy(networkChannels)
+				if connected {
+					state = st_deputy
+				} else {
+					fmt.Println("Fuck my life")
+				}
+			case <-networkChannels.SheriffDead:
+				state = st_recovery
 			}
 
 			//listen for incoming orders
@@ -78,7 +101,7 @@ func NetworkFSM(channels Channels, world *World) {
 			//listen for orders to delete
 			//listen for orders to assign
 		case st_recovery:
-
+			fmt.Println("i am so lonely. AKA i need to recover?")
 			//listen for incoming orders
 			//listen for new peers
 			//listen for lost peers
@@ -95,65 +118,40 @@ func PeerConnector(id string, world *World, channels Channels) {
 	peerUpdateCh := make(chan peers.PeerUpdate)
 	peerTxEnable := make(chan bool)
 
-	peerUpdateSheriff := make(chan peers.PeerUpdate)
 	println("PeerConnector started, transmitting id: ", id)
 	go peers.Transmitter(config.Peer_port, id, peerTxEnable)
 	go peers.Receiver(config.Peer_port, peerUpdateCh)
-	go peerUpdater(peerUpdateCh, world, peerUpdateSheriff)
 	go NetworkFSM(channels, world)
 	//on startup wait for connections then check if only one is online
 
 	//OutgoingOrder := make(chan Order)
 
 	//This code is just to higlight which channels are available
-	select {
-	case <-deputy.DeputyBecomeSheriff:
-	case <-wrangler.WranglerPromotion:
-	case <-wrangler.SheriffDisconnectedFromWrangler:
-	}
 
 }
 
-func InitSherrif(channels Channels, world *World, NetworkOrders map[string]Orderstatus) {
+func InitSherrif(channels Channels, world *World, NetworkOrders map[string]Orderstatus, oldSheriff string) {
 	fmt.Println("I am the only Wrangler in town, I am the Sheriff!")
 	nodeLeftNetwork := make(chan string)
 	go sheriff.Sheriff(channels.IncomingOrder, NetworkOrders, nodeLeftNetwork)
-	go orderForwarder(channels)
 	go Assigner(channels, world, NetworkOrders)
 	go redistributer(nodeLeftNetwork, channels.IncomingOrder, world, NetworkOrders)
-
-}
-
-func peerUpdater(peerUpdateCh chan peers.PeerUpdate, world *World, peerUpdateSheriff chan peers.PeerUpdate) {
-	for {
-		select {
-		case p := <-peerUpdateCh:
-			fmt.Printf("Peer update:\n")
-			fmt.Printf("  Peers:    %q\n", p.Peers)
-			fmt.Printf("  New:      %q\n", p.New)
-			fmt.Printf("  Lost:     %q\n", p.Lost)
-			// for _, peer := range p.Peers {
-			// 	OnlineElevators[peer] = true
-			// }
-			// for _, element := range p.Lost {
-			// 	//OnlineElevators[element] = false
-			// 	//delete(world.Map, element)
-			// 	//elevator := world.Map[element]
-			// 	//elevator.State = Undefined
-			// 	//world.Map[element] = elevator
-			// 	//print("element was set as unavailable")
-			// }
-
-		}
+	if oldSheriff != "" {
+		nodeLeftNetwork <- oldSheriff
+		fmt.Println("Sending old sheriff to redistributer", oldSheriff)
 	}
+
 }
 
 func redistributer(nodeLeftNetwork chan string, incomingOrder chan Orderstatus, world *World, NetworkOrders map[string]Orderstatus) {
 	for {
 		select {
 		case peerid := <-nodeLeftNetwork:
+			fmt.Printf("world.Map: %v\n", world.Map)
 			delete(world.Map, peerid)
+			fmt.Printf("world.Map: %v\n", world.Map)
 			fmt.Println("Node left network, redistributing orders")
+			fmt.Println("NetworkOrders: ", NetworkOrders)
 			//check for orders owned by the leaving node
 			for _, order := range NetworkOrders {
 				if order.Owner == peerid {

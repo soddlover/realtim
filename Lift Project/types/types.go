@@ -18,6 +18,13 @@ type Channels struct {
 	IncomingOrder           chan Orderstatus
 }
 
+type NetworkChannels struct {
+	DeputyPromotion   chan map[string]Orderstatus
+	WranglerPromotion chan bool
+	SheriffDead       chan bool
+	RelievedOfDuty    chan bool
+}
+
 type Orderstatus struct {
 	Owner   string
 	OrderID string
