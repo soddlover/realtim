@@ -5,8 +5,10 @@ import (
 	"mymodule/config"
 	. "mymodule/elevator"
 	"mymodule/elevator/elevio"
+	"mymodule/network/SheriffDeputyWrangler/deputy"
+	"mymodule/network/SheriffDeputyWrangler/sheriff"
+	"mymodule/network/SheriffDeputyWrangler/wrangler"
 	"mymodule/network/peers"
-	"mymodule/network/sheriff"
 	. "mymodule/types"
 
 	"github.com/google/uuid"
@@ -39,18 +41,25 @@ func PeerConnector(id string, world *World, channels Channels) {
 	listenForSheriffIP(channels, world)
 	//OutgoingOrder := make(chan Order)
 
+	//This code is just to higlight which channels are available
+	select {
+	case <-deputy.DeputyBecomeSheriff:
+	case <-wrangler.WranglerPromotion:
+	case <-wrangler.SheriffDisconnectedFromWrangler:
+	}
+
 }
 
 func listenForSheriffIP(channels Channels, world *World) {
-	sIP := sheriff.GetSheriffIP()
+	sIP := wrangler.GetSheriffIP()
 	if sIP == "" {
 		NetworkOrders := make(map[string]Orderstatus)
 		InitSherrif(channels, world, NetworkOrders)
 	} else {
 		fmt.Println("I am not the only Wrangler in town, connecting to Sheriff:")
-		if sheriff.ConnectWranglerToSheriff(sIP) {
+		if wrangler.ConnectWranglerToSheriff(sIP) {
 			fmt.Println("Me, a Wrangler connected to Sheriff")
-			go sheriff.ReceiveMessageFromSheriff(channels.OrderAssigned)
+			go wrangler.ReceiveMessageFromSheriff(channels.OrderAssigned)
 			go orderForwarder(channels)
 		}
 	}
@@ -126,13 +135,13 @@ func orderForwarder(channels Channels) {
 			if IsSheriff {
 				channels.IncomingOrder <- orderstat
 			} else {
-				sheriff.SendOrderToSheriff(orderstat)
+				wrangler.SendOrderToSheriff(orderstat)
 			}
 		case orderstat := <-channels.OrderDelete:
 			if IsSheriff {
 				channels.IncomingOrder <- orderstat
 			} else {
-				sheriff.SendOrderToSheriff(orderstat)
+				wrangler.SendOrderToSheriff(orderstat)
 			}
 
 		}
