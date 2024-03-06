@@ -66,7 +66,7 @@ func SendOrderToSheriff(order Orderstatus) (bool, error) {
 
 // ReceiveMessageFromsheriff receives an order from the sheriff and sends an acknowledgement
 func ReceiveMessageFromSheriff(orderAssigned chan Orderstatus, networkchannels NetworkChannels) {
-
+	var nodeOrdersData NodeOrdersData
 	for {
 		select {
 
@@ -78,7 +78,7 @@ func ReceiveMessageFromSheriff(orderAssigned chan Orderstatus, networkchannels N
 				if err == io.EOF {
 					fmt.Println("Connection closed by sheriff in wrangler")
 					sheriffConn.Close()
-					networkchannels.SheriffDead <- true
+					networkchannels.SheriffDead <- nodeOrdersData
 					fmt.Println("we did it")
 					return
 				}
@@ -105,10 +105,14 @@ func ReceiveMessageFromSheriff(orderAssigned chan Orderstatus, networkchannels N
 				fmt.Println("Order received from sheriff:", order)
 				orderAssigned <- order // Send the order to the elevator
 
-			case "requestToBecomeDeputy":
-				fmt.Println("Received request to become deputy from sheriff")
+			case "NodeOrders":
 				//initDeputy() //not sure if it should be go'ed or not
-				networkchannels.WranglerPromotion <- true
+				err = json.Unmarshal(msg.Data, &nodeOrdersData)
+				if err != nil {
+					fmt.Println("Error parsing order:", err)
+					continue
+				}
+				fmt.Println("Received nodeOrdersData from sheriff:")
 
 			default:
 				fmt.Println("Unknown message type:", msg.Type)

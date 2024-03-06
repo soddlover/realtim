@@ -21,9 +21,15 @@ func elevStart(drv_floors chan int) {
 func ShouldStop(elevator Elev) bool {
 	switch elevator.Dir {
 	case DirUp:
-		return elevator.Queue[elevator.Floor][BT_HallUp] ||
-			elevator.Queue[elevator.Floor][BT_Cab] ||
-			!OrdersAbove(elevator)
+		if elevator.Floor < len(elevator.Queue) &&
+			4 > len(elevator.Queue[elevator.Floor]) {
+			return elevator.Queue[elevator.Floor][BT_HallUp] ||
+				elevator.Queue[elevator.Floor][BT_Cab] || !OrdersAbove(elevator)
+
+		} else {
+			fmt.Println("ERROR: Index out of bounds. The floor number is greater than the length of the queue.")
+			return false
+		}
 	case DirDown:
 		return elevator.Queue[elevator.Floor][BT_HallDown] ||
 			elevator.Queue[elevator.Floor][BT_Cab] ||

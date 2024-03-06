@@ -20,75 +20,26 @@ var WranglerConnections = make(map[string]net.Conn)
 var NewDeputyConnChan = make(chan net.TCPConn)
 var DeputyDisconnectChan = make(chan net.TCPConn)
 
+func CheckMissingConnToOrders(networkOrders map[string]Orderstatus, nodeLeftNetwork chan string) {
+	processedIDs := make(map[string]bool)
+
+	for _, order := range networkOrders {
+		id := order.Owner
+		if WranglerConnections[id] == nil && id != config.Self_id && !processedIDs[id] {
+			nodeLeftNetwork <- id
+			fmt.Println("***Missing connection to ACTIVE ORDER Reassigning order!!!***", id)
+			processedIDs[id] = true
+		}
+	}
+}
 func Sheriff(incomingOrder chan Orderstatus, networkOrders map[string]Orderstatus, nodeLeftNetwork chan string) {
 	ipID := strings.Split(string(config.Self_id), ":")
 	go peers.Transmitter(config.Sheriff_port, ipID[0], make(chan bool)) //channel for turning off sheriff transmitt?
 	//go peers.Receiver(15647, peerUpdateCh)
-	go deputyHandeler(networkOrders)
 	go listenForWranglerConnections(incomingOrder, nodeLeftNetwork)
-}
-
-func deputyHandeler(nodeOrders map[string]Orderstatus) {
-	var deputyConn net.TCPConn
-	var ticker *time.Ticker = time.NewTicker(DEPUTY_SEND_FREQ)
-	ticker.Stop()
-	tickerRunning := false
-
-	for {
-		select {
-		case <-DeputyDisconnectChan:
-			if tickerRunning {
-				ticker.Stop()
-				tickerRunning = false
-			}
-			if len(WranglerConnections) != 0 {
-				wranglerConn, peer, _ := ChooseNewDeputy()
-				go initFirstDeputy(wranglerConn, peer)
-			} else {
-				fmt.Println("No wrangler connections")
-			}
-
-		case deputyConn = <-NewDeputyConnChan:
-			if !tickerRunning {
-				ticker.Reset(DEPUTY_SEND_FREQ)
-				tickerRunning = true
-			}
-
-		case <-ticker.C:
-			fmt.Println("Sending node orders to deputy")
-			go SendDeputyMessage(deputyConn, nodeOrders)
-		}
-	}
-}
-
-func initFirstDeputy(wranglerConn net.Conn, peer string) {
-	go sendRequestToBecomeDeputy(wranglerConn, peer)
-	go listenForDeputyConnection()
-}
-
-func sendRequestToBecomeDeputy(wranglerConn net.Conn, peer string) {
-
-	msg := Message{
-		Type: "requestToBecomeDeputy",
-		Data: nil,
-	}
-
-	// Convert the message to JSON
-	msgJSON, err := json.Marshal(msg)
-	if err != nil {
-		fmt.Println("Error marshalling deputy message:", err)
-	}
-
-	_, err = fmt.Fprintln(wranglerConn, string(msgJSON))
-	if err != nil {
-		fmt.Println("Error sending request to wrangler to become deputy, he might be dead:", err)
-		wranglerConn.Close()
-		delete(WranglerConnections, peer)
-		return
-	}
-
-	fmt.Println("Sent request to wrangler to become deputy")
-	// return true, nil
+	go SendNodeOrdersToDeputy(networkOrders)
+	time.Sleep(1 * time.Second)
+	CheckMissingConnToOrders(networkOrders, nodeLeftNetwork)
 }
 
 func listenForWranglerConnections(incomingOrder chan Orderstatus, nodeLeftNetwork chan string) {
@@ -119,80 +70,60 @@ func listenForWranglerConnections(incomingOrder chan Orderstatus, nodeLeftNetwor
 		fmt.Println(WranglerConnections)
 		go ReceiveMessage(conn, incomingOrder, peerID, nodeLeftNetwork)
 
-		if len(WranglerConnections) == 1 {
-			go initFirstDeputy(conn, peerID)
-		}
 	}
 }
 
-func listenForDeputyConnection() {
-	ln, err := net.Listen("tcp", ":"+strconv.Itoa(config.Sheriff_deputy_port))
-	if err != nil {
-		fmt.Println("Error listening deputy connection:", err)
-		return
-	}
+func SendNodeOrdersToDeputy(nodeOrders map[string]Orderstatus) {
+	ticker := time.NewTicker(3 * time.Second)
+	defer ticker.Stop()
+
 	for {
-		conn, err := ln.Accept()
-		if err != nil {
-			fmt.Println("Error accepting deputy connection:", err)
-			continue
+		select {
+		case <-ticker.C:
+			SendDeputyMessage(nodeOrders)
+			//add updatechan
 		}
-
-		tcpConn, ok := conn.(*net.TCPConn)
-		if !ok {
-			fmt.Println("Error casting to TCPConn")
-			continue
-		}
-		fmt.Fprintf(tcpConn, "%s\n", config.Self_id)
-
-		err = tcpConn.SetKeepAlive(true)
-		if err != nil {
-			fmt.Println("Error setting keepalive:", err)
-		}
-
-		err = tcpConn.SetKeepAlivePeriod(10 * time.Minute)
-		if err != nil {
-			fmt.Println("Error setting keepalive period:", err)
-		}
-
-		fmt.Println("Accepted deputy connection from", conn.RemoteAddr())
-		NewDeputyConnChan <- *tcpConn
-
 	}
 }
 
-// func sheriffUpdater(peerUpdateCh chan peers.PeerUpdate, world *assigner.World) {
+func SendDeputyMessage(nodeOrders map[string]Orderstatus) {
+	var chosenOneID string
+	for id, conn := range WranglerConnections {
+		if chosenOneID == "" || WranglerConnections[chosenOneID] == nil {
+			chosenOneID = id
+		}
+		nodeOrdersData := NodeOrdersData{
+			NodeOrders:   nodeOrders,
+			TheChosenOne: id == chosenOneID, // or false, depending on your logic
+		}
+		nodeOrdersDataJSON, err := json.Marshal(nodeOrdersData)
+		if err != nil {
+			fmt.Println("Error marshalling node orders to be sent to deputy:", err)
+		}
 
-// 	for {
-// 		select {
-// 		case p := <-peerUpdateCh:
-// 			// Connect to new peers
-// 			for _, newPeer := range p.New {
-// 				ipID := strings.Split(string(newPeer), ":")
-// 				IDint, err := strconv.Atoi(ipID[1])
-// 				if err != nil {
-// 					fmt.Println("Error converting string to int:", err)
-// 					return
-// 				}
-// 				port := config.TCP_port + IDint
-// 				conn, err := net.Dial("tcp", string(ipID[0])+":"+string(port))
-// 				if err != nil {
-// 					fmt.Println("Error connecting to peer:", err)
-// 					continue
-// 				}
-// 				Connections[string(newPeer)] = conn
-// 			}
+		// Create a new message with type "deputy"
+		msg := Message{
+			Type: "NodeOrders",
+			Data: nodeOrdersDataJSON,
+		}
 
-// 			// Close connections to lost peers
-// 			for _, lostPeer := range p.Lost {
-// 				if conn, ok := Connections[lostPeer]; ok {
-// 					conn.Close()
-// 					delete(Connections, lostPeer)
-// 				}
-// 			}
-// 		}
-// 	}
-// }
+		// Convert the message to JSON
+		msgJSON, err := json.Marshal(msg)
+		if err != nil {
+			fmt.Println("Error marshalling deputy message:", err)
+		}
+
+		_, err = fmt.Fprintln(conn, string(msgJSON))
+		if err != nil {
+			fmt.Println("Error sending node orders to deputy, he might be dead:", err)
+			//deputyConn.Close()
+			//DeputyDisconnectChan <- deputyConn
+		}
+
+		fmt.Println("Sent node orders to deputy.")
+
+	}
+}
 
 func SendOrderMessage(peer string, order Orderstatus) (bool, error) {
 	//ip := strings.Split(peer, ":")[0]
@@ -234,48 +165,6 @@ func SendOrderMessage(peer string, order Orderstatus) (bool, error) {
 	}
 	fmt.Println("successs Sent order to", peer, "order:", order)
 	return true, nil
-}
-
-func SendDeputyMessage(deputyConn net.TCPConn, nodeOrders map[string]Orderstatus) (bool, error) {
-
-	//conn, ok := Connections[peer]
-
-	// if !ok {
-	// 	fmt.Println("No connection to peer", peer)
-	// 	return false, fmt.Errorf("no connection to peer %s", peer)
-	// }
-
-	//convert the map to JSON
-	nodeOrdersJSON, err := json.Marshal(nodeOrders)
-	if err != nil {
-		fmt.Println("Error marshalling node orders to be sent to deputy:", err)
-		return false, err
-	}
-
-	// Create a new message with type "deputy"
-	msg := Message{
-		Type: "deputyMessage",
-		Data: nodeOrdersJSON,
-	}
-
-	// Convert the message to JSON
-	msgJSON, err := json.Marshal(msg)
-	if err != nil {
-		fmt.Println("Error marshalling deputy message:", err)
-	}
-
-	_, err = fmt.Fprintln(&deputyConn, string(msgJSON))
-	if err != nil {
-		fmt.Println("Error sending node orders to deputy, he might be dead:", err)
-		//deputyConn.Close()
-		DeputyDisconnectChan <- deputyConn
-
-		return false, err
-	}
-
-	fmt.Println("Sent node orders to deputy.")
-	return true, nil
-
 }
 
 func ReceiveMessage(conn net.Conn, incomingOrder chan Orderstatus, peerID string, nodeLeftNetwork chan string) (Orderstatus, error) {

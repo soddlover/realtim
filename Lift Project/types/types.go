@@ -21,7 +21,7 @@ type Channels struct {
 type NetworkChannels struct {
 	DeputyPromotion   chan map[string]Orderstatus
 	WranglerPromotion chan bool
-	SheriffDead       chan bool
+	SheriffDead       chan NodeOrdersData
 	RelievedOfDuty    chan bool
 }
 
@@ -66,4 +66,9 @@ type Order struct {
 type Message struct {
 	Type string          `json:"type"`
 	Data json.RawMessage `json:"data"`
+}
+
+type NodeOrdersData struct {
+	NodeOrders   map[string]Orderstatus
+	TheChosenOne bool
 }

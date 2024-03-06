@@ -44,8 +44,8 @@ func RunElev(channels Channels, initElev Elev) {
 	go updateLights(&elevator)
 	//go printElevator(&elevator)
 	elevStart(drv_floors)
+	elevator.Floor = elevio.GetFloor()
 	elevio.SetMotorDirection(elevio.MotorDirection(ChooseDirection(elevator)))
-	elevator.Dir = DirStop
 	channels.ElevatorStates <- elevator
 	channels.ElevatorStatesBroadcast <- elevator
 
@@ -191,6 +191,7 @@ func saveLocalOrder(channels Channels, OrdersToQueoe chan Order) {
 
 				//what if sherriff disconnect while sending this?=?!
 				channels.OrderDelete <- order
+				time.Sleep(100 * time.Millisecond)
 			}
 		}
 	}

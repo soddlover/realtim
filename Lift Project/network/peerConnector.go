@@ -5,7 +5,6 @@ import (
 	"mymodule/config"
 	. "mymodule/elevator"
 	"mymodule/elevator/elevio"
-	"mymodule/network/SheriffDeputyWrangler/deputy"
 	"mymodule/network/SheriffDeputyWrangler/sheriff"
 	"mymodule/network/SheriffDeputyWrangler/wrangler"
 	"mymodule/network/peers"
@@ -42,7 +41,7 @@ func NetworkFSM(channels Channels, world *World) {
 	networkChannels := NetworkChannels{
 		DeputyPromotion:   make(chan map[string]Orderstatus),
 		WranglerPromotion: make(chan bool),
-		SheriffDead:       make(chan bool),
+		SheriffDead:       make(chan NodeOrdersData),
 		RelievedOfDuty:    make(chan bool),
 	}
 	state = st_initial
@@ -50,12 +49,11 @@ func NetworkFSM(channels Channels, world *World) {
 	for {
 		switch state {
 		case st_initial:
-			sIP := deputy.GetSheriffIP()
+			sIP := wrangler.GetSheriffIP()
 			if sIP == "" {
 				NetworkOrders := make(map[string]Orderstatus)
 				InitSherrif(channels, world, NetworkOrders, "")
 				state = st_sherriff
-				fmt.Println("I am the only Wrangler in town, I am the Sheriff!")
 			} else {
 				fmt.Println("I am not the only Wrangler in town, connecting to Sheriff:")
 				if wrangler.ConnectWranglerToSheriff(sIP) {
@@ -65,34 +63,23 @@ func NetworkFSM(channels Channels, world *World) {
 				}
 			}
 			go orderForwarder(channels)
-
 		case st_sherriff:
 			//im jamming
 			//sheriff Conflict
 			//Shootout
 			//Fastest trigger in the west?
-		case st_deputy:
-			select {
-			case orders := <-networkChannels.DeputyPromotion:
-				InitSherrif(channels, world, orders, sheriffID)
-				state = st_sherriff
-				fmt.Println("Scareyblock?")
-				<-networkChannels.SheriffDead
-				fmt.Println("Scareyblock!")
-			}
 
 		case st_wrangler:
-			select {
-			case <-networkChannels.WranglerPromotion:
-				var connected bool
-				connected, sheriffID = deputy.InitDeputy(networkChannels)
-				if connected {
-					state = st_deputy
-				} else {
-					fmt.Println("Fuck my life")
-				}
-			case <-networkChannels.SheriffDead:
-				state = st_recovery
+			nodeOrdersData := <-networkChannels.SheriffDead
+
+			if nodeOrdersData.TheChosenOne {
+				fmt.Println("I am the chosen one, I am the Sheriff!")
+				InitSherrif(channels, world, nodeOrdersData.NodeOrders, sheriffID)
+				state = st_sherriff
+
+			} else {
+				fmt.Println("I am not the chosen one, I am a Deputy")
+				state = st_initial
 			}
 
 			//listen for incoming orders
@@ -131,8 +118,9 @@ func PeerConnector(id string, world *World, channels Channels) {
 }
 
 func InitSherrif(channels Channels, world *World, NetworkOrders map[string]Orderstatus, oldSheriff string) {
-	fmt.Println("I am the only Wrangler in town, I am the Sheriff!")
 	nodeLeftNetwork := make(chan string)
+	fmt.Println("I am the only Wrangler in town, I am the Sheriff!")
+
 	go sheriff.Sheriff(channels.IncomingOrder, NetworkOrders, nodeLeftNetwork)
 	go Assigner(channels, world, NetworkOrders)
 	go redistributer(nodeLeftNetwork, channels.IncomingOrder, world, NetworkOrders)
@@ -147,7 +135,6 @@ func redistributer(nodeLeftNetwork chan string, incomingOrder chan Orderstatus, 
 	for {
 		select {
 		case peerid := <-nodeLeftNetwork:
-			fmt.Printf("world.Map: %v\n", world.Map)
 			delete(world.Map, peerid)
 			fmt.Printf("world.Map: %v\n", world.Map)
 			fmt.Println("Node left network, redistributing orders")
@@ -209,12 +196,20 @@ func Assigner(channels Channels, world *World, NetworkOrders map[string]Ordersta
 			best_id := config.Self_id
 			best_duration := 1000000 * time.Second
 			for id, elevator := range world.Map {
+				if elevator.Floor == -1 {
+					fmt.Println("Elevator with id: ", id, " is not initialized")
+					continue
+				}
+				if len(elevator.Queue) == 0 {
+					fmt.Println("Elevator with id: ", id, " has no queue")
+				}
 				if elevator.Obstr {
 					fmt.Println("Elevator with id: ", id, " is obstructed")
 				}
 				if elevator.State == Undefined || elevator.Obstr {
 					continue
 				}
+
 				duration := timeToServeRequest(elevator, order.Button, order.Floor)
 				if duration < best_duration {
 					best_duration = duration
@@ -236,6 +231,15 @@ func Assigner(channels Channels, world *World, NetworkOrders map[string]Ordersta
 }
 
 func timeToServeRequest(e_old Elev, b elevio.ButtonType, f int) time.Duration { //FIX THIS FUCKING FUNCTION
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("*****************************************")
+			fmt.Println("Recovered from panic in timeToServeRequest:", r)
+			fmt.Println("*****************************************")
+			fmt.Println(e_old)
+		}
+	}()
+
 	e := e_old
 	e.Queue[f][b] = true
 
