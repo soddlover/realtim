@@ -32,12 +32,12 @@ func CheckMissingConnToOrders(networkOrders map[string]Orderstatus, nodeLeftNetw
 		}
 	}
 }
-func Sheriff(incomingOrder chan Orderstatus, networkOrders map[string]Orderstatus, nodeLeftNetwork chan string) {
+func Sheriff(incomingOrder chan Orderstatus, networkOrders map[string]Orderstatus, nodeLeftNetwork chan string, nodeOrdersUpdateChan chan bool) {
 	ipID := strings.Split(string(config.Self_id), ":")
 	go peers.Transmitter(config.Sheriff_port, ipID[0], make(chan bool)) //channel for turning off sheriff transmitt?
 	//go peers.Receiver(15647, peerUpdateCh)
 	go listenForWranglerConnections(incomingOrder, nodeLeftNetwork)
-	go SendNodeOrdersToDeputy(networkOrders)
+	go SendNodeOrdersToDeputy(networkOrders, nodeOrdersUpdateChan)
 	time.Sleep(1 * time.Second)
 	CheckMissingConnToOrders(networkOrders, nodeLeftNetwork)
 }
@@ -73,8 +73,8 @@ func listenForWranglerConnections(incomingOrder chan Orderstatus, nodeLeftNetwor
 	}
 }
 
-func SendNodeOrdersToDeputy(nodeOrders map[string]Orderstatus) {
-	ticker := time.NewTicker(3 * time.Second)
+func SendNodeOrdersToDeputy(nodeOrders map[string]Orderstatus, nodeOrdersUpdateChan chan bool) {
+	ticker := time.NewTicker(DEPUTY_SEND_FREQ)
 	defer ticker.Stop()
 
 	for {
@@ -82,6 +82,10 @@ func SendNodeOrdersToDeputy(nodeOrders map[string]Orderstatus) {
 		case <-ticker.C:
 			SendDeputyMessage(nodeOrders)
 			//add updatechan
+
+		case <-nodeOrdersUpdateChan:
+			SendDeputyMessage(nodeOrders)
+			ticker.Reset(DEPUTY_SEND_FREQ)
 		}
 	}
 }
@@ -119,7 +123,6 @@ func SendDeputyMessage(nodeOrders map[string]Orderstatus) {
 			//deputyConn.Close()
 			//DeputyDisconnectChan <- deputyConn
 		}
-
 		fmt.Println("Sent node orders to deputy.")
 
 	}

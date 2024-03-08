@@ -120,9 +120,9 @@ func PeerConnector(id string, world *World, channels Channels) {
 func InitSherrif(channels Channels, world *World, NetworkOrders map[string]Orderstatus, oldSheriff string) {
 	nodeLeftNetwork := make(chan string)
 	fmt.Println("I am the only Wrangler in town, I am the Sheriff!")
-
-	go sheriff.Sheriff(channels.IncomingOrder, NetworkOrders, nodeLeftNetwork)
-	go Assigner(channels, world, NetworkOrders)
+	NetworkUpdate := make(chan bool)
+	go sheriff.Sheriff(channels.IncomingOrder, NetworkOrders, nodeLeftNetwork, NetworkUpdate)
+	go Assigner(channels, world, NetworkOrders, NetworkUpdate)
 	go redistributer(nodeLeftNetwork, channels.IncomingOrder, world, NetworkOrders)
 	if oldSheriff != "" {
 		nodeLeftNetwork <- oldSheriff
@@ -182,7 +182,7 @@ func orderForwarder(channels Channels) {
 
 }
 
-func Assigner(channels Channels, world *World, NetworkOrders map[string]Orderstatus) {
+func Assigner(channels Channels, world *World, NetworkOrders map[string]Orderstatus, NetworkUpdate chan bool) {
 
 	for {
 		select {
@@ -191,6 +191,7 @@ func Assigner(channels Channels, world *World, NetworkOrders map[string]Ordersta
 			if order.Status {
 				fmt.Println("Order being deletetet")
 				delete(NetworkOrders, order.OrderID)
+				NetworkUpdate <- true
 				continue
 			}
 			best_id := config.Self_id
@@ -218,6 +219,7 @@ func Assigner(channels Channels, world *World, NetworkOrders map[string]Ordersta
 			}
 			order.Owner = best_id
 			NetworkOrders[order.OrderID] = order
+			NetworkUpdate <- true
 			fmt.Println("Added to NetworkOrders maps")
 			fmt.Println("NetworkOrders: ", len(NetworkOrders))
 			if best_id == config.Self_id {
