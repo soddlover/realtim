@@ -10,14 +10,7 @@ import (
 	"mymodule/network/peers"
 	. "mymodule/types"
 	"time"
-
-	"github.com/google/uuid"
 )
-
-type OrderAndID struct {
-	Order Order
-	ID    string
-}
 
 type World struct {
 	Map map[string]Elev
@@ -41,7 +34,7 @@ func NetworkFSM(channels Channels, world *World) {
 	networkChannels := NetworkChannels{
 		DeputyPromotion:   make(chan map[string]Orderstatus),
 		WranglerPromotion: make(chan bool),
-		SheriffDead:       make(chan NodeOrdersData),
+		SheriffDead:       make(chan NetworkOrdersData),
 		RelievedOfDuty:    make(chan bool),
 	}
 	state = st_initial
@@ -51,8 +44,9 @@ func NetworkFSM(channels Channels, world *World) {
 		case st_initial:
 			sIP := wrangler.GetSheriffIP()
 			if sIP == "" {
-				NetworkOrders := make(map[string]Orderstatus)
-				InitSherrif(channels, world, NetworkOrders, "")
+
+				NetworkOrders := [config.N_FLOORS][config.N_BUTTONS]string{}
+				InitSherrif(channels, world, &NetworkOrders, "")
 				state = st_sherriff
 			} else {
 				fmt.Println("I am not the only Wrangler in town, connecting to Sheriff:")
@@ -70,11 +64,11 @@ func NetworkFSM(channels Channels, world *World) {
 			//Fastest trigger in the west?
 
 		case st_wrangler:
-			nodeOrdersData := <-networkChannels.SheriffDead
+			networkOrderData := <-networkChannels.SheriffDead
 
-			if nodeOrdersData.TheChosenOne {
+			if networkOrderData.TheChosenOne {
 				fmt.Println("I am the chosen one, I am the Sheriff!")
-				InitSherrif(channels, world, nodeOrdersData.NodeOrders, sheriffID)
+				InitSherrif(channels, world, &networkOrderData.NetworkOrders, sheriffID)
 				state = st_sherriff
 
 			} else {
@@ -117,13 +111,13 @@ func PeerConnector(id string, world *World, channels Channels) {
 
 }
 
-func InitSherrif(channels Channels, world *World, NetworkOrders map[string]Orderstatus, oldSheriff string) {
+func InitSherrif(channels Channels, world *World, networkorders *[config.N_FLOORS][config.N_BUTTONS]string, oldSheriff string) {
 	nodeLeftNetwork := make(chan string)
 	fmt.Println("I am the only Wrangler in town, I am the Sheriff!")
 	NetworkUpdate := make(chan bool)
-	go sheriff.Sheriff(channels.IncomingOrder, NetworkOrders, nodeLeftNetwork, NetworkUpdate)
-	go Assigner(channels, world, NetworkOrders, NetworkUpdate)
-	go redistributer(nodeLeftNetwork, channels.IncomingOrder, world, NetworkOrders)
+	go sheriff.Sheriff(channels.IncomingOrder, networkorders, nodeLeftNetwork, NetworkUpdate)
+	go Assigner(channels, world, networkorders, NetworkUpdate)
+	go redistributer(nodeLeftNetwork, channels.IncomingOrder, world, networkorders)
 	if oldSheriff != "" {
 		nodeLeftNetwork <- oldSheriff
 		fmt.Println("Sending old sheriff to redistributer", oldSheriff)
@@ -131,7 +125,7 @@ func InitSherrif(channels Channels, world *World, NetworkOrders map[string]Order
 
 }
 
-func redistributer(nodeLeftNetwork chan string, incomingOrder chan Orderstatus, world *World, NetworkOrders map[string]Orderstatus) {
+func redistributer(nodeLeftNetwork chan string, incomingOrder chan Orderstatus, world *World, NetworkOrders *[config.N_FLOORS][config.N_BUTTONS]string) {
 	for {
 		select {
 		case peerid := <-nodeLeftNetwork:
@@ -140,13 +134,12 @@ func redistributer(nodeLeftNetwork chan string, incomingOrder chan Orderstatus, 
 			fmt.Println("Node left network, redistributing orders")
 			fmt.Println("NetworkOrders: ", NetworkOrders)
 			//check for orders owned by the leaving node
-			for _, order := range NetworkOrders {
-				if order.Owner == peerid {
-					//send to assigner for reassignment
-					if order.Status {
-						fmt.Println("Something is horribly wrong if you read this")
+			for floor := 0; floor < len(NetworkOrders); floor++ {
+				for button := 0; button < len(NetworkOrders[button]); button++ {
+					if NetworkOrders[floor][button] == peerid {
+						// Send to assigner for reassignment
+						incomingOrder <- Orderstatus{Floor: floor, Button: elevio.ButtonType(button), Status: false, Owner: peerid}
 					}
-					incomingOrder <- order
 				}
 			}
 		}
@@ -158,9 +151,7 @@ func orderForwarder(channels Channels) {
 	for {
 		select {
 		case order := <-channels.OrderRequest:
-
-			ID := uuid.New().String()
-			orderstat := Orderstatus{OrderID: ID, Owner: config.Self_id, Floor: order.Floor, Button: order.Button, Status: false}
+			orderstat := Orderstatus{Owner: config.Self_id, Floor: order.Floor, Button: order.Button, Status: false}
 			if order.Button == elevio.BT_Cab {
 				channels.OrderAssigned <- orderstat
 				continue
@@ -176,13 +167,11 @@ func orderForwarder(channels Channels) {
 			} else {
 				wrangler.SendOrderToSheriff(orderstat)
 			}
-
 		}
 	}
-
 }
 
-func Assigner(channels Channels, world *World, NetworkOrders map[string]Orderstatus, NetworkUpdate chan bool) {
+func Assigner(channels Channels, world *World, NetworkOrders *[config.N_FLOORS][config.N_BUTTONS]string, NetworkUpdate chan bool) {
 
 	for {
 		select {
@@ -190,20 +179,14 @@ func Assigner(channels Channels, world *World, NetworkOrders map[string]Ordersta
 			//channels.OrderAssigned <- order
 			if order.Status {
 				fmt.Println("Order being deletetet")
-				delete(NetworkOrders, order.OrderID)
+				NetworkOrders[order.Floor][order.Button] = ""
 				NetworkUpdate <- true
 				continue
 			}
+
 			best_id := config.Self_id
 			best_duration := 1000000 * time.Second
 			for id, elevator := range world.Map {
-				if elevator.Floor == -1 {
-					fmt.Println("Elevator with id: ", id, " is not initialized")
-					continue
-				}
-				if len(elevator.Queue) == 0 {
-					fmt.Println("Elevator with id: ", id, " has no queue")
-				}
 				if elevator.Obstr {
 					fmt.Println("Elevator with id: ", id, " is obstructed")
 				}
@@ -217,11 +200,21 @@ func Assigner(channels Channels, world *World, NetworkOrders map[string]Ordersta
 					best_id = id
 				}
 			}
+			assigned := NetworkOrders[order.Floor][order.Button]
+			if assigned != "" {
+				if elev, ok := world.Map[assigned]; ok {
+					if !elev.Obstr && !(elev.State == Undefined) {
+						//do nothing as its already assigned to a working elevator, could send an additional message to it incase?
+						fmt.Println("Order already assigned to a working elevator")
+						fmt.Println("SOOME PROBLEMS OCCUR HERE MAYBE???")
+						best_id = assigned
+					}
+				}
+			}
 			order.Owner = best_id
-			NetworkOrders[order.OrderID] = order
+			NetworkOrders[order.Floor][order.Button] = best_id
 			NetworkUpdate <- true
 			fmt.Println("Added to NetworkOrders maps")
-			fmt.Println("NetworkOrders: ", len(NetworkOrders))
 			if best_id == config.Self_id {
 				channels.OrderAssigned <- order
 			} else {

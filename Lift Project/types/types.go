@@ -2,6 +2,7 @@ package types
 
 import (
 	"encoding/json"
+	"mymodule/config"
 	. "mymodule/config"
 	"mymodule/elevator/elevio"
 )
@@ -21,16 +22,15 @@ type Channels struct {
 type NetworkChannels struct {
 	DeputyPromotion   chan map[string]Orderstatus
 	WranglerPromotion chan bool
-	SheriffDead       chan NodeOrdersData
+	SheriffDead       chan NetworkOrdersData
 	RelievedOfDuty    chan bool
 }
 
 type Orderstatus struct {
-	Owner   string
-	OrderID string
-	Floor   int
-	Button  elevio.ButtonType
-	Status  bool
+	Owner  string
+	Floor  int
+	Button elevio.ButtonType
+	Status bool
 }
 
 type ElevatorState int
@@ -68,7 +68,7 @@ type Message struct {
 	Data json.RawMessage `json:"data"`
 }
 
-type NodeOrdersData struct {
-	NodeOrders   map[string]Orderstatus
-	TheChosenOne bool
+type NetworkOrdersData struct {
+	NetworkOrders [config.N_FLOORS][config.N_BUTTONS]string
+	TheChosenOne  bool
 }

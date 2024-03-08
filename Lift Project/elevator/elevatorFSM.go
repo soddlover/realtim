@@ -35,8 +35,6 @@ func RunElev(channels Channels, initElev Elev) {
 	drv_floors := make(chan int, 10)
 	drv_obstr := make(chan bool, 10)
 	drv_stop := make(chan bool, 10)
-	ordersToQueue := make(chan Order, 10)
-	go saveLocalOrder(channels, ordersToQueue)
 	go elevio.PollButtons(drv_buttons)
 	go elevio.PollFloorSensor(drv_floors)
 	go elevio.PollObstructionSwitch(drv_obstr)
@@ -55,7 +53,7 @@ func RunElev(channels Channels, initElev Elev) {
 			fmt.Println("Button event at floor", buttonEvent.Floor, "button", buttonEvent.Button)
 			channels.OrderRequest <- Order{Floor: buttonEvent.Floor, Button: buttonEvent.Button}
 
-		case order := <-ordersToQueue:
+		case order := <-channels.OrderAssigned:
 			fmt.Println("Order assigned: ", order)
 			elevator.Queue[order.Floor][order.Button] = true
 			switch elevator.State {
@@ -66,9 +64,8 @@ func RunElev(channels Channels, initElev Elev) {
 					elevator.State = EB_DoorOpen
 					doorTimer.Reset(config.DOOR_OPEN_TIME)
 					elevio.SetDoorOpenLamp(true)
-					elevator.Queue[elevator.Floor] = [config.N_BUTTONS]bool{}
-					channels.OrderComplete <- Order{Floor: elevator.Floor, Button: elevio.BT_HallUp}
-					channels.OrderComplete <- Order{Floor: elevator.Floor, Button: elevio.BT_HallDown}
+					clearAtFloor(&elevator, channels)
+
 				} else {
 					elevator.State = EB_Moving
 					motorErrorTimer.Reset(config.MOTOR_ERROR_TIME)
@@ -76,8 +73,11 @@ func RunElev(channels Channels, initElev Elev) {
 			case EB_Moving:
 			case EB_DoorOpen:
 				if elevator.Floor == order.Floor {
-					elevator.Queue[order.Floor][order.Button] = false
-					channels.OrderComplete <- order
+					if elevator.Queue[order.Floor][order.Button] {
+						elevator.Queue[order.Floor][order.Button] = false
+						channels.OrderDelete <- Orderstatus{Owner: config.Self_nr, Floor: order.Floor, Button: order.Button, Status: true}
+					}
+
 					doorTimer.Reset(config.DOOR_OPEN_TIME)
 				}
 			case Undefined:
@@ -164,36 +164,4 @@ func updateLights(elevator *Elev) {
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
-}
-
-func saveLocalOrder(channels Channels, OrdersToQueoe chan Order) {
-	var localOrders [config.N_FLOORS][config.N_BUTTONS][]Orderstatus
-	for {
-		select {
-		case order := <-channels.OrderAssigned:
-			//save order to local queue
-			if order.Button == elevio.BT_Cab {
-				OrdersToQueoe <- Order{Floor: order.Floor, Button: order.Button}
-				continue
-			}
-			fmt.Println("Order added to me: ")
-			localOrders[order.Floor][order.Button] = append(localOrders[order.Floor][order.Button], order)
-			OrdersToQueoe <- Order{Floor: order.Floor, Button: order.Button}
-
-		case order := <-channels.OrderComplete:
-			fmt.Println("Order completed removing from local list")
-			completedOrderList := localOrders[order.Floor][order.Button]
-			//find order in queue based on floor and button
-			localOrders[order.Floor][order.Button] = []Orderstatus{}
-			for _, order := range completedOrderList {
-				order.Status = true
-				fmt.Println("Order completed deletet from list and sent to sherr or myself: ")
-
-				//what if sherriff disconnect while sending this?=?!
-				channels.OrderDelete <- order
-				time.Sleep(100 * time.Millisecond)
-			}
-		}
-	}
-
 }

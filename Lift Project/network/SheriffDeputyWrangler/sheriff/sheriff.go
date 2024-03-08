@@ -20,26 +20,31 @@ var WranglerConnections = make(map[string]net.Conn)
 var NewDeputyConnChan = make(chan net.TCPConn)
 var DeputyDisconnectChan = make(chan net.TCPConn)
 
-func CheckMissingConnToOrders(networkOrders map[string]Orderstatus, nodeLeftNetwork chan string) {
+func CheckMissingConnToOrders(networkOrders [config.N_FLOORS][config.N_BUTTONS]string, nodeLeftNetwork chan string) {
 	processedIDs := make(map[string]bool)
-
-	for _, order := range networkOrders {
-		id := order.Owner
-		if WranglerConnections[id] == nil && id != config.Self_id && !processedIDs[id] {
-			nodeLeftNetwork <- id
-			fmt.Println("***Missing connection to ACTIVE ORDER Reassigning order!!!***", id)
-			processedIDs[id] = true
+	fmt.Println("Checking for missing connections to orders")
+	for floor := 0; floor < len(networkOrders); floor++ {
+		for button := 0; button < len(networkOrders[floor]); button++ {
+			id := networkOrders[floor][button]
+			fmt.Printf("Checking order at floor %d, button %d, id: %s\n", floor, button, id) // Print the current order being checked
+			if id != "" && WranglerConnections[id] == nil && id != config.Self_id && !processedIDs[id] {
+				nodeLeftNetwork <- id
+				fmt.Println("***Missing connection to ACTIVE ORDER Reassigning order!!!***", id)
+				processedIDs[id] = true
+			} else {
+				fmt.Printf("Order at floor %d, button %d is not missing connection\n", floor, button) // Print a message if the order is not missing connection
+			}
 		}
 	}
 }
-func Sheriff(incomingOrder chan Orderstatus, networkOrders map[string]Orderstatus, nodeLeftNetwork chan string, nodeOrdersUpdateChan chan bool) {
+func Sheriff(incomingOrder chan Orderstatus, networkOrders *[config.N_FLOORS][config.N_BUTTONS]string, nodeLeftNetwork chan string, nodeOrdersUpdateChan chan bool) {
 	ipID := strings.Split(string(config.Self_id), ":")
 	go peers.Transmitter(config.Sheriff_port, ipID[0], make(chan bool)) //channel for turning off sheriff transmitt?
 	//go peers.Receiver(15647, peerUpdateCh)
 	go listenForWranglerConnections(incomingOrder, nodeLeftNetwork)
 	go SendNodeOrdersToDeputy(networkOrders, nodeOrdersUpdateChan)
 	time.Sleep(1 * time.Second)
-	CheckMissingConnToOrders(networkOrders, nodeLeftNetwork)
+	CheckMissingConnToOrders(*networkOrders, nodeLeftNetwork)
 }
 
 func listenForWranglerConnections(incomingOrder chan Orderstatus, nodeLeftNetwork chan string) {
@@ -73,32 +78,32 @@ func listenForWranglerConnections(incomingOrder chan Orderstatus, nodeLeftNetwor
 	}
 }
 
-func SendNodeOrdersToDeputy(nodeOrders map[string]Orderstatus, nodeOrdersUpdateChan chan bool) {
+func SendNodeOrdersToDeputy(networkOrders *[config.N_FLOORS][config.N_BUTTONS]string, nodeOrdersUpdateChan chan bool) {
 	ticker := time.NewTicker(DEPUTY_SEND_FREQ)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
-			SendDeputyMessage(nodeOrders)
+			SendDeputyMessage(networkOrders)
 			//add updatechan
 
 		case <-nodeOrdersUpdateChan:
-			SendDeputyMessage(nodeOrders)
+			SendDeputyMessage(networkOrders)
 			ticker.Reset(DEPUTY_SEND_FREQ)
 		}
 	}
 }
 
-func SendDeputyMessage(nodeOrders map[string]Orderstatus) {
+func SendDeputyMessage(networkOrders *[config.N_FLOORS][config.N_BUTTONS]string) {
 	var chosenOneID string
 	for id, conn := range WranglerConnections {
 		if chosenOneID == "" || WranglerConnections[chosenOneID] == nil {
 			chosenOneID = id
 		}
-		nodeOrdersData := NodeOrdersData{
-			NodeOrders:   nodeOrders,
-			TheChosenOne: id == chosenOneID, // or false, depending on your logic
+		nodeOrdersData := NetworkOrdersData{
+			NetworkOrders: *networkOrders,
+			TheChosenOne:  id == chosenOneID, // or false, depending on your logic
 		}
 		nodeOrdersDataJSON, err := json.Marshal(nodeOrdersData)
 		if err != nil {
@@ -124,6 +129,7 @@ func SendDeputyMessage(nodeOrders map[string]Orderstatus) {
 			//DeputyDisconnectChan <- deputyConn
 		}
 		fmt.Println("Sent node orders to deputy.")
+		fmt.Println("Nodeorders:", *networkOrders)
 
 	}
 }

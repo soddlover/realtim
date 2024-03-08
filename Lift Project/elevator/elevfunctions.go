@@ -96,20 +96,38 @@ func OrdersBelow(elevator Elev) bool {
 }
 
 func clearAtFloor(elevator *Elev, channels Channels) {
+
 	elevator.Queue[elevator.Floor][BT_Cab] = false
 	if elevator.Dir == DirUp {
-		elevator.Queue[elevator.Floor][BT_HallUp] = false
-		channels.OrderComplete <- Order{Floor: elevator.Floor, Button: BT_HallUp}
+		if elevator.Queue[elevator.Floor][BT_HallUp] {
+			elevator.Queue[elevator.Floor][BT_HallUp] = false
+			channels.OrderDelete <- Orderstatus{Owner: Self_nr, Floor: elevator.Floor, Button: BT_HallUp, Status: true}
+		}
 		if !OrdersAbove(*elevator) {
-			elevator.Queue[elevator.Floor][BT_HallDown] = false
-			channels.OrderComplete <- Order{Floor: elevator.Floor, Button: BT_HallDown}
+			if elevator.Queue[elevator.Floor][BT_HallDown] {
+				elevator.Queue[elevator.Floor][BT_HallDown] = false
+				channels.OrderDelete <- Orderstatus{Owner: Self_nr, Floor: elevator.Floor, Button: BT_HallDown, Status: true}
+			}
 		}
 	} else if elevator.Dir == DirDown {
-		elevator.Queue[elevator.Floor][BT_HallDown] = false
-		channels.OrderComplete <- Order{Floor: elevator.Floor, Button: BT_HallDown}
+		if elevator.Queue[elevator.Floor][BT_HallDown] {
+			elevator.Queue[elevator.Floor][BT_HallDown] = false
+			channels.OrderDelete <- Orderstatus{Owner: Self_nr, Floor: elevator.Floor, Button: BT_HallDown, Status: true}
+		}
 		if !OrdersBelow(*elevator) {
+			if elevator.Queue[elevator.Floor][BT_HallUp] {
+				elevator.Queue[elevator.Floor][BT_HallUp] = false
+				channels.OrderDelete <- Orderstatus{Owner: Self_nr, Floor: elevator.Floor, Button: BT_HallUp, Status: true}
+			}
+		}
+	} else if elevator.Dir == DirStop {
+		if elevator.Queue[elevator.Floor][BT_HallUp] {
 			elevator.Queue[elevator.Floor][BT_HallUp] = false
-			channels.OrderComplete <- Order{Floor: elevator.Floor, Button: BT_HallUp}
+			channels.OrderDelete <- Orderstatus{Owner: Self_nr, Floor: elevator.Floor, Button: BT_HallUp, Status: true}
+		}
+		if elevator.Queue[elevator.Floor][BT_HallDown] {
+			elevator.Queue[elevator.Floor][BT_HallDown] = false
+			channels.OrderDelete <- Orderstatus{Owner: Self_nr, Floor: elevator.Floor, Button: BT_HallDown, Status: true}
 		}
 	}
 }
