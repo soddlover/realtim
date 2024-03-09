@@ -11,20 +11,20 @@ import (
 	"time"
 )
 
-func redistributer(nodeLeftNetwork <-chan string, incomingOrder chan<- Orderstatus, world *World, NetworkOrders *[config.N_FLOORS][config.N_BUTTONS]string) {
+func redistributor(nodeLeftNetwork <-chan string, incomingOrder chan<- Orderstatus, world *World, NetworkOrders *[config.N_FLOORS][config.N_BUTTONS]string) {
 	for {
 		select {
-		case peerid := <-nodeLeftNetwork:
-			delete(world.Map, peerid)
+		case peerID := <-nodeLeftNetwork:
+			delete(world.Map, peerID)
 			fmt.Printf("world.Map: %v\n", world.Map)
 			fmt.Println("Node left network, redistributing orders")
 			fmt.Println("NetworkOrders: ", NetworkOrders)
 			//check for orders owned by the leaving node
 			for floor := 0; floor < len(NetworkOrders); floor++ {
 				for button := 0; button < len(NetworkOrders[button]); button++ {
-					if NetworkOrders[floor][button] == peerid {
+					if NetworkOrders[floor][button] == peerID {
 						// Send to assigner for reassignment
-						incomingOrder <- Orderstatus{Floor: floor, Button: elevio.ButtonType(button), Status: false, Owner: peerid}
+						incomingOrder <- Orderstatus{Floor: floor, Button: elevio.ButtonType(button), Status: false, Owner: peerID}
 					}
 				}
 			}

@@ -84,10 +84,8 @@ func NetworkFSM(channels Channels, world *World) {
 			//listen for lost peers
 			//listen for orders to delete
 			//listen for orders to assign
-
 		}
 	}
-
 }
 
 func InitSherrif(channels Channels, world *World, networkorders *[config.N_FLOORS][config.N_BUTTONS]string, oldSheriff string) {
@@ -96,7 +94,7 @@ func InitSherrif(channels Channels, world *World, networkorders *[config.N_FLOOR
 	NetworkUpdate := make(chan bool)
 	go sheriff.Sheriff(channels.IncomingOrder, networkorders, nodeLeftNetwork, NetworkUpdate)
 	go Assigner(channels, world, networkorders, NetworkUpdate)
-	go redistributer(nodeLeftNetwork, channels.IncomingOrder, world, networkorders)
+	go redistributor(nodeLeftNetwork, channels.IncomingOrder, world, networkorders)
 	if oldSheriff != "" {
 		nodeLeftNetwork <- oldSheriff
 		fmt.Println("Sending old sheriff to redistributer", oldSheriff)

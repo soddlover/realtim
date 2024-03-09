@@ -44,14 +44,14 @@ func updateBroadcastworld(bcastWorld BroadcastWorld, world *World, broadcastStat
 	}
 }
 
-func StateBroadcaster(elevStateTx chan Elev, world *World, id string) {
+func StateBroadcaster(localElevator <-chan Elev, world *World, id string) {
 	//init bcast world
 	bcastWorld := BroadcastWorld{Map: make(map[string]BroadcastState)}
 	//using same world becuse why not?=
 	broadcastStateRx := make(chan BroadcastState)
 	broadcastStateTx := make(chan BroadcastState)
 
-	go repeater(elevStateTx, broadcastStateTx, id)
+	go repeater(localElevator, broadcastStateTx, id)
 	go bcast.Transmitter(config.Broadcast_state_port, broadcastStateTx)
 	go bcast.Receiver(config.Broadcast_state_port, broadcastStateRx)
 	go updateBroadcastworld(bcastWorld, world, broadcastStateRx)
