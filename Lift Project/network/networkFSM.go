@@ -65,7 +65,7 @@ func NetworkFSM(channels Channels, world *World) {
 			//compare to own IP
 			selfIP := strings.Split(string(config.Self_id), ":")
 			//check for conflict
-			if sIP != selfIP[0] {
+			if sIP != "" && sIP != selfIP[0] {
 				fmt.Println("Sheriff Conflict, my IP:", selfIP[0], "other Sheriff IP:", sIP)
 				fmt.Println("Preparing for shootout!!!!")
 				fmt.Println("Allahu Akbar")
