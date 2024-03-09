@@ -57,11 +57,12 @@ func main() {
 
 	//fmt.Print("Hello, World!")
 	// go RunElev(channels)
-	go network.PeerConnector(id, world, channels)
 	go network.StateBroadcaster(channels.ElevatorStatesBroadcast, world, id)
 	// go PeerConnector(id, world)
 	go backup.WriteBackup(channels.ElevatorStates)
 	go elev.RunElev(channels, initElev)
+	go network.NetworkFSM(channels, world)
+
 	//go Assigner(channels, world)
 	//go printWorld(world)
 	select {}

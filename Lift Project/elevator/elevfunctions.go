@@ -7,7 +7,7 @@ import (
 	. "mymodule/types"
 )
 
-func elevStart(drv_floors chan int) {
+func elevStart(drv_floors <-chan int) {
 
 	if GetFloor() == -1 {
 		SetMotorDirection(MD_Down)

@@ -74,7 +74,7 @@ func sendOrderToSheriff(order Orderstatus, OrderSent chan Orderstatus) (bool, er
 }
 
 // THIS FUNCTION DOES NOT WORK AT ALL YET BEWARE WTF!!!!!!!!
-func acknowledger(OrderSent chan Orderstatus, networkOrdersRecieved chan NetworkOrdersData) {
+func acknowledger(OrderSent <-chan Orderstatus, networkOrdersRecieved <-chan NetworkOrdersData) {
 	unacknowledgedButtons := [config.N_FLOORS][config.N_BUTTONS]bool{}
 	unacknowledgedComplete := [config.N_FLOORS][config.N_BUTTONS]bool{}
 	orderTickers := [config.N_FLOORS][config.N_BUTTONS]*time.Ticker{}

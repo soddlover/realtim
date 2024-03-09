@@ -17,7 +17,7 @@ type BroadcastWorld struct {
 	Map map[string]BroadcastState
 }
 
-func updateBroadcastworld(bcastWorld BroadcastWorld, world *World, broadcastStateRx chan BroadcastState) {
+func updateBroadcastworld(bcastWorld BroadcastWorld, world *World, broadcastStateRx <-chan BroadcastState) {
 	for {
 		//update world view
 		select {
@@ -57,7 +57,7 @@ func StateBroadcaster(elevStateTx chan Elev, world *World, id string) {
 	go updateBroadcastworld(bcastWorld, world, broadcastStateRx)
 }
 
-func repeater(elevStateTx chan Elev, repeatedElevState chan BroadcastState, elevId string) {
+func repeater(elevStateTx <-chan Elev, repeatedElevState chan<- BroadcastState, elevId string) {
 	var lastElev Elev
 	ticker := time.NewTicker(2000 * time.Millisecond)
 	var broadcastState BroadcastState
