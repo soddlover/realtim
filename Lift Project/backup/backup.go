@@ -44,7 +44,7 @@ func Backup(fresh bool) Elev {
 	}
 }
 
-func WriteBackup(elevChan chan Elev) {
+func WriteBackup(elevChan <-chan Elev) {
 	ticker := time.NewTicker(5 * time.Second)
 	var elev Elev
 

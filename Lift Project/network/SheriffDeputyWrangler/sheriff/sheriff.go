@@ -20,7 +20,7 @@ var WranglerConnections = make(map[string]net.Conn)
 var NewDeputyConnChan = make(chan net.TCPConn)
 var DeputyDisconnectChan = make(chan net.TCPConn)
 
-func CheckMissingConnToOrders(networkOrders [config.N_FLOORS][config.N_BUTTONS]string, nodeLeftNetwork chan string) {
+func CheckMissingConnToOrders(networkOrders [config.N_FLOORS][config.N_BUTTONS]string, nodeLeftNetwork chan<- string) {
 	processedIDs := make(map[string]bool)
 	fmt.Println("Checking for missing connections to orders")
 	for floor := 0; floor < len(networkOrders); floor++ {
@@ -176,7 +176,7 @@ func SendOrderMessage(peer string, order Orderstatus) (bool, error) {
 	return true, nil
 }
 
-func ReceiveMessage(conn net.Conn, incomingOrder chan Orderstatus, peerID string, nodeLeftNetwork chan string) (Orderstatus, error) {
+func ReceiveMessage(conn net.Conn, incomingOrder chan<- Orderstatus, peerID string, nodeLeftNetwork chan<- string) (Orderstatus, error) {
 	for {
 		reader := bufio.NewReader(conn)
 		message, err := reader.ReadString('\n')

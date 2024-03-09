@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-func redistributer(nodeLeftNetwork chan string, incomingOrder chan Orderstatus, world *World, NetworkOrders *[config.N_FLOORS][config.N_BUTTONS]string) {
+func redistributer(nodeLeftNetwork <-chan string, incomingOrder chan<- Orderstatus, world *World, NetworkOrders *[config.N_FLOORS][config.N_BUTTONS]string) {
 	for {
 		select {
 		case peerid := <-nodeLeftNetwork:
