@@ -11,27 +11,26 @@ import (
 	"time"
 )
 
-func redistributor(nodeLeftNetwork <-chan string, incomingOrder chan<- Orderstatus, world *World, NetworkOrders *[config.N_FLOORS][config.N_BUTTONS]string) {
-	for {
-		select {
-		case peerID := <-nodeLeftNetwork:
-			delete(world.Map, peerID)
-			fmt.Printf("world.Map: %v\n", world.Map)
-			fmt.Println("Node left network, redistributing orders")
-			fmt.Println("NetworkOrders: ", NetworkOrders)
-			//check for orders owned by the leaving node
-			for floor := 0; floor < len(NetworkOrders); floor++ {
-				for button := 0; button < len(NetworkOrders[button]); button++ {
-					if NetworkOrders[floor][button] == peerID {
-						// Send to assigner for reassignment
-						incomingOrder <- Orderstatus{Floor: floor, Button: elevio.ButtonType(button), Status: false, Owner: peerID}
-					}
-				}
-			}
-		}
-	}
-
-}
+// func redistributor(nodeLeftNetwork <-chan string, incomingOrder chan<- Orderstatus, world *World, NetworkOrders *[config.N_FLOORS][config.N_BUTTONS]string) {
+// 	for {
+// 		select {
+// 		case peerID := <-nodeLeftNetwork:
+// 			delete(world.Map, peerID)
+// 			fmt.Printf("world.Map: %v\n", world.Map)
+// 			fmt.Println("Node left network, redistributing orders")
+// 			fmt.Println("NetworkOrders: ", NetworkOrders)
+// 			//check for orders owned by the leaving node
+// 			for floor := 0; floor < len(NetworkOrders); floor++ {
+// 				for button := 0; button < len(NetworkOrders[button]); button++ {
+// 					if NetworkOrders[floor][button] == peerID {
+// 						// Send to assigner for reassignment
+// 						incomingOrder <- Orderstatus{Floor: floor, Button: elevio.ButtonType(button), Status: false, Owner: peerID}
+// 					}
+// 				}
+// 			}
+// 		}
+// 	}
+// }
 
 func orderForwarder(channels Channels) {
 	for {
@@ -57,7 +56,13 @@ func orderForwarder(channels Channels) {
 	}
 }
 
-func Assigner(channels Channels, world *World, NetworkOrders *[config.N_FLOORS][config.N_BUTTONS]string, NetworkUpdate chan bool) {
+func Assigner(
+	channels Channels,
+	world *World,
+	NetworkOrders *[config.N_FLOORS][config.N_BUTTONS]string,
+	NetworkUpdate chan bool,
+	nodeLeftNetwork <-chan string,
+	incomingOrder chan<- Orderstatus) {
 
 	for {
 		select {
@@ -107,6 +112,20 @@ func Assigner(channels Channels, world *World, NetworkOrders *[config.N_FLOORS][
 				go sheriff.SendOrderMessage(best_id, order)
 			}
 
+		case peerID := <-nodeLeftNetwork:
+			delete(world.Map, peerID)
+			fmt.Printf("world.Map: %v\n", world.Map)
+			fmt.Println("Node left network, redistributing orders")
+			fmt.Println("NetworkOrders: ", NetworkOrders)
+			//check for orders owned by the leaving node
+			for floor := 0; floor < len(NetworkOrders); floor++ {
+				for button := 0; button < len(NetworkOrders[button]); button++ {
+					if NetworkOrders[floor][button] == peerID {
+						// Send to assigner for reassignment
+						incomingOrder <- Orderstatus{Floor: floor, Button: elevio.ButtonType(button), Status: false, Owner: peerID}
+					}
+				}
+			}
 		}
 	}
 }

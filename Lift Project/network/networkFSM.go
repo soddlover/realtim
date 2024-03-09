@@ -93,8 +93,8 @@ func InitSherrif(channels Channels, world *World, networkorders *[config.N_FLOOR
 	fmt.Println("I am the only Wrangler in town, I am the Sheriff!")
 	NetworkUpdate := make(chan bool)
 	go sheriff.Sheriff(channels.IncomingOrder, networkorders, nodeLeftNetwork, NetworkUpdate)
-	go Assigner(channels, world, networkorders, NetworkUpdate)
-	go redistributor(nodeLeftNetwork, channels.IncomingOrder, world, networkorders)
+	go Assigner(channels, world, networkorders, NetworkUpdate, nodeLeftNetwork, channels.IncomingOrder)
+	//go redistributor(nodeLeftNetwork, channels.IncomingOrder, world, networkorders)
 	if oldSheriff != "" {
 		nodeLeftNetwork <- oldSheriff
 		fmt.Println("Sending old sheriff to redistributer", oldSheriff)
