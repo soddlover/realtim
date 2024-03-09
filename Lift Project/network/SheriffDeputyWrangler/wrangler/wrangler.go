@@ -25,6 +25,24 @@ func ConnectWranglerToSheriff(sheriffIP string) bool {
 		fmt.Println("Error connecting to sheriff:", err)
 		return false
 	}
+
+	tcpConn, ok := conn.(*net.TCPConn)
+	if !ok {
+		fmt.Println("Error asserting connection type")
+		return false
+	}
+
+	if err := tcpConn.SetKeepAlive(true); err != nil {
+		fmt.Println("Error setting keepalive:", err)
+		return false
+	}
+
+	// Set the keepalive period to 1 minute.
+	if err := tcpConn.SetKeepAlivePeriod(3 * time.Second); err != nil {
+		fmt.Println("Error setting keepalive period:", err)
+		return false
+	}
+
 	fmt.Fprintf(conn, "%s\n", config.Self_id)
 	fmt.Println("sent id to sheriff:", config.Self_id)
 	sheriffConn = conn

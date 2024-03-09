@@ -24,6 +24,7 @@ type NetworkChannels struct {
 	WranglerPromotion chan bool
 	SheriffDead       chan NetworkOrdersData
 	RelievedOfDuty    chan bool
+	RemaindingOrders  chan [N_FLOORS][N_BUTTONS]string
 }
 
 type Orderstatus struct {

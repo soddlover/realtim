@@ -17,7 +17,8 @@ type BroadcastWorld struct {
 	Map map[string]BroadcastState
 }
 
-func updateBroadcastworld(bcastWorld BroadcastWorld, world *World, broadcastStateRx <-chan BroadcastState) {
+func updateBroadcastworld(world *World, broadcastStateRx <-chan BroadcastState) {
+	bcastWorld := BroadcastWorld{Map: make(map[string]BroadcastState)}
 	for {
 		//update world view
 		select {
@@ -46,7 +47,6 @@ func updateBroadcastworld(bcastWorld BroadcastWorld, world *World, broadcastStat
 
 func StateBroadcaster(localElevator <-chan Elev, world *World, id string) {
 	//init bcast world
-	bcastWorld := BroadcastWorld{Map: make(map[string]BroadcastState)}
 	//using same world becuse why not?=
 	broadcastStateRx := make(chan BroadcastState)
 	broadcastStateTx := make(chan BroadcastState)
@@ -54,7 +54,7 @@ func StateBroadcaster(localElevator <-chan Elev, world *World, id string) {
 	go repeater(localElevator, broadcastStateTx, id)
 	go bcast.Transmitter(config.Broadcast_state_port, broadcastStateTx)
 	go bcast.Receiver(config.Broadcast_state_port, broadcastStateRx)
-	go updateBroadcastworld(bcastWorld, world, broadcastStateRx)
+	go updateBroadcastworld(world, broadcastStateRx)
 }
 
 func repeater(elevStateTx <-chan Elev, repeatedElevState chan<- BroadcastState, elevId string) {

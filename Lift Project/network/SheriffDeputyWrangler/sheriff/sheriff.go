@@ -37,17 +37,28 @@ func CheckMissingConnToOrders(networkOrders [config.N_FLOORS][config.N_BUTTONS]s
 		}
 	}
 }
-func Sheriff(incomingOrder chan Orderstatus, networkOrders *[config.N_FLOORS][config.N_BUTTONS]string, nodeLeftNetwork chan string, nodeOrdersUpdateChan chan bool) {
+func Sheriff(incomingOrder chan Orderstatus, networkOrders *[config.N_FLOORS][config.N_BUTTONS]string, nodeLeftNetwork chan string, nodeOrdersUpdateChan chan bool, demoted <-chan bool, quitAssigner chan<- bool) {
+
 	ipID := strings.Split(string(config.Self_id), ":")
-	go peers.Transmitter(config.Sheriff_port, ipID[0], make(chan bool)) //channel for turning off sheriff transmitt?
+	transmitEnable := make(chan bool)
+	listenWranglerEnable := make(chan bool)
+	sendOrderToDeputyEnable := make(chan bool)
+	go peers.Transmitter(config.Sheriff_port, ipID[0], transmitEnable) //channel for turning off sheriff transmitt?
 	//go peers.Receiver(15647, peerUpdateCh)
-	go listenForWranglerConnections(incomingOrder, nodeLeftNetwork)
-	go SendNodeOrdersToDeputy(networkOrders, nodeOrdersUpdateChan)
+	go listenForWranglerConnections(incomingOrder, nodeLeftNetwork, listenWranglerEnable)
+	go SendNodeOrdersToDeputy(networkOrders, nodeOrdersUpdateChan, sendOrderToDeputyEnable)
 	time.Sleep(1 * time.Second)
 	CheckMissingConnToOrders(*networkOrders, nodeLeftNetwork)
+
+	<-demoted
+	transmitEnable <- false
+	listenWranglerEnable <- false
+	sendOrderToDeputyEnable <- false
+	quitAssigner <- true
+
 }
 
-func listenForWranglerConnections(incomingOrder chan Orderstatus, nodeLeftNetwork chan string) {
+func listenForWranglerConnections(incomingOrder chan Orderstatus, nodeLeftNetwork chan string, listenWranglerEnable <-chan bool) {
 	ln, err := net.Listen("tcp", ":"+strconv.Itoa(config.TCP_port))
 	if err != nil {
 		fmt.Println("Error listening for connections:", err)
@@ -55,30 +66,39 @@ func listenForWranglerConnections(incomingOrder chan Orderstatus, nodeLeftNetwor
 	}
 
 	for {
-		conn, err := ln.Accept()
-		if err != nil {
-			fmt.Println("Error accepting connection:", err)
-			continue
+		select {
+		case enable := <-listenWranglerEnable:
+			if !enable {
+				fmt.Println("Stopping listenForWranglerConnections goroutine")
+				ln.Close()
+				return
+			}
+		default:
+			conn, err := ln.Accept()
+			if err != nil {
+				fmt.Println("Error accepting connection:", err)
+				continue
+			}
+			reader := bufio.NewReader(conn)
+			message, err := reader.ReadString('\n')
+			if err != nil {
+				fmt.Println("Error reading from connection:", err)
+				continue
+			}
+
+			peerID := strings.TrimSpace(message)
+
+			WranglerConnections[peerID] = conn
+
+			fmt.Println("Accepted Wrangler", peerID)
+			fmt.Println(WranglerConnections)
+			go ReceiveMessage(conn, incomingOrder, peerID, nodeLeftNetwork)
+
 		}
-		reader := bufio.NewReader(conn)
-		message, err := reader.ReadString('\n')
-		if err != nil {
-			fmt.Println("Error reading from connection:", err)
-			continue
-		}
-
-		peerID := strings.TrimSpace(message)
-
-		WranglerConnections[peerID] = conn
-
-		fmt.Println("Accepted Wrangler", peerID)
-		fmt.Println(WranglerConnections)
-		go ReceiveMessage(conn, incomingOrder, peerID, nodeLeftNetwork)
-
 	}
 }
 
-func SendNodeOrdersToDeputy(networkOrders *[config.N_FLOORS][config.N_BUTTONS]string, nodeOrdersUpdateChan chan bool) {
+func SendNodeOrdersToDeputy(networkOrders *[config.N_FLOORS][config.N_BUTTONS]string, nodeOrdersUpdateChan chan bool, sendOrderToDeputyEnable <-chan bool) {
 	ticker := time.NewTicker(DEPUTY_SEND_FREQ)
 	defer ticker.Stop()
 
@@ -91,6 +111,12 @@ func SendNodeOrdersToDeputy(networkOrders *[config.N_FLOORS][config.N_BUTTONS]st
 		case <-nodeOrdersUpdateChan:
 			SendDeputyMessage(networkOrders)
 			ticker.Reset(DEPUTY_SEND_FREQ)
+
+		case enable := <-sendOrderToDeputyEnable:
+			if !enable {
+				fmt.Println("Stopping SendNodeOrdersToDeputy goroutine")
+				return
+			}
 		}
 	}
 }

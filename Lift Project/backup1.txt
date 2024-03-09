@@ -1,1 +1,1 @@
-{"State":0,"Dir":0,"Floor":7,"Queue":[[false,false,false],[false,false,false],[false,false,false],[false,false,false],[false,false,false],[false,false,false],[false,false,false],[false,false,false],[false,false,false]],"Obstr":false}
+{"State":0,"Dir":0,"Floor":5,"Queue":[[false,false,false],[false,false,false],[false,false,false],[false,false,false],[false,false,false],[false,false,false],[false,false,false],[false,false,false],[false,false,false]],"Obstr":false}

@@ -62,7 +62,10 @@ func Assigner(
 	NetworkOrders *[config.N_FLOORS][config.N_BUTTONS]string,
 	NetworkUpdate chan bool,
 	nodeLeftNetwork <-chan string,
-	incomingOrder chan<- Orderstatus) {
+	incomingOrder chan<- Orderstatus,
+	quitAssigner <-chan bool,
+	remainingOrders chan<- [config.N_FLOORS][config.N_BUTTONS]string,
+) {
 
 	for {
 		select {
@@ -126,7 +129,10 @@ func Assigner(
 					}
 				}
 			}
+		case <-quitAssigner:
+			remainingOrders <- *NetworkOrders
 		}
+
 	}
 }
 
