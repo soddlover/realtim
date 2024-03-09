@@ -62,6 +62,8 @@ func main() {
 	// go PeerConnector(id, world)
 	go backup.WriteBackup(channels.ElevatorStates)
 	go elev.RunElev(channels, initElev)
+	go network.NetworkFSM(channels, world)
+
 	//go Assigner(channels, world)
 	//go printWorld(world)
 	select {}
