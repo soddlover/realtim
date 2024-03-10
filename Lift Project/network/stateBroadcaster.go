@@ -7,71 +7,57 @@ import (
 	"time"
 )
 
-type BroadcastState struct {
-	ElevState      Elev
-	Id             string
-	SequenceNumber int
-}
-
-type BroadcastWorld struct {
-	Map map[string]BroadcastState
-}
-
-func updateBroadcastworld(world *World, broadcastStateRx <-chan BroadcastState) {
-	bcastWorld := BroadcastWorld{Map: make(map[string]BroadcastState)}
+func updateBroadcastworld(systemState *SystemState, broadcastStateRx <-chan BcastState) {
+	bcastSystem := BcastSystem{Map: make(map[string]BcastState)}
 	for {
-		//update world view
 		select {
 		case bcastState := <-broadcastStateRx:
-			// elev := bcastState.ElevState
-			if _, ok := world.Map[bcastState.Id]; !ok {
-				delete(bcastWorld.Map, bcastState.Id)
+			_, existsInSystemState := systemState.Map[bcastState.ID]
+			if !existsInSystemState {
+				delete(bcastSystem.Map, bcastState.ID)
 			}
-			if _, ok := bcastWorld.Map[bcastState.Id]; ok {
-
-				if bcastState.SequenceNumber > bcastWorld.Map[bcastState.Id].SequenceNumber {
-					bcastWorld.Map[bcastState.Id] = bcastState
-					world.Map[bcastState.Id] = bcastState.ElevState
-					// fmt.Println("Updated value")
-					// fmt.Printf("%+v\n", bcastWorld)
+			existingBcastState, existsInBcastSystem := bcastSystem.Map[bcastState.ID]
+			if existsInBcastSystem {
+				if bcastState.SequenceNumber > existingBcastState.SequenceNumber {
+					bcastSystem.Map[bcastState.ID] = bcastState
+					systemState.Map[bcastState.ID] = bcastState.ElevState
 				}
 			} else {
-				//might be unnecicary if implemented by peer functionality.
-				bcastWorld.Map[bcastState.Id] = bcastState
-				world.Map[bcastState.Id] = bcastState.ElevState
-				//fmt.Println("Added new element to map.")
+				bcastSystem.Map[bcastState.ID] = bcastState
+				systemState.Map[bcastState.ID] = bcastState.ElevState
 			}
 		}
 	}
 }
 
-func StateBroadcaster(localElevator <-chan Elev, world *World, id string) {
+func StateBroadcaster(elevatorState <-chan Elev, systemState *SystemState, id string) {
 	//init bcast world
 	//using same world becuse why not?=
-	broadcastStateRx := make(chan BroadcastState)
-	broadcastStateTx := make(chan BroadcastState)
+	broadcastStateRx := make(chan BcastState)
+	broadcastStateTx := make(chan BcastState)
 
-	go repeater(localElevator, broadcastStateTx, id)
+	go repeater(elevatorState, broadcastStateTx, id)
 	go bcast.Transmitter(config.Broadcast_state_port, broadcastStateTx)
 	go bcast.Receiver(config.Broadcast_state_port, broadcastStateRx)
-	go updateBroadcastworld(world, broadcastStateRx)
+	go updateBroadcastworld(systemState, broadcastStateRx)
 }
 
-func repeater(elevStateTx <-chan Elev, repeatedElevState chan<- BroadcastState, elevId string) {
+func repeater(elevatorState <-chan Elev, broadcastStateTx chan<- BcastState, elevID string) {
 	var lastElev Elev
 	ticker := time.NewTicker(2000 * time.Millisecond)
-	var broadcastState BroadcastState
+	var broadcastState BcastState
 
 	for i := 0; ; i++ {
 		select {
-		case elev := <-elevStateTx:
+		case elev := <-elevatorState:
 			lastElev = elev
 		case <-ticker.C:
-			broadcastState = BroadcastState{lastElev, elevId, i}
-			// .ElevState = lastElev
-			// broadcastState.Id = elevId
-			// broadcastState.SequenceNumber = i
-			repeatedElevState <- broadcastState
+			broadcastState = BcastState{
+				ElevState:      lastElev,
+				ID:             elevID,
+				SequenceNumber: i,
+			}
+			broadcastStateTx <- broadcastState
 		}
 	}
 }
