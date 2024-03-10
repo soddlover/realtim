@@ -9,7 +9,14 @@ import (
 	"time"
 )
 
-func RunElev(channels Channels, initElev Elev) {
+func RunElev(
+	elevatorStateBackup chan<- Elev,
+	elevatorStateBroadcast chan<- Elev,
+	orderRequest chan<- Order,
+	orderAssigned <-chan Orderstatus,
+	orderDelete chan<- Orderstatus,
+	initElev Elev) {
+
 	idInt, _ := strconv.Atoi(config.Self_nr)
 	port := config.SimulatorPort + idInt
 	addr := "localhost:" + fmt.Sprint(port)
@@ -44,16 +51,16 @@ func RunElev(channels Channels, initElev Elev) {
 	elevStart(drv_floors)
 	elevator.Floor = elevio.GetFloor()
 	elevio.SetMotorDirection(elevio.MotorDirection(ChooseDirection(elevator)))
-	channels.ElevatorStates <- elevator
-	channels.ElevatorStatesBroadcast <- elevator
+	elevatorStateBackup <- elevator
+	elevatorStateBroadcast <- elevator
 
 	for {
 		select {
 		case buttonEvent := <-drv_buttons:
 			fmt.Println("Button event at floor", buttonEvent.Floor, "button", buttonEvent.Button)
-			channels.OrderRequest <- Order{Floor: buttonEvent.Floor, Button: buttonEvent.Button}
+			orderRequest <- Order{Floor: buttonEvent.Floor, Button: buttonEvent.Button}
 
-		case order := <-channels.OrderAssigned:
+		case order := <-orderAssigned:
 			fmt.Println("Order assigned: ", order)
 			elevator.Queue[order.Floor][order.Button] = true
 			switch elevator.State {
@@ -64,7 +71,7 @@ func RunElev(channels Channels, initElev Elev) {
 					elevator.State = EB_DoorOpen
 					doorTimer.Reset(config.DOOR_OPEN_TIME)
 					elevio.SetDoorOpenLamp(true)
-					clearAtFloor(&elevator, channels)
+					clearAtFloor(&elevator, orderDelete)
 
 				} else {
 					elevator.State = EB_Moving
@@ -75,7 +82,7 @@ func RunElev(channels Channels, initElev Elev) {
 				if elevator.Floor == order.Floor {
 					if elevator.Queue[order.Floor][order.Button] {
 						elevator.Queue[order.Floor][order.Button] = false
-						channels.OrderDelete <- Orderstatus{Owner: config.Self_nr, Floor: order.Floor, Button: order.Button, Status: true}
+						orderDelete <- Orderstatus{Owner: config.Self_nr, Floor: order.Floor, Button: order.Button, Status: true}
 					}
 
 					doorTimer.Reset(config.DOOR_OPEN_TIME)
@@ -85,8 +92,8 @@ func RunElev(channels Channels, initElev Elev) {
 				fmt.Println("Undefined state WTF")
 			}
 
-			channels.ElevatorStates <- elevator
-			channels.ElevatorStatesBroadcast <- elevator
+			elevatorStateBackup <- elevator
+			elevatorStateBroadcast <- elevator
 
 		case elevator.Floor = <-drv_floors:
 			fmt.Println("Arrived at floor", elevator.Floor)
@@ -97,23 +104,23 @@ func RunElev(channels Channels, initElev Elev) {
 				elevio.SetDoorOpenLamp(true)
 				doorTimer.Reset(config.DOOR_OPEN_TIME)
 
-				clearAtFloor(&elevator, channels)
+				clearAtFloor(&elevator, orderDelete)
 				elevator.Dir = DirStop
 
 				elevator.State = EB_DoorOpen
 			} else if elevator.State == EB_Moving {
 				motorErrorTimer.Reset(config.MOTOR_ERROR_TIME)
 			}
-			channels.ElevatorStates <- elevator
-			channels.ElevatorStatesBroadcast <- elevator
+			elevatorStateBackup <- elevator
+			elevatorStateBroadcast <- elevator
 
 		case <-doorTimer.C:
 			if elevio.GetObstruction() {
 				doorTimer.Reset(config.DOOR_OPEN_TIME)
 				elevator.Obstr = true
 				fmt.Println("Obstruction detected")
-				channels.ElevatorStates <- elevator
-				channels.ElevatorStatesBroadcast <- elevator
+				elevatorStateBackup <- elevator
+				elevatorStateBroadcast <- elevator
 				continue
 			}
 			elevio.SetDoorOpenLamp(false)
@@ -126,8 +133,8 @@ func RunElev(channels Channels, initElev Elev) {
 				elevio.SetMotorDirection(elevio.MotorDirection(elevator.Dir))
 				motorErrorTimer.Reset(config.MOTOR_ERROR_TIME)
 			}
-			channels.ElevatorStates <- elevator
-			channels.ElevatorStatesBroadcast <- elevator
+			elevatorStateBackup <- elevator
+			elevatorStateBroadcast <- elevator
 		case <-motorErrorTimer.C:
 			elevio.SetMotorDirection(elevio.MD_Stop)
 			elevator.State = Undefined
@@ -140,15 +147,15 @@ func RunElev(channels Channels, initElev Elev) {
 			}
 			elevStart(drv_floors)
 			elevator.State = EB_Idle
-			channels.ElevatorStates <- elevator
-			channels.ElevatorStatesBroadcast <- elevator
+			elevatorStateBackup <- elevator
+			elevatorStateBroadcast <- elevator
 		//fullfør cab ordre
 		case obstruction := <-drv_obstr:
 			if !obstruction && elevator.Obstr {
 				doorTimer.Reset(config.DOOR_OPEN_TIME)
 				elevator.Obstr = false
-				channels.ElevatorStates <- elevator
-				channels.ElevatorStatesBroadcast <- elevator
+				elevatorStateBackup <- elevator
+				elevatorStateBroadcast <- elevator
 			}
 
 		}
