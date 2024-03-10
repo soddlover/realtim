@@ -22,7 +22,6 @@ const (
 	st_recovery
 )
 
-var OnlineElevators = make(map[string]bool)
 var state State
 var sheriffID string
 
@@ -99,5 +98,4 @@ func InitSherrif(channels Channels, world *World, networkorders *[config.N_FLOOR
 		nodeLeftNetwork <- oldSheriff
 		fmt.Println("Sending old sheriff to redistributer", oldSheriff)
 	}
-
 }
