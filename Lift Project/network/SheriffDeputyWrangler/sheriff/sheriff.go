@@ -26,18 +26,18 @@ func CheckMissingConnToOrders(networkOrders [config.N_FLOORS][config.N_BUTTONS]s
 	for floor := 0; floor < len(networkOrders); floor++ {
 		for button := 0; button < len(networkOrders[floor]); button++ {
 			id := networkOrders[floor][button]
-			fmt.Printf("Checking order at floor %d, button %d, id: %s\n", floor, button, id) // Print the current order being checked
+			//fmt.Printf("Checking order at floor %d, button %d, id: %s\n", floor, button, id) // Print the current order being checked
 			if id != "" && WranglerConnections[id] == nil && id != config.Self_id && !processedIDs[id] {
 				nodeLeftNetwork <- id
 				fmt.Println("***Missing connection to ACTIVE ORDER Reassigning order!!!***", id)
 				processedIDs[id] = true
 			} else {
-				fmt.Printf("Order at floor %d, button %d is not missing connection\n", floor, button) // Print a message if the order is not missing connection
+				//fmt.Printf("Order at floor %d, button %d is not missing connection\n", floor, button) // Print a message if the order is not missing connection
 			}
 		}
 	}
 }
-func Sheriff(incomingOrder chan Orderstatus, networkOrders *[config.N_FLOORS][config.N_BUTTONS]string, nodeLeftNetwork chan string, nodeOrdersUpdateChan chan bool, demoted <-chan bool, quitAssigner chan<- bool) {
+func Sheriff(incomingOrder chan Orderstatus, networkOrders *[config.N_FLOORS][config.N_BUTTONS]string, nodeLeftNetwork chan string, nodeOrdersUpdateChan chan bool, relievedOfDuty <-chan bool, quitAssigner chan<- bool) {
 
 	ipID := strings.Split(string(config.Self_id), ":")
 	transmitEnable := make(chan bool)
@@ -50,7 +50,7 @@ func Sheriff(incomingOrder chan Orderstatus, networkOrders *[config.N_FLOORS][co
 	time.Sleep(1 * time.Second)
 	CheckMissingConnToOrders(*networkOrders, nodeLeftNetwork)
 
-	<-demoted
+	<-relievedOfDuty
 	transmitEnable <- false
 	listenWranglerEnable <- false
 	sendOrderToDeputyEnable <- false

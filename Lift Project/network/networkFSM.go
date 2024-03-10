@@ -62,6 +62,7 @@ func NetworkFSM(channels Channels, world *World) {
 
 			//check for sheriff Conflict
 			sIP := wrangler.GetSheriffIP()
+			print("Sheriff IP: ", sIP, "\n")
 			//compare to own IP
 			selfIP := strings.Split(string(config.Self_id), ":")
 			//check for conflict
@@ -90,7 +91,6 @@ func NetworkFSM(channels Channels, world *World) {
 							}
 						}
 					}
-
 				}
 			}
 

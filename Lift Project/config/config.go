@@ -13,7 +13,6 @@ const (
 	Broadcast_state_port = 16569
 	Peer_port            = 15647
 	TCP_port             = 16000
-	Sheriff_deputy_port  = 16001
 	SimulatorPort        = 15657
 )
 
