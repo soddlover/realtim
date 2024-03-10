@@ -22,17 +22,17 @@ var DeputyDisconnectChan = make(chan net.TCPConn)
 
 func CheckMissingConnToOrders(networkOrders [config.N_FLOORS][config.N_BUTTONS]string, nodeLeftNetwork chan<- string) {
 	processedIDs := make(map[string]bool)
-	fmt.Println("Checking for missing connections to orders")
+	//fmt.Println("Checking for missing connections to orders")
 	for floor := 0; floor < len(networkOrders); floor++ {
 		for button := 0; button < len(networkOrders[floor]); button++ {
 			id := networkOrders[floor][button]
-			fmt.Printf("Checking order at floor %d, button %d, id: %s\n", floor, button, id) // Print the current order being checked
+			//fmt.Printf("Checking order at floor %d, button %d, id: %s\n", floor, button, id) // Print the current order being checked
 			if id != "" && WranglerConnections[id] == nil && id != config.Self_id && !processedIDs[id] {
 				nodeLeftNetwork <- id
 				fmt.Println("***Missing connection to ACTIVE ORDER Reassigning order!!!***", id)
 				processedIDs[id] = true
 			} else {
-				fmt.Printf("Order at floor %d, button %d is not missing connection\n", floor, button) // Print a message if the order is not missing connection
+				//fmt.Printf("Order at floor %d, button %d is not missing connection\n", floor, button) // Print a message if the order is not missing connection
 			}
 		}
 	}
