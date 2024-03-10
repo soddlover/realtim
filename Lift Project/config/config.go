@@ -3,7 +3,7 @@ package config
 import "time"
 
 const (
-	N_FLOORS             = 9
+	N_FLOORS             = 4
 	N_ELEVATORS          = 1
 	N_BUTTONS            = 3
 	TRAVEL_TIME          = 2
