@@ -58,7 +58,7 @@ func orderForwarder(channels Channels) {
 
 func Assigner(
 	channels Channels,
-	world *World,
+	world *SystemState,
 	NetworkOrders *[config.N_FLOORS][config.N_BUTTONS]string,
 	NetworkUpdate chan bool,
 	nodeLeftNetwork <-chan string,

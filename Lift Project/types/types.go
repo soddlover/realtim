@@ -34,6 +34,20 @@ type Orderstatus struct {
 	Status bool
 }
 
+type BcastState struct {
+	ElevState      Elev
+	ID             string
+	SequenceNumber int
+}
+
+type SystemState struct {
+	Map map[string]Elev
+}
+
+type BcastSystem struct {
+	Map map[string]BcastState
+}
+
 type ElevatorState int
 
 const (
