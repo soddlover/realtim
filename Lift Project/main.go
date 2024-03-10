@@ -19,67 +19,56 @@ func main() {
 	flag.StringVar(&id, "id", "", "id of this peer")
 	fresh := flag.Bool("fresh", false, "Start a fresh elevator")
 	flag.Parse()
-	localIP, err := localip.LocalIP()
-	if err != nil {
-		fmt.Println(err)
-		localIP = "DISCONNECTED"
+
+	var localIP string
+	var err error
+	for {
+		localIP, err = localip.LocalIP()
+		if err != nil {
+			fmt.Println(err)
+			time.Sleep(1 * time.Second)
+		} else {
+			break
+		}
 	}
+
 	if id == "" {
 		id = localIP + ":0"
 		config.Self_nr = "0"
 	} else {
 		config.Self_nr = id
 		id = localIP + ":" + id
-
 	}
+
 	config.Self_id = id
 
 	initElev := backup.Backup(*fresh)
 
 	if (initElev == Elev{}) {
 		fmt.Println("Starting with fresh elevator")
-
 	}
 
-	world := &network.World{
+	systemState := &SystemState{
 		Map: make(map[string]Elev),
 	}
 
-	channels := Channels{
-		ElevatorStates:          make(chan Elev, 10),
-		ElevatorStatesBroadcast: make(chan Elev, 10),
-		OrderRequest:            make(chan Order, 10),
-		OrderComplete:           make(chan Order, 10),
-		OrderAssigned:           make(chan Orderstatus, 10),
-		OrderDelete:             make(chan Orderstatus, 10),
-		IncomingOrder:           make(chan Orderstatus, 10),
-	}
+	elevatorStateBackup := make(chan Elev, 10)
+	elevatorStateBroadcast := make(chan Elev, 10)
+	orderRequest := make(chan Order, 10)
+	orderComplete := make(chan Order, 10)
+	orderAssigned := make(chan Orderstatus, 10)
+	orderDelete := make(chan Orderstatus, 10)
+	incomingOrder := make(chan Orderstatus, 10)
 
-	//fmt.Print("Hello, World!")
+	//fmt.Print("Hello, systemState!")
 	// go RunElev(channels)
-	go network.StateBroadcaster(channels.ElevatorStatesBroadcast, world, id)
-	// go PeerConnector(id, world)
-	go backup.WriteBackup(channels.ElevatorStates)
-	go elev.RunElev(channels, initElev)
-	go network.NetworkFSM(channels, world)
+	go network.StateBroadcaster(elevatorStateBroadcast, systemState, id)
+	// go PeerConnector(id, systemState)
+	go backup.WriteBackup(elevatorStateBackup)
+	go elev.RunElev(elevatorStateBackup, elevatorStateBroadcast, orderRequest, orderAssigned, orderDelete, initElev)
+	go network.NetworkFSM(channels, systemState)
 
-	//go Assigner(channels, world)
-	//go printWorld(world)
+	//go Assigner(channels, systemState)
+	//go printsystemState(systemState)
 	select {}
-}
-
-func printWorld(world *network.World) {
-	ticker := time.NewTicker(10 * time.Second)
-	for {
-		select {
-		case <-ticker.C:
-			for _, value := range world.Map {
-				//fmt.Println("Key:", key, "Value:", value)
-				fmt.Println("Direction:", value.Dir)
-				fmt.Println("Floor:", value.Floor)
-				//fmt.Println("Queue:", value.Queue)
-				fmt.Println("State:", value.State)
-			}
-		}
-	}
 }
