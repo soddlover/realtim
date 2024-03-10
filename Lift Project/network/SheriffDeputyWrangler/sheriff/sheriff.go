@@ -37,7 +37,13 @@ func CheckMissingConnToOrders(networkOrders [config.N_FLOORS][config.N_BUTTONS]s
 		}
 	}
 }
-func Sheriff(incomingOrder chan Orderstatus, networkOrders *[config.N_FLOORS][config.N_BUTTONS]string, nodeLeftNetwork chan string, nodeOrdersUpdateChan chan bool, relievedOfDuty <-chan bool, quitAssigner chan<- bool) {
+func Sheriff(
+	incomingOrder chan Orderstatus,
+	networkOrders *[config.N_FLOORS][config.N_BUTTONS]string,
+	nodeLeftNetwork chan string,
+	nodeOrdersUpdateChan chan bool,
+	relievedOfDuty <-chan bool,
+	quitAssigner chan<- bool) {
 
 	ipID := strings.Split(string(config.Self_id), ":")
 	transmitEnable := make(chan bool)
@@ -58,7 +64,11 @@ func Sheriff(incomingOrder chan Orderstatus, networkOrders *[config.N_FLOORS][co
 
 }
 
-func listenForWranglerConnections(incomingOrder chan Orderstatus, nodeLeftNetwork chan string, listenWranglerEnable <-chan bool) {
+func listenForWranglerConnections(
+	incomingOrder chan<- Orderstatus,
+	nodeLeftNetwork chan<- string,
+	listenWranglerEnable <-chan bool) {
+
 	ln, err := net.Listen("tcp", ":"+strconv.Itoa(config.TCP_port))
 	if err != nil {
 		fmt.Println("Error listening for connections:", err)
@@ -202,7 +212,11 @@ func SendOrderMessage(peer string, order Orderstatus) (bool, error) {
 	return true, nil
 }
 
-func ReceiveMessage(conn net.Conn, incomingOrder chan<- Orderstatus, peerID string, nodeLeftNetwork chan<- string) (Orderstatus, error) {
+func ReceiveMessage(
+	conn net.Conn,
+	incomingOrder chan<- Orderstatus,
+	peerID string,
+	nodeLeftNetwork chan<- string) (Orderstatus, error) {
 	for {
 		reader := bufio.NewReader(conn)
 		message, err := reader.ReadString('\n')
