@@ -46,13 +46,13 @@ func orderForwarder(
 				orderAssigned <- orderstat
 				continue
 			}
-			if state == st_sherriff {
+			if duty == dt_sherriff {
 				incomingOrder <- orderstat
 			} else {
 				wrangler.SendOrderToSheriff(orderstat)
 			}
 		case orderstat := <-orderDelete:
-			if state == st_sherriff {
+			if duty == dt_sherriff {
 				incomingOrder <- orderstat
 			} else {
 				wrangler.SendOrderToSheriff(orderstat)
@@ -64,12 +64,13 @@ func orderForwarder(
 func Assigner(
 	networkUpdate chan<- bool,
 	orderAssigned chan<- Orderstatus,
-	systemstate *SystemState,
+	systemState *SystemState,
 	networkOrders *[config.N_FLOORS][config.N_BUTTONS]string,
 	nodeLeftNetwork <-chan string,
 	incomingOrder chan Orderstatus,
 	quitAssigner <-chan bool,
-	remainingOrders chan<- [config.N_FLOORS][config.N_BUTTONS]string) {
+	remainingOrders chan<- [config.N_FLOORS][config.N_BUTTONS]string,
+) {
 
 	for {
 		select {
@@ -84,7 +85,7 @@ func Assigner(
 
 			best_id := config.Self_id
 			best_duration := 1000000 * time.Second
-			for id, elevator := range systemstate.Map {
+			for id, elevator := range systemState.Map {
 				if elevator.Obstr {
 					fmt.Println("Elevator with id: ", id, " is obstructed")
 				}
@@ -100,7 +101,7 @@ func Assigner(
 			}
 			assigned := networkOrders[order.Floor][order.Button]
 			if assigned != "" {
-				if elev, ok := systemstate.Map[assigned]; ok {
+				if elev, ok := systemState.Map[assigned]; ok {
 					if !elev.Obstr && !(elev.State == Undefined) {
 						//do nothing as its already assigned to a working elevator, could send an additional message to it incase?
 						fmt.Println("Order already assigned to a working elevator")
@@ -120,8 +121,8 @@ func Assigner(
 			}
 
 		case peerID := <-nodeLeftNetwork:
-			delete(systemstate.Map, peerID)
-			fmt.Printf("world.Map: %v\n", systemstate.Map)
+			delete(systemState.Map, peerID)
+			fmt.Printf("world.Map: %v\n", systemState.Map)
 			fmt.Println("Node left network, redistributing orders")
 			fmt.Println("NetworkOrders: ", networkOrders)
 			//check for orders owned by the leaving node
