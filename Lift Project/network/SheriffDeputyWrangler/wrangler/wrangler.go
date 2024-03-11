@@ -14,8 +14,6 @@ import (
 )
 
 var sheriffConn net.Conn
-var SheriffDisconnectedFromWrangler = make(chan bool)
-var WranglerPromotion = make(chan bool)
 var orderSent = make(chan Orderstatus)
 var NodeOrdersReceived = make(chan NetworkOrdersData)
 
@@ -152,7 +150,7 @@ func acknowledger(OrderSent <-chan Orderstatus, networkOrdersRecieved <-chan Net
 
 // ReceiveMessageFromsheriff receives an order from the sheriff and sends an acknowledgement
 func ReceiveMessageFromSheriff(
-	orderAssigned chan Orderstatus,
+	orderAssigned chan<- Orderstatus,
 	sheriffDead chan<- NetworkOrdersData) {
 
 	var lastnodeOrdersData NetworkOrdersData

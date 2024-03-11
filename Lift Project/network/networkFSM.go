@@ -20,9 +20,7 @@ const (
 	st_recovery
 )
 
-var OnlineElevators = make(map[string]bool)
 var state State
-var sheriffID string
 
 func NetworkFSM(
 	orderRequest chan Order,
@@ -38,6 +36,7 @@ func NetworkFSM(
 	remainingOrders := make(chan [config.N_FLOORS][config.N_BUTTONS]string)
 
 	state = st_initial
+	var lastSheriff string
 
 	for {
 		switch state {
@@ -54,6 +53,7 @@ func NetworkFSM(
 					fmt.Println("Me, a Wrangler connected to Sheriff")
 					go wrangler.ReceiveMessageFromSheriff(orderAssigned, sheriffDead)
 					state = st_wrangler
+					lastSheriff = sIP
 				}
 			}
 			go orderForwarder(incommingOrder, orderAssigned, orderRequest, orderDelete)
@@ -101,7 +101,7 @@ func NetworkFSM(
 
 			if networkOrderData.TheChosenOne {
 				fmt.Println("I am the chosen one, I am the Sheriff!")
-				InitSherrif(incommingOrder, systemState, &networkOrderData.NetworkOrders, sheriffID, relievedOfDuty, remainingOrders, orderAssigned)
+				InitSherrif(incommingOrder, systemState, &networkOrderData.NetworkOrders, lastSheriff, relievedOfDuty, remainingOrders, orderAssigned)
 				state = st_sherriff
 
 			} else {
