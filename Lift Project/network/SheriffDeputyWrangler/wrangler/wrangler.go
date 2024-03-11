@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"mymodule/config"
+	elevatorFSM "mymodule/elevator"
 	"mymodule/network/conn"
 	"mymodule/types"
 	. "mymodule/types"
@@ -71,7 +72,7 @@ func resendOrderToSheriff(order Orderstatus) (bool, error) {
 
 func sendOrderToSheriff(order Orderstatus, OrderSent chan Orderstatus) (bool, error) {
 	if OrderSent != nil {
-		//OrderSent <- order
+		OrderSent <- order
 	}
 	orderJSON, err := json.Marshal(order)
 	if err != nil {
@@ -104,7 +105,7 @@ func acknowledger(OrderSent <-chan Orderstatus, networkOrdersRecieved <-chan Net
 			} else {
 				unacknowledgedButtons[orderstatus.Floor][orderstatus.Button] = true
 			}
-			ticker := time.NewTicker(time.Second * 1) // Resend the order every 10 seconds
+			ticker := time.NewTicker(time.Second * 3) // Resend the order every 10 seconds
 			orderTickers[orderstatus.Floor][orderstatus.Button] = ticker
 			go func(order Orderstatus) {
 				for range ticker.C {
@@ -127,19 +128,28 @@ func acknowledger(OrderSent <-chan Orderstatus, networkOrdersRecieved <-chan Net
 
 		case networkorders := <-networkOrdersRecieved:
 			// Which orders have been deleted?
+			fmt.Println("Received network orders from ", networkorders)
 			for floor := 0; floor < config.N_FLOORS; floor++ {
 				for button := 0; button < config.N_BUTTONS; button++ {
 					if networkorders.NetworkOrders[floor][button] != "" {
-						unacknowledgedButtons[floor][button] = false
-						ticker := orderTickers[floor][button]
-						ticker.Stop()
-						orderTickers[floor][button] = nil
-
+						if unacknowledgedButtons[floor][button] {
+							unacknowledgedButtons[floor][button] = false
+							fmt.Println("Order acknowledged by sheriff:", floor, button)
+							if ticker := orderTickers[floor][button]; ticker != nil {
+								ticker.Stop()
+								orderTickers[floor][button] = nil
+							}
+						}
 					} else {
-						unacknowledgedComplete[floor][button] = false
-						ticker := orderTickers[floor][button]
-						ticker.Stop()
-						orderTickers[floor][button] = nil
+						if unacknowledgedComplete[floor][button] {
+							fmt.Println("Order acknowledged by sheriff:", floor, button)
+							unacknowledgedComplete[floor][button] = false
+							if ticker := orderTickers[floor][button]; ticker != nil {
+								ticker.Stop()
+								orderTickers[floor][button] = nil
+							}
+
+						}
 
 					}
 				}
