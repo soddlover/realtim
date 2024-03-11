@@ -31,7 +31,7 @@ type Orderstatus struct {
 	Owner  string
 	Floor  int
 	Button elevio.ButtonType
-	Status bool
+	Served bool
 }
 
 type BcastState struct {

@@ -41,7 +41,7 @@ func orderForwarder(
 	for {
 		select {
 		case order := <-orderRequest:
-			orderstat := Orderstatus{Owner: config.Self_id, Floor: order.Floor, Button: order.Button, Status: false}
+			orderstat := Orderstatus{Owner: config.Self_id, Floor: order.Floor, Button: order.Button, Served: false}
 			if order.Button == elevio.BT_Cab {
 				orderAssigned <- orderstat
 				continue
@@ -76,7 +76,7 @@ func Assigner(
 		select {
 		case order := <-incomingOrder:
 			//channels.OrderAssigned <- order
-			if order.Status {
+			if order.Served {
 				fmt.Println("Order being deletetet")
 				networkOrders[order.Floor][order.Button] = ""
 				networkUpdate <- true
@@ -130,7 +130,7 @@ func Assigner(
 				for button := 0; button < len(networkOrders[button]); button++ {
 					if networkOrders[floor][button] == peerID {
 						// Send to assigner for reassignment
-						incomingOrder <- Orderstatus{Floor: floor, Button: elevio.ButtonType(button), Status: false, Owner: peerID}
+						incomingOrder <- Orderstatus{Floor: floor, Button: elevio.ButtonType(button), Served: false, Owner: peerID}
 					}
 				}
 			}
