@@ -99,7 +99,7 @@ func acknowledger(OrderSent <-chan Orderstatus, networkOrdersRecieved <-chan Net
 	for {
 		select {
 		case orderstatus := <-OrderSent:
-			if orderstatus.Status {
+			if orderstatus.Served {
 				unacknowledgedComplete[orderstatus.Floor][orderstatus.Button] = true
 			} else {
 				unacknowledgedButtons[orderstatus.Floor][orderstatus.Button] = true

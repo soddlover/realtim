@@ -82,7 +82,7 @@ func RunElev(
 				if elevator.Floor == order.Floor {
 					if elevator.Queue[order.Floor][order.Button] {
 						elevator.Queue[order.Floor][order.Button] = false
-						orderDelete <- Orderstatus{Owner: config.Self_nr, Floor: order.Floor, Button: order.Button, Status: true}
+						orderDelete <- Orderstatus{Owner: config.Self_nr, Floor: order.Floor, Button: order.Button, Served: true}
 					}
 
 					doorTimer.Reset(config.DOOR_OPEN_TIME)
