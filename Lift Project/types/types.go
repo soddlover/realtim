@@ -40,12 +40,12 @@ type BcastState struct {
 	SequenceNumber int
 }
 
-type SystemState struct {
-	Map map[string]Elev
-}
-
 type BcastSystem struct {
 	Map map[string]BcastState
+}
+
+type SystemState struct {
+	Map map[string]Elev
 }
 
 type ElevatorState int

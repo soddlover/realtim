@@ -10,7 +10,6 @@ import (
 	"mymodule/network/localip"
 	. "mymodule/types"
 	"time"
-	//. "mymodule/network"
 )
 
 func main() {
