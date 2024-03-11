@@ -3,73 +3,108 @@ package network
 import (
 	"fmt"
 	"mymodule/config"
+	"mymodule/elevator/elevio"
 	"mymodule/network/SheriffDeputyWrangler/sheriff"
 	"mymodule/network/SheriffDeputyWrangler/wrangler"
 	. "mymodule/types"
+	"strings"
 )
 
-type World struct {
-	Map map[string]Elev
-}
-
-type State int
+type duty int
 
 const (
-	st_initial State = iota
-	st_sherriff
-	st_deputy
-	st_wrangler
-	st_recovery
+	dt_initial duty = iota
+	dt_sherriff
+	dt_deputy
+	dt_wrangler
+	dt_recovery
 )
 
-var OnlineElevators = make(map[string]bool)
-var state State
-var sheriffID string
+var currentDuty duty
 
-func NetworkFSM(channels Channels, world *World) {
-	networkChannels := NetworkChannels{
-		DeputyPromotion:   make(chan map[string]Orderstatus),
-		WranglerPromotion: make(chan bool),
-		SheriffDead:       make(chan NetworkOrdersData),
-		RelievedOfDuty:    make(chan bool),
-	}
-	state = st_initial
+func NetworkFSM(
+	orderRequest chan Order,
+	orderAssigned chan Orderstatus,
+	orderDelete chan Orderstatus,
+	systemState *SystemState,
+	incommingOrder chan Orderstatus,
+) {
+
+	sheriffDead := make(chan NetworkOrdersData)
+	relievedOfDuty := make(chan bool)
+	remainingOrders := make(chan [config.N_FLOORS][config.N_BUTTONS]string)
+
+	currentDuty = dt_initial
 
 	for {
-		switch state {
-		case st_initial:
+		switch currentDuty {
+		case dt_initial:
 			sIP := wrangler.GetSheriffIP()
 			if sIP == "" {
 
 				NetworkOrders := [config.N_FLOORS][config.N_BUTTONS]string{}
-				InitSherrif(channels, world, &NetworkOrders, "")
-				state = st_sherriff
+				InitSherrif(incommingOrder, systemState, &NetworkOrders, relievedOfDuty, remainingOrders, orderAssigned)
+				currentDuty = dt_sherriff
 			} else {
 				fmt.Println("I am not the only Wrangler in town, connecting to Sheriff:")
 				if wrangler.ConnectWranglerToSheriff(sIP) {
 					fmt.Println("Me, a Wrangler connected to Sheriff")
-					go wrangler.ReceiveMessageFromSheriff(channels.OrderAssigned, networkChannels)
-					state = st_wrangler
+					go wrangler.ReceiveMessageFromSheriff(orderAssigned, sheriffDead)
+					currentDuty = dt_wrangler
 				}
 			}
-			go orderForwarder(channels)
-		case st_sherriff:
+			go orderForwarder(incommingOrder, orderAssigned, orderRequest, orderDelete)
+		case dt_sherriff:
 			//im jamming
-			//sheriff Conflict
-			//Shootout
-			//Fastest trigger in the west?
 
-		case st_wrangler:
-			networkOrderData := <-networkChannels.SheriffDead
+			//check for sheriff Conflict
+			sIP := wrangler.GetSheriffIP()
+			//print("Sheriff IP: ", sIP, "\n")
+			//compare to own IP
+			selfIP := strings.Split(string(config.Self_id), ":")
+			//check for conflict
+			if sIP != "" && sIP != selfIP[0] {
+				fmt.Println("Sheriff Conflict, my IP:", selfIP[0], "other Sheriff IP:", sIP)
+				fmt.Println("Preparing for shootout!!!!")
+				fmt.Println("Allahu Akbar")
+
+				// 	//shootout
+				if selfIP[0] > sIP {
+					fmt.Println("I won the shootout! Theres a new sheriff in town.")
+					continue
+				}
+				fmt.Println("I died.")
+
+				if wrangler.ConnectWranglerToSheriff(sIP) {
+					fmt.Println("Me, a Wrangler connected to Sheriff")
+					currentDuty = dt_wrangler
+					go wrangler.ReceiveMessageFromSheriff(orderAssigned, sheriffDead)
+					relievedOfDuty <- true
+					o := <-remainingOrders
+
+					for i := 0; i < len(o); i++ {
+						for j := 0; j < len(o[i]); j++ {
+							if o[i][j] != "" {
+								orderRequest <- Order{Floor: i, Button: elevio.ButtonType(j)}
+							}
+						}
+					}
+				}
+			}
+
+			// 	//the highest IP wins
+
+		case dt_wrangler:
+			networkOrderData := <-sheriffDead
 
 			if networkOrderData.TheChosenOne {
 				fmt.Println("I am the chosen one, I am the Sheriff!")
-				InitSherrif(channels, world, &networkOrderData.NetworkOrders, sheriffID)
-				state = st_sherriff
+				InitSherrif(incommingOrder, systemState, &networkOrderData.NetworkOrders, relievedOfDuty, remainingOrders, orderAssigned)
+				currentDuty = dt_sherriff
 
 			} else {
 				fmt.Println("I am not the chosen one, I am a Deputy")
-				state = st_initial
+				currentDuty = dt_initial
 			}
 
 			//listen for incoming orders
@@ -77,8 +112,8 @@ func NetworkFSM(channels Channels, world *World) {
 			//listen for lost peers
 			//listen for orders to delete
 			//listen for orders to assign
-		case st_recovery:
-			state = st_initial
+		case dt_recovery:
+			currentDuty = dt_initial
 			//listen for incoming orders
 			//listen for new peers
 			//listen for lost peers
@@ -88,16 +123,49 @@ func NetworkFSM(channels Channels, world *World) {
 	}
 }
 
-func InitSherrif(channels Channels, world *World, networkorders *[config.N_FLOORS][config.N_BUTTONS]string, oldSheriff string) {
-	nodeLeftNetwork := make(chan string)
-	fmt.Println("I am the only Wrangler in town, I am the Sheriff!")
-	NetworkUpdate := make(chan bool)
-	go sheriff.Sheriff(channels.IncomingOrder, networkorders, nodeLeftNetwork, NetworkUpdate)
-	go Assigner(channels, world, networkorders, NetworkUpdate)
-	go redistributor(nodeLeftNetwork, channels.IncomingOrder, world, networkorders)
-	if oldSheriff != "" {
-		nodeLeftNetwork <- oldSheriff
-		fmt.Println("Sending old sheriff to redistributer", oldSheriff)
-	}
+func InitSherrif(
+	incomingOrder chan Orderstatus,
+	systemState *SystemState,
+	networkorders *[config.N_FLOORS][config.N_BUTTONS]string,
+	relievedOfDuty <-chan bool,
+	remainingOrders chan<- [config.N_FLOORS][config.N_BUTTONS]string,
+	orderAssigned chan<- Orderstatus,
+) {
 
+	nodeLeftNetwork := make(chan string)
+	quitAssigner := make(chan bool)
+	fmt.Println("I am the only Wrangler in town, I am the Sheriff!")
+	networkUpdate := make(chan bool)
+	go sheriff.Sheriff(incomingOrder, networkorders, nodeLeftNetwork, networkUpdate, relievedOfDuty, quitAssigner)
+	go Assigner(networkUpdate, orderAssigned, systemState, networkorders, nodeLeftNetwork, incomingOrder, quitAssigner, remainingOrders)
+	//go redistributor(nodeLeftNetwork, channels.IncomingOrder, world, networkorders)
+}
+
+func orderForwarder(
+	incomingOrder chan<- Orderstatus,
+	orderAssigned chan<- Orderstatus,
+	orderRequest <-chan Order,
+	orderDelete <-chan Orderstatus,
+) {
+	for {
+		select {
+		case order := <-orderRequest:
+			orderstat := Orderstatus{Owner: config.Self_id, Floor: order.Floor, Button: order.Button, Served: false}
+			if order.Button == elevio.BT_Cab {
+				orderAssigned <- orderstat
+				continue
+			}
+			if currentDuty == dt_sherriff {
+				incomingOrder <- orderstat
+			} else {
+				wrangler.SendOrderToSheriff(orderstat)
+			}
+		case orderstat := <-orderDelete:
+			if currentDuty == dt_sherriff {
+				incomingOrder <- orderstat
+			} else {
+				wrangler.SendOrderToSheriff(orderstat)
+			}
+		}
+	}
 }

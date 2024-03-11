@@ -14,8 +14,6 @@ import (
 )
 
 var sheriffConn net.Conn
-var SheriffDisconnectedFromWrangler = make(chan bool)
-var WranglerPromotion = make(chan bool)
 var orderSent = make(chan Orderstatus)
 var NodeOrdersReceived = make(chan NetworkOrdersData)
 
@@ -25,6 +23,24 @@ func ConnectWranglerToSheriff(sheriffIP string) bool {
 		fmt.Println("Error connecting to sheriff:", err)
 		return false
 	}
+
+	tcpConn, ok := conn.(*net.TCPConn)
+	if !ok {
+		fmt.Println("Error asserting connection type")
+		return false
+	}
+
+	if err := tcpConn.SetKeepAlive(true); err != nil {
+		fmt.Println("Error setting keepalive:", err)
+		return false
+	}
+
+	// Set the keepalive period to 1 minute.
+	if err := tcpConn.SetKeepAlivePeriod(3 * time.Second); err != nil {
+		fmt.Println("Error setting keepalive period:", err)
+		return false
+	}
+
 	fmt.Fprintf(conn, "%s\n", config.Self_id)
 	fmt.Println("sent id to sheriff:", config.Self_id)
 	sheriffConn = conn
@@ -83,7 +99,7 @@ func acknowledger(OrderSent <-chan Orderstatus, networkOrdersRecieved <-chan Net
 	for {
 		select {
 		case orderstatus := <-OrderSent:
-			if orderstatus.Status {
+			if orderstatus.Served {
 				unacknowledgedComplete[orderstatus.Floor][orderstatus.Button] = true
 			} else {
 				unacknowledgedButtons[orderstatus.Floor][orderstatus.Button] = true
@@ -133,7 +149,10 @@ func acknowledger(OrderSent <-chan Orderstatus, networkOrdersRecieved <-chan Net
 }
 
 // ReceiveMessageFromsheriff receives an order from the sheriff and sends an acknowledgement
-func ReceiveMessageFromSheriff(orderAssigned chan Orderstatus, networkchannels NetworkChannels) {
+func ReceiveMessageFromSheriff(
+	orderAssigned chan<- Orderstatus,
+	sheriffDead chan<- NetworkOrdersData) {
+
 	var lastnodeOrdersData NetworkOrdersData
 
 	go acknowledger(orderSent, NodeOrdersReceived)
@@ -148,7 +167,7 @@ func ReceiveMessageFromSheriff(orderAssigned chan Orderstatus, networkchannels N
 				if err == io.EOF {
 					fmt.Println("Connection closed by sheriff in wrangler")
 					sheriffConn.Close()
-					networkchannels.SheriffDead <- lastnodeOrdersData
+					sheriffDead <- lastnodeOrdersData
 					fmt.Println("we did it")
 					return
 				}

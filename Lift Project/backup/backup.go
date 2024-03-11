@@ -16,7 +16,7 @@ func Backup(fresh bool) Elev {
 
 	if fresh {
 		os.Remove("backup" + config.Self_nr + ".txt")
-		return takeControl()
+		return Elev{}
 	}
 	// Start a ticker that checks the file every second
 	ticker := time.NewTicker(10 * time.Second)

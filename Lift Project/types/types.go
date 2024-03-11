@@ -24,13 +24,28 @@ type NetworkChannels struct {
 	WranglerPromotion chan bool
 	SheriffDead       chan NetworkOrdersData
 	RelievedOfDuty    chan bool
+	RemaindingOrders  chan [N_FLOORS][N_BUTTONS]string
 }
 
 type Orderstatus struct {
 	Owner  string
 	Floor  int
 	Button elevio.ButtonType
-	Status bool
+	Served bool
+}
+
+type BcastState struct {
+	ElevState      Elev
+	ID             string
+	SequenceNumber int
+}
+
+type BcastSystem struct {
+	Map map[string]BcastState
+}
+
+type SystemState struct {
+	Map map[string]Elev
 }
 
 type ElevatorState int
