@@ -91,6 +91,7 @@ func NetworkFSM(
 							}
 						}
 					}
+					fmt.Println("Transferred orders to new Sheriff")
 				}
 
 			default:
