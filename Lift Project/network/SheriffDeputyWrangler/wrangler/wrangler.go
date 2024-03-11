@@ -151,7 +151,10 @@ func acknowledger(OrderSent <-chan Orderstatus, networkOrdersRecieved <-chan Net
 }
 
 // ReceiveMessageFromsheriff receives an order from the sheriff and sends an acknowledgement
-func ReceiveMessageFromSheriff(orderAssigned chan Orderstatus, networkchannels NetworkChannels) {
+func ReceiveMessageFromSheriff(
+	orderAssigned chan Orderstatus,
+	sheriffDead chan<- NetworkOrdersData) {
+
 	var lastnodeOrdersData NetworkOrdersData
 
 	go acknowledger(orderSent, NodeOrdersReceived)
@@ -166,7 +169,7 @@ func ReceiveMessageFromSheriff(orderAssigned chan Orderstatus, networkchannels N
 				if err == io.EOF {
 					fmt.Println("Connection closed by sheriff in wrangler")
 					sheriffConn.Close()
-					networkchannels.SheriffDead <- lastnodeOrdersData
+					sheriffDead <- lastnodeOrdersData
 					fmt.Println("we did it")
 					return
 				}

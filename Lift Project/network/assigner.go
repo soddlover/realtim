@@ -32,23 +32,28 @@ import (
 // 	}
 // }
 
-func orderForwarder(channels Channels) {
+func orderForwarder(
+	incomingOrder chan<- Orderstatus,
+	orderAssigned chan<- Orderstatus,
+	orderRequest <-chan Order,
+	orderDelete <-chan Orderstatus,
+) {
 	for {
 		select {
-		case order := <-channels.OrderRequest:
+		case order := <-orderRequest:
 			orderstat := Orderstatus{Owner: config.Self_id, Floor: order.Floor, Button: order.Button, Status: false}
 			if order.Button == elevio.BT_Cab {
-				channels.OrderAssigned <- orderstat
+				orderAssigned <- orderstat
 				continue
 			}
 			if state == st_sherriff {
-				channels.IncomingOrder <- orderstat
+				incomingOrder <- orderstat
 			} else {
 				wrangler.SendOrderToSheriff(orderstat)
 			}
-		case orderstat := <-channels.OrderDelete:
+		case orderstat := <-orderDelete:
 			if state == st_sherriff {
-				channels.IncomingOrder <- orderstat
+				incomingOrder <- orderstat
 			} else {
 				wrangler.SendOrderToSheriff(orderstat)
 			}
@@ -57,30 +62,29 @@ func orderForwarder(channels Channels) {
 }
 
 func Assigner(
-	channels Channels,
-	world *SystemState,
-	NetworkOrders *[config.N_FLOORS][config.N_BUTTONS]string,
-	NetworkUpdate chan bool,
+	networkUpdate chan<- bool,
+	orderAssigned chan<- Orderstatus,
+	systemstate *SystemState,
+	networkOrders *[config.N_FLOORS][config.N_BUTTONS]string,
 	nodeLeftNetwork <-chan string,
-	incomingOrder chan<- Orderstatus,
+	incomingOrder chan Orderstatus,
 	quitAssigner <-chan bool,
-	remainingOrders chan<- [config.N_FLOORS][config.N_BUTTONS]string,
-) {
+	remainingOrders chan<- [config.N_FLOORS][config.N_BUTTONS]string) {
 
 	for {
 		select {
-		case order := <-channels.IncomingOrder:
+		case order := <-incomingOrder:
 			//channels.OrderAssigned <- order
 			if order.Status {
 				fmt.Println("Order being deletetet")
-				NetworkOrders[order.Floor][order.Button] = ""
-				NetworkUpdate <- true
+				networkOrders[order.Floor][order.Button] = ""
+				networkUpdate <- true
 				continue
 			}
 
 			best_id := config.Self_id
 			best_duration := 1000000 * time.Second
-			for id, elevator := range world.Map {
+			for id, elevator := range systemstate.Map {
 				if elevator.Obstr {
 					fmt.Println("Elevator with id: ", id, " is obstructed")
 				}
@@ -94,9 +98,9 @@ func Assigner(
 					best_id = id
 				}
 			}
-			assigned := NetworkOrders[order.Floor][order.Button]
+			assigned := networkOrders[order.Floor][order.Button]
 			if assigned != "" {
-				if elev, ok := world.Map[assigned]; ok {
+				if elev, ok := systemstate.Map[assigned]; ok {
 					if !elev.Obstr && !(elev.State == Undefined) {
 						//do nothing as its already assigned to a working elevator, could send an additional message to it incase?
 						fmt.Println("Order already assigned to a working elevator")
@@ -106,31 +110,31 @@ func Assigner(
 				}
 			}
 			order.Owner = best_id
-			NetworkOrders[order.Floor][order.Button] = best_id
-			NetworkUpdate <- true
+			networkOrders[order.Floor][order.Button] = best_id
+			networkUpdate <- true
 			fmt.Println("Added to NetworkOrders maps")
 			if best_id == config.Self_id {
-				channels.OrderAssigned <- order
+				orderAssigned <- order
 			} else {
 				go sheriff.SendOrderMessage(best_id, order)
 			}
 
 		case peerID := <-nodeLeftNetwork:
-			delete(world.Map, peerID)
-			fmt.Printf("world.Map: %v\n", world.Map)
+			delete(systemstate.Map, peerID)
+			fmt.Printf("world.Map: %v\n", systemstate.Map)
 			fmt.Println("Node left network, redistributing orders")
-			fmt.Println("NetworkOrders: ", NetworkOrders)
+			fmt.Println("NetworkOrders: ", networkOrders)
 			//check for orders owned by the leaving node
-			for floor := 0; floor < len(NetworkOrders); floor++ {
-				for button := 0; button < len(NetworkOrders[button]); button++ {
-					if NetworkOrders[floor][button] == peerID {
+			for floor := 0; floor < len(networkOrders); floor++ {
+				for button := 0; button < len(networkOrders[button]); button++ {
+					if networkOrders[floor][button] == peerID {
 						// Send to assigner for reassignment
 						incomingOrder <- Orderstatus{Floor: floor, Button: elevio.ButtonType(button), Status: false, Owner: peerID}
 					}
 				}
 			}
 		case <-quitAssigner:
-			remainingOrders <- *NetworkOrders
+			remainingOrders <- *networkOrders
 		}
 
 	}

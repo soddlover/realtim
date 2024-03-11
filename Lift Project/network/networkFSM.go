@@ -25,12 +25,14 @@ var state State
 var sheriffID string
 
 func NetworkFSM(
-	orderRequest chan<- Order,
-	orderAssigned <-chan Orderstatus,
-	orderDelete chan<- Orderstatus, world *SystemState) {
+	orderRequest chan Order,
+	orderAssigned chan Orderstatus,
+	orderDelete chan Orderstatus,
+	systemState *SystemState,
+	incommingOrder chan Orderstatus,
 
-	deputyPromotion := make(chan map[string]Orderstatus)
-	wranglerPromotion := make(chan bool)
+) {
+
 	sheriffDead := make(chan NetworkOrdersData)
 	relievedOfDuty := make(chan bool)
 	remainingOrders := make(chan [config.N_FLOORS][config.N_BUTTONS]string)
@@ -44,17 +46,17 @@ func NetworkFSM(
 			if sIP == "" {
 
 				NetworkOrders := [config.N_FLOORS][config.N_BUTTONS]string{}
-				InitSherrif(channels, world, &NetworkOrders, "", networkChannels.RelievedOfDuty, networkChannels.RemaindingOrders)
+				InitSherrif(incommingOrder, systemState, &NetworkOrders, "", relievedOfDuty, remainingOrders, orderAssigned)
 				state = st_sherriff
 			} else {
 				fmt.Println("I am not the only Wrangler in town, connecting to Sheriff:")
 				if wrangler.ConnectWranglerToSheriff(sIP) {
 					fmt.Println("Me, a Wrangler connected to Sheriff")
-					go wrangler.ReceiveMessageFromSheriff(channels.OrderAssigned, networkChannels)
+					go wrangler.ReceiveMessageFromSheriff(orderAssigned, sheriffDead)
 					state = st_wrangler
 				}
 			}
-			go orderForwarder(channels)
+			go orderForwarder(incommingOrder, orderAssigned, orderRequest, orderDelete)
 		case st_sherriff:
 			//im jamming
 
@@ -78,14 +80,14 @@ func NetworkFSM(
 				if wrangler.ConnectWranglerToSheriff(sIP) {
 					fmt.Println("Me, a Wrangler connected to Sheriff")
 					state = st_wrangler
-					go wrangler.ReceiveMessageFromSheriff(channels.OrderAssigned, networkChannels)
-					networkChannels.RelievedOfDuty <- true
-					remaindingOrders := <-networkChannels.RemaindingOrders
+					go wrangler.ReceiveMessageFromSheriff(orderAssigned, sheriffDead)
+					relievedOfDuty <- true
+					remaindingOrders := <-remainingOrders
 
 					for i := 0; i < len(remaindingOrders); i++ {
 						for j := 0; j < len(remaindingOrders[i]); j++ {
 							if remaindingOrders[i][j] != "" {
-								channels.OrderRequest <- Order{Floor: i, Button: elevio.ButtonType(j)}
+								orderRequest <- Order{Floor: i, Button: elevio.ButtonType(j)}
 							}
 						}
 					}
@@ -95,11 +97,11 @@ func NetworkFSM(
 			// 	//the highest IP wins
 
 		case st_wrangler:
-			networkOrderData := <-networkChannels.SheriffDead
+			networkOrderData := <-sheriffDead
 
 			if networkOrderData.TheChosenOne {
 				fmt.Println("I am the chosen one, I am the Sheriff!")
-				InitSherrif(channels, world, &networkOrderData.NetworkOrders, sheriffID, networkChannels.RelievedOfDuty, networkChannels.RemaindingOrders)
+				InitSherrif(incommingOrder, systemState, &networkOrderData.NetworkOrders, sheriffID, relievedOfDuty, remainingOrders, orderAssigned)
 				state = st_sherriff
 
 			} else {
@@ -124,19 +126,21 @@ func NetworkFSM(
 }
 
 func InitSherrif(
-	channels Channels,
 	incomingOrder chan Orderstatus,
-	world *SystemState,
+	systemState *SystemState,
 	networkorders *[config.N_FLOORS][config.N_BUTTONS]string,
-	oldSheriff string, relievedOfDuty <-chan bool,
-	remaindingOrders chan<- [config.N_FLOORS][config.N_BUTTONS]string) {
+	oldSheriff string,
+	relievedOfDuty <-chan bool,
+	remaindingOrders chan<- [config.N_FLOORS][config.N_BUTTONS]string,
+	orderAssigned chan<- Orderstatus,
+) {
 
 	nodeLeftNetwork := make(chan string)
 	quitAssigner := make(chan bool)
 	fmt.Println("I am the only Wrangler in town, I am the Sheriff!")
-	NetworkUpdate := make(chan bool)
-	go sheriff.Sheriff(incomingOrder, networkorders, nodeLeftNetwork, NetworkUpdate, relievedOfDuty, quitAssigner)
-	go Assigner(channels, world, networkorders, NetworkUpdate, nodeLeftNetwork, channels.IncomingOrder, quitAssigner, remaindingOrders)
+	networkUpdate := make(chan bool)
+	go sheriff.Sheriff(incomingOrder, networkorders, nodeLeftNetwork, networkUpdate, relievedOfDuty, quitAssigner)
+	go Assigner(networkUpdate, orderAssigned, systemState, networkorders, nodeLeftNetwork, incomingOrder, quitAssigner, remaindingOrders)
 	//go redistributor(nodeLeftNetwork, channels.IncomingOrder, world, networkorders)
 	if oldSheriff != "" {
 		nodeLeftNetwork <- oldSheriff

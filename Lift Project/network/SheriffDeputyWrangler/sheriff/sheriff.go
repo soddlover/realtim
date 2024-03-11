@@ -38,7 +38,7 @@ func CheckMissingConnToOrders(networkOrders [config.N_FLOORS][config.N_BUTTONS]s
 	}
 }
 func Sheriff(
-	incomingOrder chan Orderstatus,
+	incomingOrder chan<- Orderstatus,
 	networkOrders *[config.N_FLOORS][config.N_BUTTONS]string,
 	nodeLeftNetwork chan string,
 	nodeOrdersUpdateChan chan bool,
