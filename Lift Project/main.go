@@ -13,6 +13,7 @@ import (
 )
 
 func main() {
+
 	// WHen starting
 	var id string
 	flag.StringVar(&id, "id", "", "id of this peer")

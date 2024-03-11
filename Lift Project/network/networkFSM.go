@@ -35,6 +35,9 @@ func NetworkFSM(
 	remainingOrders := make(chan [config.N_FLOORS][config.N_BUTTONS]string)
 
 	currentDuty = dt_initial
+	lostConns := make(chan string)
+	go CheckHeartbeats(lostConns)
+	go Heartbeats(lostConns)
 
 	for {
 		switch currentDuty {
@@ -119,6 +122,19 @@ func NetworkFSM(
 			//listen for lost peers
 			//listen for orders to delete
 			//listen for orders to assign
+		}
+	}
+}
+
+func Heartbeats(lostConns <-chan string) {
+	for {
+		select {
+		case id := <-lostConns:
+			if currentDuty == dt_sherriff {
+				sheriff.CloseConns(id)
+			} else {
+				wrangler.CloseSheriffConn()
+			}
 		}
 	}
 }

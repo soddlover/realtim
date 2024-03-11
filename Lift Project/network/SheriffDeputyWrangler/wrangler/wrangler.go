@@ -217,3 +217,11 @@ func ReceiveMessageFromSheriff(
 	}
 	//over 3 readerrors
 }
+func CloseSheriffConn() {
+	err := sheriffConn.Close()
+	if err != nil {
+		fmt.Println("Error closing sheriff connection:", err)
+		return
+	}
+	fmt.Println("Sheriff connection closed")
+}

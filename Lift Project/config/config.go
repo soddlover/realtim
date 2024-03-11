@@ -3,7 +3,7 @@ package config
 import "time"
 
 const (
-	N_FLOORS             = 4
+	N_FLOORS             = 9
 	N_ELEVATORS          = 1
 	N_BUTTONS            = 3
 	TRAVEL_TIME          = 2
@@ -14,6 +14,8 @@ const (
 	Peer_port            = 15647
 	TCP_port             = 16000
 	SimulatorPort        = 15657
+	HEARTBEAT            = 50 * time.Millisecond
+	HEARTBEAT_DEADLINE   = 100 * time.Millisecond
 )
 
 type Button int

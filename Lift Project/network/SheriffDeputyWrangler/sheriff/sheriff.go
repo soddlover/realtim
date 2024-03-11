@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"mymodule/config"
-	"mymodule/elevator/elevio"
 	"mymodule/network/peers"
 	. "mymodule/types"
 	"net"
@@ -263,28 +262,12 @@ func ChooseNewDeputy() (net.Conn, string, error) {
 	return nil, "", fmt.Errorf("no wrangler connections")
 }
 
-func orderForwarder(
-	incomingOrder chan<- Orderstatus,
-	orderAssigned chan<- Orderstatus,
-	orderRequest <-chan Order,
-	orderDelete <-chan Orderstatus,
-	quit <-chan bool,
-) {
-	for {
-		select {
-		case order := <-orderRequest:
-			orderstat := Orderstatus{Owner: config.Self_id, Floor: order.Floor, Button: order.Button, Served: false}
-			if order.Button == elevio.BT_Cab {
-				orderAssigned <- orderstat
-				continue
-			}
-			incomingOrder <- orderstat
+func CloseConns(id string) {
 
-		case orderstat := <-orderDelete:
-			incomingOrder <- orderstat
-
-		case <-quit:
-			return
-		}
+	if WranglerConnections[id] != nil {
+		fmt.Println("Closing connection to", id)
+		WranglerConnections[id].Close()
+	} else {
+		fmt.Println("Connection already closed", id)
 	}
 }

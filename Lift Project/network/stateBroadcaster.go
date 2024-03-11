@@ -1,17 +1,43 @@
 package network
 
 import (
+	"fmt"
 	"mymodule/config"
 	"mymodule/network/bcast"
 	. "mymodule/types"
 	"time"
 )
 
+var lastHeartbeat = make(map[string]time.Time)
+
+func CheckHeartbeats(lostConn chan string) {
+	lastReported := make(map[string]bool)
+	for {
+		time.Sleep(1 * time.Second) // Check every 10 seconds
+
+		for id, last := range lastHeartbeat {
+			if time.Since(last) > config.HEARTBEAT_DEADLINE { // If it's been more than 30 seconds since the last heartbeat
+
+				if !lastReported[id] {
+					fmt.Printf("No heartbeat from %s for more than 3 seconds\n", id)
+					lostConn <- id
+					lastReported[id] = true
+				}
+
+				// Here you can add code to close the connection to the peer
+			} else {
+				lastReported[id] = false
+			}
+		}
+	}
+}
+
 func updateBroadcastworld(systemState *SystemState, broadcastStateRx <-chan BcastState) {
 	bcastSystem := BcastSystem{Map: make(map[string]BcastState)}
 	for {
 		select {
 		case bcastState := <-broadcastStateRx:
+			lastHeartbeat[bcastState.ID] = time.Now()
 			_, existsInSystemState := systemState.Map[bcastState.ID]
 			if !existsInSystemState {
 				delete(bcastSystem.Map, bcastState.ID)
@@ -44,7 +70,7 @@ func StateBroadcaster(elevatorState <-chan Elev, systemState *SystemState, id st
 
 func repeater(elevatorState <-chan Elev, broadcastStateTx chan<- BcastState, elevID string) {
 	var lastElev Elev
-	ticker := time.NewTicker(2000 * time.Millisecond)
+	ticker := time.NewTicker(config.HEARTBEAT)
 	var broadcastState BcastState
 
 	for i := 0; ; i++ {
