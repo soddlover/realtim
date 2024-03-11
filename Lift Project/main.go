@@ -62,8 +62,19 @@ func main() {
 	go network.StateBroadcaster(elevatorStateBroadcast, systemState, id)
 	// go PeerConnector(id, systemState)
 	go backup.WriteBackup(elevatorStateBackup)
-	go elev.RunElev(elevatorStateBackup, elevatorStateBroadcast, orderRequest, orderAssigned, orderDelete, initElev)
-	go network.NetworkFSM(orderRequest, orderAssigned, orderDelete, systemState, incomingOrder)
+	go elev.RunElev(
+		elevatorStateBackup,
+		elevatorStateBroadcast,
+		orderRequest,
+		orderAssigned,
+		orderDelete,
+		initElev)
+	go network.NetworkFSM(
+		orderRequest,
+		orderAssigned,
+		orderDelete,
+		systemState,
+		incomingOrder)
 
 	//go Assigner(channels, systemState)
 	//go printsystemState(systemState)

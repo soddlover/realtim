@@ -6,7 +6,6 @@ import (
 	. "mymodule/elevator"
 	"mymodule/elevator/elevio"
 	"mymodule/network/SheriffDeputyWrangler/sheriff"
-	"mymodule/network/SheriffDeputyWrangler/wrangler"
 	. "mymodule/types"
 	"time"
 )
@@ -32,35 +31,6 @@ import (
 // 	}
 // }
 
-func orderForwarder(
-	incomingOrder chan<- Orderstatus,
-	orderAssigned chan<- Orderstatus,
-	orderRequest <-chan Order,
-	orderDelete <-chan Orderstatus,
-) {
-	for {
-		select {
-		case order := <-orderRequest:
-			orderstat := Orderstatus{Owner: config.Self_id, Floor: order.Floor, Button: order.Button, Served: false}
-			if order.Button == elevio.BT_Cab {
-				orderAssigned <- orderstat
-				continue
-			}
-			if duty == dt_sherriff {
-				incomingOrder <- orderstat
-			} else {
-				wrangler.SendOrderToSheriff(orderstat)
-			}
-		case orderstat := <-orderDelete:
-			if duty == dt_sherriff {
-				incomingOrder <- orderstat
-			} else {
-				wrangler.SendOrderToSheriff(orderstat)
-			}
-		}
-	}
-}
-
 func Assigner(
 	networkUpdate chan<- bool,
 	orderAssigned chan<- Orderstatus,
@@ -83,33 +53,34 @@ func Assigner(
 				continue
 			}
 
-			best_id := config.Self_id
-			best_duration := 1000000 * time.Second
-			for id, elevator := range systemState.Map {
-				if elevator.Obstr {
-					fmt.Println("Elevator with id: ", id, " is obstructed")
-				}
-				if elevator.State == Undefined || elevator.Obstr {
-					continue
-				}
+			// best_id := config.Self_id
+			// best_duration := 1000000 * time.Second
+			// for id, elevator := range systemState.Map {
+			// 	if elevator.Obstr {
+			// 		fmt.Println("Elevator with id: ", id, " is obstructed")
+			// 	}
+			// 	if elevator.State == Undefined || elevator.Obstr {
+			// 		continue
+			// 	}
 
-				duration := timeToServeRequest(elevator, order.Button, order.Floor)
-				if duration < best_duration {
-					best_duration = duration
-					best_id = id
-				}
-			}
-			assigned := networkOrders[order.Floor][order.Button]
-			if assigned != "" {
-				if elev, ok := systemState.Map[assigned]; ok {
-					if !elev.Obstr && !(elev.State == Undefined) {
-						//do nothing as its already assigned to a working elevator, could send an additional message to it incase?
-						fmt.Println("Order already assigned to a working elevator")
-						fmt.Println("SOOME PROBLEMS OCCUR HERE MAYBE???")
-						best_id = assigned
-					}
-				}
-			}
+			// 	duration := timeToServeRequest(elevator, order.Button, order.Floor)
+			// 	if duration < best_duration {
+			// 		best_duration = duration
+			// 		best_id = id
+			// 	}
+			// }
+			// assigned := networkOrders[order.Floor][order.Button]
+			// if assigned != "" {
+			// 	if elev, ok := systemState.Map[assigned]; ok {
+			// 		if !elev.Obstr && !(elev.State == Undefined) {
+			// 			//do nothing as its already assigned to a working elevator, could send an additional message to it incase?
+			// 			fmt.Println("Order already assigned to a working elevator")
+			// 			fmt.Println("SOOME PROBLEMS OCCUR HERE MAYBE???")
+			// 			best_id = assigned
+			// 		}
+			// 	}
+			// }
+			best_id := calculateFastestID(*systemState, *networkOrders, Order{Floor: order.Floor, Button: order.Button})
 			order.Owner = best_id
 			networkOrders[order.Floor][order.Button] = best_id
 			networkUpdate <- true
@@ -205,4 +176,36 @@ func requestsClearAtCurrentFloor(e_old Elev, f func(elevio.ButtonType, int)) Ele
 		}
 	}
 	return e
+}
+
+func calculateFastestID(systemState SystemState, networkOrders [config.N_FLOORS][config.N_BUTTONS]string, order Order) string {
+
+	best_id := config.Self_id
+	best_duration := 1000000 * time.Second
+	for id, elevator := range systemState.Map {
+		if elevator.Obstr {
+			fmt.Println("Elevator with id: ", id, " is obstructed")
+		}
+		if elevator.State == Undefined || elevator.Obstr {
+			continue
+		}
+
+		duration := timeToServeRequest(elevator, order.Button, order.Floor)
+		if duration < best_duration {
+			best_duration = duration
+			best_id = id
+		}
+	}
+	assigned := networkOrders[order.Floor][order.Button]
+	if assigned != "" {
+		if elev, ok := systemState.Map[assigned]; ok {
+			if !elev.Obstr && !(elev.State == Undefined) {
+				//do nothing as its already assigned to a working elevator, could send an additional message to it incase?
+				// fmt.Println("Order already assigned to a working elevator")
+				// fmt.Println("SOOME PROBLEMS OCCUR HERE MAYBE???")
+				best_id = assigned
+			}
+		}
+	}
+	return best_id
 }

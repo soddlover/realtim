@@ -10,17 +10,17 @@ import (
 	"strings"
 )
 
-type Duty int
+type duty int
 
 const (
-	dt_initial Duty = iota
+	dt_initial duty = iota
 	dt_sherriff
 	dt_deputy
 	dt_wrangler
 	dt_recovery
 )
 
-var duty Duty
+var currentDuty duty
 
 func NetworkFSM(
 	orderRequest chan Order,
@@ -34,25 +34,23 @@ func NetworkFSM(
 	relievedOfDuty := make(chan bool)
 	remainingOrders := make(chan [config.N_FLOORS][config.N_BUTTONS]string)
 
-	duty = dt_initial
-	var lastSheriff string
+	currentDuty = dt_initial
 
 	for {
-		switch duty {
+		switch currentDuty {
 		case dt_initial:
 			sIP := wrangler.GetSheriffIP()
 			if sIP == "" {
 
 				NetworkOrders := [config.N_FLOORS][config.N_BUTTONS]string{}
-				InitSherrif(incommingOrder, systemState, &NetworkOrders, "", relievedOfDuty, remainingOrders, orderAssigned)
-				duty = dt_sherriff
+				InitSherrif(incommingOrder, systemState, &NetworkOrders, relievedOfDuty, remainingOrders, orderAssigned)
+				currentDuty = dt_sherriff
 			} else {
 				fmt.Println("I am not the only Wrangler in town, connecting to Sheriff:")
 				if wrangler.ConnectWranglerToSheriff(sIP) {
 					fmt.Println("Me, a Wrangler connected to Sheriff")
 					go wrangler.ReceiveMessageFromSheriff(orderAssigned, sheriffDead)
-					duty = dt_wrangler
-					lastSheriff = sIP
+					currentDuty = dt_wrangler
 				}
 			}
 			go orderForwarder(incommingOrder, orderAssigned, orderRequest, orderDelete)
@@ -61,7 +59,7 @@ func NetworkFSM(
 
 			//check for sheriff Conflict
 			sIP := wrangler.GetSheriffIP()
-			print("Sheriff IP: ", sIP, "\n")
+			//print("Sheriff IP: ", sIP, "\n")
 			//compare to own IP
 			selfIP := strings.Split(string(config.Self_id), ":")
 			//check for conflict
@@ -76,16 +74,17 @@ func NetworkFSM(
 					continue
 				}
 				fmt.Println("I died.")
+
 				if wrangler.ConnectWranglerToSheriff(sIP) {
 					fmt.Println("Me, a Wrangler connected to Sheriff")
-					duty = dt_wrangler
+					currentDuty = dt_wrangler
 					go wrangler.ReceiveMessageFromSheriff(orderAssigned, sheriffDead)
 					relievedOfDuty <- true
-					remaindingOrders := <-remainingOrders
+					o := <-remainingOrders
 
-					for i := 0; i < len(remaindingOrders); i++ {
-						for j := 0; j < len(remaindingOrders[i]); j++ {
-							if remaindingOrders[i][j] != "" {
+					for i := 0; i < len(o); i++ {
+						for j := 0; j < len(o[i]); j++ {
+							if o[i][j] != "" {
 								orderRequest <- Order{Floor: i, Button: elevio.ButtonType(j)}
 							}
 						}
@@ -100,12 +99,12 @@ func NetworkFSM(
 
 			if networkOrderData.TheChosenOne {
 				fmt.Println("I am the chosen one, I am the Sheriff!")
-				InitSherrif(incommingOrder, systemState, &networkOrderData.NetworkOrders, lastSheriff, relievedOfDuty, remainingOrders, orderAssigned)
-				duty = dt_sherriff
+				InitSherrif(incommingOrder, systemState, &networkOrderData.NetworkOrders, relievedOfDuty, remainingOrders, orderAssigned)
+				currentDuty = dt_sherriff
 
 			} else {
 				fmt.Println("I am not the chosen one, I am a Deputy")
-				duty = dt_initial
+				currentDuty = dt_initial
 			}
 
 			//listen for incoming orders
@@ -114,7 +113,7 @@ func NetworkFSM(
 			//listen for orders to delete
 			//listen for orders to assign
 		case dt_recovery:
-			duty = dt_initial
+			currentDuty = dt_initial
 			//listen for incoming orders
 			//listen for new peers
 			//listen for lost peers
@@ -128,7 +127,6 @@ func InitSherrif(
 	incomingOrder chan Orderstatus,
 	systemState *SystemState,
 	networkorders *[config.N_FLOORS][config.N_BUTTONS]string,
-	oldSheriff string,
 	relievedOfDuty <-chan bool,
 	remainingOrders chan<- [config.N_FLOORS][config.N_BUTTONS]string,
 	orderAssigned chan<- Orderstatus,
@@ -141,8 +139,33 @@ func InitSherrif(
 	go sheriff.Sheriff(incomingOrder, networkorders, nodeLeftNetwork, networkUpdate, relievedOfDuty, quitAssigner)
 	go Assigner(networkUpdate, orderAssigned, systemState, networkorders, nodeLeftNetwork, incomingOrder, quitAssigner, remainingOrders)
 	//go redistributor(nodeLeftNetwork, channels.IncomingOrder, world, networkorders)
-	if oldSheriff != "" {
-		nodeLeftNetwork <- oldSheriff
-		fmt.Println("Sending old sheriff to redistributer", oldSheriff)
+}
+
+func orderForwarder(
+	incomingOrder chan<- Orderstatus,
+	orderAssigned chan<- Orderstatus,
+	orderRequest <-chan Order,
+	orderDelete <-chan Orderstatus,
+) {
+	for {
+		select {
+		case order := <-orderRequest:
+			orderstat := Orderstatus{Owner: config.Self_id, Floor: order.Floor, Button: order.Button, Served: false}
+			if order.Button == elevio.BT_Cab {
+				orderAssigned <- orderstat
+				continue
+			}
+			if currentDuty == dt_sherriff {
+				incomingOrder <- orderstat
+			} else {
+				wrangler.SendOrderToSheriff(orderstat)
+			}
+		case orderstat := <-orderDelete:
+			if currentDuty == dt_sherriff {
+				incomingOrder <- orderstat
+			} else {
+				wrangler.SendOrderToSheriff(orderstat)
+			}
+		}
 	}
 }
