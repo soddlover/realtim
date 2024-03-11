@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"mymodule/config"
 	. "mymodule/elevator"
+	elevatorFSM "mymodule/elevator"
 	"mymodule/elevator/elevio"
 	"mymodule/network/SheriffDeputyWrangler/sheriff"
 	. "mymodule/types"
@@ -50,6 +51,7 @@ func Assigner(
 				fmt.Println("Order being deletetet")
 				networkOrders[order.Floor][order.Button] = ""
 				networkUpdate <- true
+				elevatorFSM.UpdateLightsFromNetworkOrders(*networkOrders)
 				continue
 			}
 
@@ -84,6 +86,7 @@ func Assigner(
 			order.Owner = best_id
 			networkOrders[order.Floor][order.Button] = best_id
 			networkUpdate <- true
+			elevatorFSM.UpdateLightsFromNetworkOrders(*networkOrders)
 			fmt.Println("Added to NetworkOrders maps")
 			if best_id == config.Self_id {
 				orderAssigned <- order

@@ -205,7 +205,8 @@ func ReceiveMessageFromSheriff(
 					continue
 				}
 				fmt.Println("Received nodeOrdersData from sheriff:")
-				//NodeOrdersReceived <- nodeOrdersData
+				NodeOrdersReceived <- nodeOrdersData
+				elevatorFSM.UpdateLightsFromNetworkOrders(nodeOrdersData.NetworkOrders)
 				lastnodeOrdersData = nodeOrdersData
 
 			default:

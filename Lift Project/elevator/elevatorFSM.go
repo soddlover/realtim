@@ -46,7 +46,7 @@ func RunElev(
 	go elevio.PollFloorSensor(drv_floors)
 	go elevio.PollObstructionSwitch(drv_obstr)
 	go elevio.PollStopButton(drv_stop)
-	go updateLights(&elevator)
+	//go updateLights(&elevator)
 	//go printElevator(&elevator)
 	elevStart(drv_floors)
 	elevator.Floor = elevio.GetFloor()
@@ -170,5 +170,16 @@ func updateLights(elevator *Elev) {
 			}
 		}
 		time.Sleep(100 * time.Millisecond)
+	}
+}
+func UpdateLightsFromNetworkOrders(networkorders [config.N_FLOORS][config.N_BUTTONS]string) {
+	for floor := 0; floor < config.N_FLOORS; floor++ {
+		for button := 0; button < config.N_BUTTONS; button++ {
+			if networkorders[floor][button] != "" {
+				elevio.SetButtonLamp(elevio.ButtonType(button), floor, true)
+			} else {
+				elevio.SetButtonLamp(elevio.ButtonType(button), floor, false)
+			}
+		}
 	}
 }
