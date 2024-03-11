@@ -8,6 +8,7 @@ import (
 	"mymodule/network/SheriffDeputyWrangler/wrangler"
 	. "mymodule/types"
 	"strings"
+	"time"
 )
 
 type duty int
@@ -83,6 +84,7 @@ func NetworkFSM(
 					go wrangler.ReceiveMessageFromSheriff(orderAssigned, sheriffDead)
 					relievedOfDuty <- true
 					o := <-remainingOrders
+					time.Sleep(5 * time.Second)
 
 					for i := 0; i < len(o); i++ {
 						for j := 0; j < len(o[i]); j++ {

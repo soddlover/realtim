@@ -58,10 +58,15 @@ func Sheriff(
 	CheckMissingConnToOrders(*networkOrders, nodeLeftNetwork)
 
 	<-relievedOfDuty
+	fmt.Println("Relieved of duty")
 	transmitEnable <- false
+	fmt.Println("Stopped transmitter")
 	listenWranglerEnable <- false
+	fmt.Println("Stopped glistenForWranglerConnections")
 	sendOrderToDeputyEnable <- false
+	fmt.Println("Stopped SendNodeOrdersToDeputy")
 	quitAssigner <- true
+	fmt.Println("Stopped Assigner")
 
 }
 
