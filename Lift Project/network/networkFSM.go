@@ -55,20 +55,22 @@ func NetworkFSM(
 			}
 			go orderForwarder(incommingOrder, orderAssigned, orderRequest, orderDelete)
 		case dt_sherriff:
-			//im jamming
 
-			//check for sheriff Conflict
 			sIP := wrangler.GetSheriffIP()
-			//print("Sheriff IP: ", sIP, "\n")
-			//compare to own IP
 			selfIP := strings.Split(string(config.Self_id), ":")
-			//check for conflict
-			if sIP != "" && sIP != selfIP[0] {
+
+			switch {
+			case sIP == "":
+				fmt.Println("This is weird, I should have been broadcasting my IP, read '' as broadcasted IP")
+
+			case sIP == "DISCONNECTED":
+				fmt.Println("Something is wrong, read ", sIP, " as broadcasted IP")
+
+			case sIP != selfIP[0]:
 				fmt.Println("Sheriff Conflict, my IP:", selfIP[0], "other Sheriff IP:", sIP)
 				fmt.Println("Preparing for shootout!!!!")
 				fmt.Println("Allahu Akbar")
 
-				// 	//shootout
 				if selfIP[0] > sIP {
 					fmt.Println("I won the shootout! Theres a new sheriff in town.")
 					continue
@@ -90,6 +92,9 @@ func NetworkFSM(
 						}
 					}
 				}
+
+			default:
+				continue
 			}
 
 			// 	//the highest IP wins
