@@ -162,7 +162,7 @@ func acknowledger(OrderSent <-chan Orderstatus, networkOrdersRecieved <-chan Net
 func ReceiveMessageFromSheriff(
 	orderAssigned chan<- Order,
 	sheriffDead chan<- NetworkOrdersData,
-	networkorders *[config.N_FLOORS][config.N_BUTTONS]string) {
+	networkorders *NetworkOrders) {
 
 	var lastnodeOrdersData NetworkOrdersData
 
@@ -221,7 +221,9 @@ func ReceiveMessageFromSheriff(
 				NodeOrdersReceived <- nodeOrdersData
 				elevatorFSM.UpdateLightsFromNetworkOrders(nodeOrdersData.NetworkOrders)
 				lastnodeOrdersData = nodeOrdersData
-				*networkorders = nodeOrdersData.NetworkOrders
+				networkorders.Mutex.Lock()
+				networkorders.Orders = nodeOrdersData.NetworkOrders
+				networkorders.Mutex.Unlock()
 
 			default:
 				fmt.Println("Unknown message type:", msg.Type)

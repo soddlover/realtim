@@ -2,9 +2,9 @@ package types
 
 import (
 	"encoding/json"
-	"mymodule/config"
 	. "mymodule/config"
 	"mymodule/elevator/elevio"
+	"sync"
 )
 
 // this is where all universally used types are definedtype ElevatorState ints
@@ -58,7 +58,12 @@ type Message struct {
 	Data json.RawMessage `json:"data"`
 }
 
+type NetworkOrders struct {
+	Orders [N_FLOORS][N_BUTTONS]string
+	Mutex  sync.Mutex
+}
+
 type NetworkOrdersData struct {
-	NetworkOrders [config.N_FLOORS][config.N_BUTTONS]string
+	NetworkOrders [N_FLOORS][N_BUTTONS]string
 	TheChosenOne  bool
 }

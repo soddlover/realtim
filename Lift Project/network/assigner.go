@@ -10,79 +10,78 @@ import (
 	"time"
 )
 
-// func redistributor(nodeLeftNetwork <-chan string, incomingOrder chan<- Orderstatus, world *World, NetworkOrders *[config.N_FLOORS][config.N_BUTTONS]string) {
-// 	for {
-// 		select {
-// 		case peerID := <-nodeLeftNetwork:
-// 			delete(world.Map, peerID)
-// 			fmt.Printf("world.Map: %v\n", world.Map)
-// 			fmt.Println("Node left network, redistributing orders")
-// 			fmt.Println("NetworkOrders: ", NetworkOrders)
-// 			//check for orders owned by the leaving node
-// 			for floor := 0; floor < len(NetworkOrders); floor++ {
-// 				for button := 0; button < len(NetworkOrders[button]); button++ {
-// 					if NetworkOrders[floor][button] == peerID {
-// 						// Send to assigner for reassignment
-// 						incomingOrder <- Orderstatus{Floor: floor, Button: elevio.ButtonType(button), Status: false, Owner: peerID}
-// 					}
-// 				}
-// 			}
-// 		}
-// 	}
-// }
+func redistributor(
+	nodeLeftNetwork <-chan string,
+	incomingOrder chan<- Orderstatus,
+	systemState map[string]Elev,
+	networkOrders *NetworkOrders) {
+	for {
+		select {
+		case peerID := <-nodeLeftNetwork:
+			networkOrders.Mutex.Lock()
+			delete(systemState, peerID)
+			fmt.Printf("world.Map: %v\n", systemState)
+			fmt.Println("Node left network, redistributing orders")
+			fmt.Println("NetworkOrders: ", networkOrders.Orders)
+			//check for orders owned by the leaving node
+
+			for floor := 0; floor < len(networkOrders.Orders); floor++ {
+				for button := 0; button < len(networkOrders.Orders[button]); button++ {
+					if networkOrders.Orders[floor][button] == peerID {
+						// Send to assigner for reassignment
+						networkOrders.Mutex.Unlock()
+						incomingOrder <- Orderstatus{Floor: floor, Button: elevio.ButtonType(button), Served: false, Owner: peerID}
+						networkOrders.Mutex.Lock()
+
+					}
+				}
+			}
+			networkOrders.Mutex.Unlock()
+		}
+	}
+}
 
 func Assigner(
 	networkUpdate chan<- bool,
 	orderAssigned chan<- Order,
 	systemState map[string]Elev,
-	networkOrders *[config.N_FLOORS][config.N_BUTTONS]string,
+	networkOrders *NetworkOrders,
 	nodeLeftNetwork <-chan string,
 	incomingOrder chan Orderstatus,
 	quitAssigner <-chan bool,
 	remainingOrders chan<- [config.N_FLOORS][config.N_BUTTONS]string,
 ) {
-
 	for {
 		select {
 		case order := <-incomingOrder:
 			//channels.OrderAssigned <- order
-
 			if order.Served {
 				fmt.Println("Order being deletetet")
-				networkOrders[order.Floor][order.Button] = ""
+				networkOrders.Mutex.Lock()
+				networkOrders.Orders[order.Floor][order.Button] = ""
+				networkOrders.Mutex.Unlock()
 				networkUpdate <- true
-				UpdateLightsFromNetworkOrders(*networkOrders)
+				networkOrders.Mutex.Lock()
+				UpdateLightsFromNetworkOrders(networkOrders.Orders)
+				networkOrders.Mutex.Unlock()
 				continue
 			}
-			best_id := calculateFastestID(systemState, *networkOrders, Order{Floor: order.Floor, Button: order.Button})
+			networkOrders.Mutex.Lock()
+			best_id := calculateFastestID(systemState, networkOrders, Order{Floor: order.Floor, Button: order.Button})
 			order.Owner = best_id
-			networkOrders[order.Floor][order.Button] = best_id
+			networkOrders.Orders[order.Floor][order.Button] = best_id
+			networkOrders.Mutex.Unlock()
 			networkUpdate <- true
-			UpdateLightsFromNetworkOrders(*networkOrders)
+			networkOrders.Mutex.Lock()
+			UpdateLightsFromNetworkOrders(networkOrders.Orders)
+			networkOrders.Mutex.Unlock()
 			fmt.Println("Added to NetworkOrders maps")
 			if best_id == config.Self_id {
 				orderAssigned <- Order{Floor: order.Floor, Button: order.Button}
 			} else {
 				go sheriff.SendOrderMessage(best_id, order)
 			}
-
-		case peerID := <-nodeLeftNetwork:
-			delete(systemState, peerID)
-			fmt.Printf("world.Map: %v\n", systemState)
-			fmt.Println("Node left network, redistributing orders")
-			fmt.Println("NetworkOrders: ", networkOrders)
-			//check for orders owned by the leaving node
-			for floor := 0; floor < len(networkOrders); floor++ {
-				for button := 0; button < len(networkOrders[floor]); button++ {
-					if networkOrders[floor][button] == peerID {
-						// Send to assigner for reassignment
-						incomingOrder <- Orderstatus{Floor: floor, Button: elevio.ButtonType(button), Served: false, Owner: peerID}
-					}
-				}
-			}
-
 		}
-
 	}
 }
 
@@ -152,7 +151,7 @@ func requestsClearAtCurrentFloor(e_old Elev, f func(elevio.ButtonType, int)) Ele
 	return e
 }
 
-func calculateFastestID(systemState map[string]Elev, networkOrders [config.N_FLOORS][config.N_BUTTONS]string, order Order) string {
+func calculateFastestID(systemState map[string]Elev, networkOrders *NetworkOrders, order Order) string {
 
 	best_id := config.Self_id
 	best_duration := 1000000 * time.Second
@@ -170,7 +169,7 @@ func calculateFastestID(systemState map[string]Elev, networkOrders [config.N_FLO
 			best_id = id
 		}
 	}
-	assigned := networkOrders[order.Floor][order.Button]
+	assigned := networkOrders.Orders[order.Floor][order.Button]
 	if assigned != "" {
 		if elev, ok := systemState[assigned]; ok {
 			if !elev.Obstr && !(elev.State == Undefined) {
