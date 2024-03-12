@@ -7,7 +7,7 @@ import (
 	"mymodule/network/SheriffDeputyWrangler/sheriff"
 	"mymodule/network/SheriffDeputyWrangler/wrangler"
 	. "mymodule/types"
-	"strings"
+	"os"
 	"time"
 )
 
@@ -18,7 +18,7 @@ const (
 	dt_sherriff
 	dt_deputy
 	dt_wrangler
-	dt_recovery
+	dt_offline
 )
 
 var currentDuty duty
@@ -61,48 +61,53 @@ func NetworkFSM(
 		case dt_sherriff:
 
 			sIP := wrangler.GetSheriffIP()
-			selfIP := strings.Split(string(config.Self_id), ":")
 
-			switch {
-			case sIP == "":
+			if sIP == "" {
 				fmt.Println("This is weird, I should have been broadcasting my IP, read '' as broadcasted IP")
+				fmt.Println("I must be offline so sad")
+				currentDuty = dt_offline
+				//relievedOfDuty <- true
+			}
+			time.Sleep(1 * time.Second)
 
-			case sIP == "DISCONNECTED":
-				fmt.Println("Something is wrong, read ", sIP, " as broadcasted IP")
+			/*
+				case sIP == "offline":
+					fmt.Println("Once i was afraid i was petrified, killing myself")
+					os.Exit(1)
 
-			case sIP != selfIP[0]:
-				fmt.Println("Sheriff Conflict, my IP:", selfIP[0], "other Sheriff IP:", sIP)
-				fmt.Println("Preparing for shootout!!!!")
-				fmt.Println("Allahu Akbar")
+				case sIP == "DISCONNECTED":
+					fmt.Println("Something is wrong, read ", sIP, " as broadcasted IP")
 
-				if selfIP[0] > sIP {
-					fmt.Println("I won the shootout! Theres a new sheriff in town.")
-					time.Sleep(1 * time.Second)
-					continue
-				}
-				fmt.Println("I died.")
+				case sIP != selfIP[0]:
+					fmt.Println("Sheriff Conflict, my IP:", selfIP[0], "other Sheriff IP:", sIP)
+					fmt.Println("Preparing for shootout!!!!")
+					fmt.Println("Allahu Akbar")
 
-				if wrangler.ConnectWranglerToSheriff(sIP) {
-					fmt.Println("Me, a Wrangler connected to Sheriff")
-					currentDuty = dt_wrangler
-					go wrangler.ReceiveMessageFromSheriff(orderAssigned, sheriffDead, &NetworkOrders)
-					relievedOfDuty <- true
-					o := <-remainingOrders
-					time.Sleep(5 * time.Second)
+					if selfIP[0] > sIP {
+						fmt.Println("I won the shootout! Theres a new sheriff in town.")
+						time.Sleep(1 * time.Second)
+						continue
+					}
+					fmt.Println("I died.")
 
-					for i := 0; i < len(o); i++ {
-						for j := 0; j < len(o[i]); j++ {
-							if o[i][j] != "" {
-								orderRequest <- Order{Floor: i, Button: elevio.ButtonType(j)}
+					if wrangler.ConnectWranglerToSheriff(sIP) {
+						fmt.Println("Me, a Wrangler connected to Sheriff")
+						currentDuty = dt_wrangler
+						go wrangler.ReceiveMessageFromSheriff(orderAssigned, sheriffDead, &NetworkOrders)
+						relievedOfDuty <- true
+						o := <-remainingOrders
+						time.Sleep(5 * time.Second)
+
+						for i := 0; i < len(o); i++ {
+							for j := 0; j < len(o[i]); j++ {
+								if o[i][j] != "" {
+									orderRequest <- Order{Floor: i, Button: elevio.ButtonType(j)}
+								}
 							}
 						}
+						fmt.Println("Transferred orders to new Sheriff")
 					}
-					fmt.Println("Transferred orders to new Sheriff")
-				}
-
-			default:
-				continue
-			}
+			*/
 
 		case dt_wrangler:
 			networkOrderData := <-sheriffDead
@@ -122,8 +127,13 @@ func NetworkFSM(
 			//listen for lost peers
 			//listen for orders to delete
 			//listen for orders to assign
-		case dt_recovery:
-			currentDuty = dt_initial
+		case dt_offline:
+			sIP := wrangler.GetSheriffIP()
+			if sIP != "" {
+				fmt.Println("Back online, time to restart")
+				os.Exit(1)
+			}
+			time.Sleep(1 * time.Second)
 			//listen for incoming orders
 			//listen for new peers
 			//listen for lost peers
@@ -176,13 +186,17 @@ func orderForwarder(
 				orderAssigned <- Order{Floor: order.Floor, Button: order.Button}
 				continue
 			}
+			if currentDuty == dt_offline {
+				continue
+			}
+
 			if currentDuty == dt_sherriff {
 				incomingOrder <- orderstat
 			} else {
 				wrangler.SendOrderToSheriff(orderstat)
 			}
 		case orderstat := <-orderDelete:
-			if currentDuty == dt_sherriff {
+			if currentDuty == dt_sherriff || currentDuty == dt_offline {
 				incomingOrder <- orderstat
 			} else {
 				wrangler.SendOrderToSheriff(orderstat)
@@ -203,9 +217,6 @@ func checkSync(systemState map[string]Elev, networkOrders *[config.N_FLOORS][con
 							orderAssigned <- Order{Floor: floor, Button: elevio.ButtonType(button)}
 							fmt.Println("WARNING - Order not in sync with system state, reassigning order TO MYSELF KJØH")
 						}
-
-						//send order to sheriff
-
 					}
 				}
 			}

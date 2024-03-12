@@ -172,6 +172,7 @@ func updateLights(elevator *Elev) {
 		time.Sleep(100 * time.Millisecond)
 	}
 }
+
 func UpdateLightsFromNetworkOrders(networkorders [config.N_FLOORS][config.N_BUTTONS]string) {
 	for floor := 0; floor < config.N_FLOORS; floor++ {
 		for button := 0; button < config.N_BUTTONS; button++ {
