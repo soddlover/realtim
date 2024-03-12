@@ -77,6 +77,7 @@ func NetworkFSM(
 
 				if selfIP[0] > sIP {
 					fmt.Println("I won the shootout! Theres a new sheriff in town.")
+					time.Sleep(1 * time.Second)
 					continue
 				}
 				fmt.Println("I died.")
