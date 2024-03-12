@@ -30,20 +30,25 @@ func CheckHeartbeats(lostConn chan string) {
 	}
 }
 
-func updateBroadcastworld(systemState map[string]Elev, broadcastStateRx <-chan BcastState) {
-	bcastSystem := make(map[string]BcastState)
+func updateBroadcastworld(systemState *SystemState, broadcastStateRx <-chan BcastState) {
+	bcastSystem := BcastSystem{Map: make(map[string]BcastState)}
 	for {
-		bcastState := <-broadcastStateRx
-		lastHeartbeat[bcastState.ID] = time.Now()
-		_, existsInSystemState := systemState[bcastState.ID]
-		if !existsInSystemState {
-			delete(bcastSystem, bcastState.ID)
-		}
-		existingBcastState, existsInBcastSystem := bcastSystem[bcastState.ID]
-		if existsInBcastSystem {
-			if bcastState.SequenceNumber > existingBcastState.SequenceNumber {
-				bcastSystem[bcastState.ID] = bcastState
-				systemState[bcastState.ID] = bcastState.ElevState
+		select {
+		case bcastState := <-broadcastStateRx:
+			lastHeartbeat[bcastState.ID] = time.Now()
+			_, existsInSystemState := systemState.Map[bcastState.ID]
+			if !existsInSystemState {
+				delete(bcastSystem.Map, bcastState.ID)
+			}
+			existingBcastState, existsInBcastSystem := bcastSystem.Map[bcastState.ID]
+			if existsInBcastSystem {
+				if bcastState.SequenceNumber > existingBcastState.SequenceNumber {
+					bcastSystem.Map[bcastState.ID] = bcastState
+					systemState.Map[bcastState.ID] = bcastState.ElevState
+				}
+			} else {
+				bcastSystem.Map[bcastState.ID] = bcastState
+				systemState.Map[bcastState.ID] = bcastState.ElevState
 			}
 		} else {
 			bcastSystem[bcastState.ID] = bcastState
@@ -52,8 +57,9 @@ func updateBroadcastworld(systemState map[string]Elev, broadcastStateRx <-chan B
 	}
 }
 
-func StateBroadcaster(elevatorState <-chan Elev, systemState map[string]Elev, id string) {
-
+func StateBroadcaster(elevatorState <-chan Elev, systemState *SystemState, id string) {
+	//init bcast world
+	//using same world becuse why not?=
 	broadcastStateRx := make(chan BcastState)
 	broadcastStateTx := make(chan BcastState)
 

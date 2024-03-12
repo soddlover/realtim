@@ -49,7 +49,9 @@ func main() {
 		fmt.Println("Starting with fresh elevator")
 	}
 
-	systemState := make(map[string]Elev)
+	systemState := &SystemState{
+		Map: make(map[string]Elev),
+	}
 
 	elevatorStateBackup := make(chan Elev, 10)
 	elevatorStateBroadcast := make(chan Elev, 10)

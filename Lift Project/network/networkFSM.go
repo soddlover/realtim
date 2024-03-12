@@ -27,7 +27,7 @@ func NetworkFSM(
 	orderRequest chan Order,
 	orderAssigned chan Order,
 	orderDelete chan Orderstatus,
-	systemState map[string]Elev,
+	systemState *SystemState,
 	incommingOrder chan Orderstatus,
 ) {
 
@@ -156,7 +156,7 @@ func Heartbeats(lostConns <-chan string) {
 
 func InitSherrif(
 	incomingOrder chan Orderstatus,
-	systemState map[string]Elev,
+	systemState *SystemState,
 	networkorders *[config.N_FLOORS][config.N_BUTTONS]string,
 	relievedOfDuty <-chan bool,
 	remainingOrders chan<- [config.N_FLOORS][config.N_BUTTONS]string,
@@ -205,17 +205,14 @@ func orderForwarder(
 	}
 }
 
-func checkSync(systemState map[string]Elev, networkOrders *[config.N_FLOORS][config.N_BUTTONS]string, orderAssigned chan<- Order) {
+func checkSync(systemState *SystemState, networkOrders *[config.N_FLOORS][config.N_BUTTONS]string, orderAssigned chan<- Order) {
+	//check if the network orders are in sync with the system state
 	for {
 		for floor := 0; floor < config.N_FLOORS; floor++ {
 			for button := 0; button < config.N_BUTTONS; button++ {
 				if networkOrders[floor][button] != "" {
-					assignedElev, existsInSystemState := systemState[networkOrders[floor][button]]
-					if !existsInSystemState || !assignedElev.Queue[floor][button] {
-						if networkOrders[floor][button] == config.Self_id {
-							fmt.Println("Elevator queueueueu", assignedElev.Queue)
-							//delete(systemState, networkOrders[floor][button])
-							//networkOrders[floor][button] = ""
+					_, existsInSystemState := systemState.Map[networkOrders[floor][button]]
+					if !existsInSystemState || !systemState.Map[networkOrders[floor][button]].Queue[floor][button] {
 
 							//elev := systemState[config.Self_id]
 							// Modify the struct
