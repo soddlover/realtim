@@ -54,34 +54,6 @@ func Assigner(
 				UpdateLightsFromNetworkOrders(*networkOrders)
 				continue
 			}
-
-			// best_id := config.Self_id
-			// best_duration := 1000000 * time.Second
-			// for id, elevator := range systemState.Map {
-			// 	if elevator.Obstr {
-			// 		fmt.Println("Elevator with id: ", id, " is obstructed")
-			// 	}
-			// 	if elevator.State == Undefined || elevator.Obstr {
-			// 		continue
-			// 	}
-
-			// 	duration := timeToServeRequest(elevator, order.Button, order.Floor)
-			// 	if duration < best_duration {
-			// 		best_duration = duration
-			// 		best_id = id
-			// 	}
-			// }
-			// assigned := networkOrders[order.Floor][order.Button]
-			// if assigned != "" {
-			// 	if elev, ok := systemState.Map[assigned]; ok {
-			// 		if !elev.Obstr && !(elev.State == Undefined) {
-			// 			//do nothing as its already assigned to a working elevator, could send an additional message to it incase?
-			// 			fmt.Println("Order already assigned to a working elevator")
-			// 			fmt.Println("SOOME PROBLEMS OCCUR HERE MAYBE???")
-			// 			best_id = assigned
-			// 		}
-			// 	}
-			// }
 			best_id := calculateFastestID(systemState, *networkOrders, Order{Floor: order.Floor, Button: order.Button})
 			order.Owner = best_id
 			networkOrders[order.Floor][order.Button] = best_id
@@ -101,7 +73,7 @@ func Assigner(
 			fmt.Println("NetworkOrders: ", networkOrders)
 			//check for orders owned by the leaving node
 			for floor := 0; floor < len(networkOrders); floor++ {
-				for button := 0; button < len(networkOrders[button]); button++ {
+				for button := 0; button < len(networkOrders[floor]); button++ {
 					if networkOrders[floor][button] == peerID {
 						// Send to assigner for reassignment
 						incomingOrder <- Orderstatus{Floor: floor, Button: elevio.ButtonType(button), Served: false, Owner: peerID}

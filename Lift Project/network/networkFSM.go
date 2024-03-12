@@ -210,18 +210,27 @@ func checkSync(systemState map[string]Elev, networkOrders *[config.N_FLOORS][con
 		for floor := 0; floor < config.N_FLOORS; floor++ {
 			for button := 0; button < config.N_BUTTONS; button++ {
 				if networkOrders[floor][button] != "" {
-					_, existsInSystemState := systemState[networkOrders[floor][button]]
-					if !existsInSystemState || !systemState[networkOrders[floor][button]].Queue[floor][button] {
-
+					assignedElev, existsInSystemState := systemState[networkOrders[floor][button]]
+					if !existsInSystemState || !assignedElev.Queue[floor][button] {
 						if networkOrders[floor][button] == config.Self_id {
+
+							//delete(systemState, networkOrders[floor][button])
+							//networkOrders[floor][button] = ""
+
+							elev := systemState[config.Self_id]
+							// Modify the struct
+							elev.Queue[floor][button] = true
+							// Put the struct back into the map
+							systemState[config.Self_id] = elev
+
 							orderAssigned <- Order{Floor: floor, Button: elevio.ButtonType(button)}
 							fmt.Println("WARNING - Order not in sync with system state, reassigning order TO MYSELF KJØH")
+
 						}
 					}
 				}
 			}
 		}
-
 		time.Sleep(1 * time.Second)
 	}
 }
