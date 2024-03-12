@@ -56,7 +56,7 @@ func main() {
 	elevatorStateBroadcast := make(chan Elev, 10)
 	orderRequest := make(chan Order, 10)
 	//orderComplete := make(chan Order, 10)
-	orderAssigned := make(chan Orderstatus, 10)
+	orderAssigned := make(chan Order, 10)
 	orderDelete := make(chan Orderstatus, 10)
 	incomingOrder := make(chan Orderstatus, 10)
 

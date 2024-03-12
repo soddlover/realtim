@@ -25,7 +25,7 @@ var currentDuty duty
 
 func NetworkFSM(
 	orderRequest chan Order,
-	orderAssigned chan Orderstatus,
+	orderAssigned chan Order,
 	orderDelete chan Orderstatus,
 	systemState *SystemState,
 	incommingOrder chan Orderstatus,
@@ -153,7 +153,7 @@ func InitSherrif(
 	networkorders *[config.N_FLOORS][config.N_BUTTONS]string,
 	relievedOfDuty <-chan bool,
 	remainingOrders chan<- [config.N_FLOORS][config.N_BUTTONS]string,
-	orderAssigned chan<- Orderstatus,
+	orderAssigned chan<- Order,
 ) {
 
 	nodeLeftNetwork := make(chan string)
@@ -167,7 +167,7 @@ func InitSherrif(
 
 func orderForwarder(
 	incomingOrder chan<- Orderstatus,
-	orderAssigned chan<- Orderstatus,
+	orderAssigned chan<- Order,
 	orderRequest <-chan Order,
 	orderDelete <-chan Orderstatus,
 ) {
@@ -176,7 +176,7 @@ func orderForwarder(
 		case order := <-orderRequest:
 			orderstat := Orderstatus{Owner: config.Self_id, Floor: order.Floor, Button: order.Button, Served: false}
 			if order.Button == elevio.BT_Cab {
-				orderAssigned <- orderstat
+				orderAssigned <- Order{Floor: order.Floor, Button: order.Button}
 				continue
 			}
 			if currentDuty == dt_sherriff {

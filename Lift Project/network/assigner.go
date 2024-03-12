@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"mymodule/config"
 	. "mymodule/elevator"
-	elevatorFSM "mymodule/elevator"
 	"mymodule/elevator/elevio"
 	"mymodule/network/SheriffDeputyWrangler/sheriff"
 	. "mymodule/types"
@@ -34,7 +33,7 @@ import (
 
 func Assigner(
 	networkUpdate chan<- bool,
-	orderAssigned chan<- Orderstatus,
+	orderAssigned chan<- Order,
 	systemState *SystemState,
 	networkOrders *[config.N_FLOORS][config.N_BUTTONS]string,
 	nodeLeftNetwork <-chan string,
@@ -51,7 +50,7 @@ func Assigner(
 				fmt.Println("Order being deletetet")
 				networkOrders[order.Floor][order.Button] = ""
 				networkUpdate <- true
-				elevatorFSM.UpdateLightsFromNetworkOrders(*networkOrders)
+				UpdateLightsFromNetworkOrders(*networkOrders)
 				continue
 			}
 
@@ -86,10 +85,10 @@ func Assigner(
 			order.Owner = best_id
 			networkOrders[order.Floor][order.Button] = best_id
 			networkUpdate <- true
-			elevatorFSM.UpdateLightsFromNetworkOrders(*networkOrders)
+			UpdateLightsFromNetworkOrders(*networkOrders)
 			fmt.Println("Added to NetworkOrders maps")
 			if best_id == config.Self_id {
-				orderAssigned <- order
+				orderAssigned <- Order{Floor: order.Floor, Button: order.Button}
 			} else {
 				go sheriff.SendOrderMessage(best_id, order)
 			}

@@ -13,7 +13,7 @@ func RunElev(
 	elevatorStateBackup chan<- Elev,
 	elevatorStateBroadcast chan<- Elev,
 	orderRequest chan<- Order,
-	orderAssigned <-chan Orderstatus,
+	orderAssigned <-chan Order,
 	orderDelete chan<- Orderstatus,
 	initElev Elev) {
 

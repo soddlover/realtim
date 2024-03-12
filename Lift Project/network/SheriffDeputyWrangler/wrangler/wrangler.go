@@ -160,7 +160,7 @@ func acknowledger(OrderSent <-chan Orderstatus, networkOrdersRecieved <-chan Net
 
 // ReceiveMessageFromsheriff receives an order from the sheriff and sends an acknowledgement
 func ReceiveMessageFromSheriff(
-	orderAssigned chan<- Orderstatus,
+	orderAssigned chan<- Order,
 	sheriffDead chan<- NetworkOrdersData) {
 
 	var lastnodeOrdersData NetworkOrdersData
@@ -202,7 +202,7 @@ func ReceiveMessageFromSheriff(
 				}
 
 				fmt.Println("Order received from sheriff:", order)
-				orderAssigned <- order
+				orderAssigned <- Order{Floor: order.Floor, Button: order.Button}
 				// Send the order to the elevator
 
 			case "NodeOrders":
