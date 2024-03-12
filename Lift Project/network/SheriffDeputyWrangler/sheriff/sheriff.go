@@ -37,6 +37,7 @@ func CheckMissingConnToOrders(networkOrders [config.N_FLOORS][config.N_BUTTONS]s
 		}
 	}
 }
+
 func Sheriff(
 	incomingOrder chan<- Orderstatus,
 	networkOrders *[config.N_FLOORS][config.N_BUTTONS]string,
@@ -57,13 +58,17 @@ func Sheriff(
 	CheckMissingConnToOrders(*networkOrders, nodeLeftNetwork)
 
 	<-relievedOfDuty
+	fmt.Println("Relieved of duty")
 	transmitEnable <- false
+	fmt.Println("Stopped transmitter")
 	listenWranglerEnable <- false
+	fmt.Println("Stopped glistenForWranglerConnections")
 	sendOrderToDeputyEnable <- false
+	fmt.Println("Stopped SendNodeOrdersToDeputy")
 	quitAssigner <- true
+	fmt.Println("Stopped Assigner")
 
 }
-
 func listenForWranglerConnections(
 	incomingOrder chan<- Orderstatus,
 	nodeLeftNetwork chan<- string,
@@ -75,6 +80,18 @@ func listenForWranglerConnections(
 		return
 	}
 
+	newConn := make(chan net.Conn)
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				fmt.Println("Error accepting connection:", err)
+				continue
+			}
+			newConn <- conn
+		}
+	}()
+
 	for {
 		select {
 		case enable := <-listenWranglerEnable:
@@ -83,12 +100,7 @@ func listenForWranglerConnections(
 				ln.Close()
 				return
 			}
-		default:
-			conn, err := ln.Accept()
-			if err != nil {
-				fmt.Println("Error accepting connection:", err)
-				continue
-			}
+		case conn := <-newConn:
 			reader := bufio.NewReader(conn)
 			message, err := reader.ReadString('\n')
 			if err != nil {
@@ -103,7 +115,6 @@ func listenForWranglerConnections(
 			fmt.Println("Accepted Wrangler", peerID)
 			fmt.Println(WranglerConnections)
 			go ReceiveMessage(conn, incomingOrder, peerID, nodeLeftNetwork)
-
 		}
 	}
 }
