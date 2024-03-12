@@ -46,8 +46,7 @@ func RunElev(
 	go elevio.PollFloorSensor(drv_floors)
 	go elevio.PollObstructionSwitch(drv_obstr)
 	go elevio.PollStopButton(drv_stop)
-	//go updateLights(&elevator)
-	//go printElevator(&elevator)
+	go updateLights(&elevator)
 	elevStart(drv_floors)
 	elevator.Floor = elevio.GetFloor()
 	elevio.SetMotorDirection(elevio.MotorDirection(ChooseDirection(elevator)))
@@ -166,7 +165,9 @@ func updateLights(elevator *Elev) {
 	for {
 		for floor := 0; floor < config.N_FLOORS; floor++ {
 			for button := 0; button < config.N_BUTTONS; button++ {
-				elevio.SetButtonLamp(elevio.ButtonType(button), floor, elevator.Queue[floor][button])
+				if elevio.ButtonType(button) == elevio.BT_Cab {
+					elevio.SetButtonLamp(elevio.ButtonType(button), floor, elevator.Queue[floor][button])
+				}
 			}
 		}
 		time.Sleep(100 * time.Millisecond)
@@ -175,10 +176,12 @@ func updateLights(elevator *Elev) {
 func UpdateLightsFromNetworkOrders(networkorders [config.N_FLOORS][config.N_BUTTONS]string) {
 	for floor := 0; floor < config.N_FLOORS; floor++ {
 		for button := 0; button < config.N_BUTTONS; button++ {
-			if networkorders[floor][button] != "" {
-				elevio.SetButtonLamp(elevio.ButtonType(button), floor, true)
-			} else {
-				elevio.SetButtonLamp(elevio.ButtonType(button), floor, false)
+			if elevio.ButtonType(button) != elevio.BT_Cab {
+				if networkorders[floor][button] != "" {
+					elevio.SetButtonLamp(elevio.ButtonType(button), floor, true)
+				} else {
+					elevio.SetButtonLamp(elevio.ButtonType(button), floor, false)
+				}
 			}
 		}
 	}

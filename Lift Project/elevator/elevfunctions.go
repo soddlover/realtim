@@ -3,12 +3,16 @@ package elevatorFSM
 import (
 	"fmt"
 	. "mymodule/config"
+	"mymodule/elevator/elevio"
 	. "mymodule/elevator/elevio"
 	. "mymodule/types"
 )
 
 func elevStart(drv_floors <-chan int) {
-
+	for floor := 0; floor < N_FLOORS; floor++ {
+		elevio.SetButtonLamp(BT_HallUp, floor, false)
+		elevio.SetButtonLamp(BT_HallDown, floor, false)
+	}
 	if GetFloor() == -1 {
 		SetMotorDirection(MD_Down)
 		<-drv_floors
