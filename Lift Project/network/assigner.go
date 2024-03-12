@@ -59,27 +59,25 @@ func Assigner(
 				fmt.Println("Order being deletetet")
 				networkOrders.Mutex.Lock()
 				networkOrders.Orders[order.Floor][order.Button] = ""
-				networkOrders.Mutex.Unlock()
-				networkUpdate <- true
-				networkOrders.Mutex.Lock()
 				UpdateLightsFromNetworkOrders(networkOrders.Orders)
 				networkOrders.Mutex.Unlock()
+				networkUpdate <- true
 				continue
 			}
 			networkOrders.Mutex.Lock()
 			best_id := calculateFastestID(systemState, networkOrders, Order{Floor: order.Floor, Button: order.Button})
 			order.Owner = best_id
 			networkOrders.Orders[order.Floor][order.Button] = best_id
-			networkOrders.Mutex.Unlock()
-			networkUpdate <- true
-			networkOrders.Mutex.Lock()
 			UpdateLightsFromNetworkOrders(networkOrders.Orders)
 			networkOrders.Mutex.Unlock()
+			networkUpdate <- true
 			fmt.Println("Added to NetworkOrders maps")
 			if best_id == config.Self_id {
 				orderAssigned <- Order{Floor: order.Floor, Button: order.Button}
 			} else {
 				go sheriff.SendOrderMessage(best_id, order)
+				fmt.Println("SystemState: ")
+				fmt.Println(systemState)
 			}
 		}
 	}
