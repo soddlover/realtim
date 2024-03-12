@@ -18,9 +18,6 @@ const DEPUTY_SEND_FREQ = 3 * time.Second
 
 var WranglerConnections = make(map[string]net.Conn)
 
-var NewDeputyConnChan = make(chan net.TCPConn)
-var DeputyDisconnectChan = make(chan net.TCPConn)
-
 func CheckMissingConnToOrders(networkOrders [config.N_FLOORS][config.N_BUTTONS]string, nodeLeftNetwork chan<- string) {
 	processedIDs := make(map[string]bool)
 	fmt.Println("Checking for missing connections to orders")
@@ -271,15 +268,6 @@ func ReceiveMessage(
 		incomingOrder <- order
 
 	}
-}
-
-func ChooseNewDeputy() (net.Conn, string, error) {
-	//fmt.Println("Choosing new deputy")
-	for k := range WranglerConnections {
-		fmt.Println("The new deputy is:", k)
-		return WranglerConnections[k], k, nil
-	}
-	return nil, "", fmt.Errorf("no wrangler connections")
 }
 
 func CloseConns(id string) {
