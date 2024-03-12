@@ -148,7 +148,6 @@ func RunElev(
 			elevator.State = EB_Idle
 			elevatorStateBackup <- elevator
 			elevatorStateBroadcast <- elevator
-		//fullfør cab ordre
 		case obstruction := <-drv_obstr:
 			if !obstruction && elevator.Obstr {
 				doorTimer.Reset(config.DOOR_OPEN_TIME)

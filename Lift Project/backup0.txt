@@ -1,5 +1,1 @@
-<<<<<<< HEAD
 {"State":0,"Dir":0,"Floor":0,"Queue":[[false,false,false],[false,false,false],[false,false,false],[false,false,false],[false,false,false],[false,false,false],[false,false,false],[false,false,false],[false,false,false]],"Obstr":false}
-=======
-{"State":0,"Dir":0,"Floor":0,"Queue":[[false,false,false],[false,false,false],[false,false,false],[false,false,false]],"Obstr":false}
->>>>>>> henrik_og_marius_code_cleaning

@@ -22,6 +22,7 @@ func main() {
 
 	var localIP string
 	var err error
+
 	for {
 		localIP, err = localip.LocalIP()
 		if err != nil {
@@ -53,13 +54,11 @@ func main() {
 	elevatorStateBackup := make(chan Elev, 10)
 	elevatorStateBroadcast := make(chan Elev, 10)
 	orderRequest := make(chan Order, 10)
-	//orderComplete := make(chan Order, 10)
 	orderAssigned := make(chan Order, 10)
 	orderDelete := make(chan Orderstatus, 10)
 	incomingOrder := make(chan Orderstatus, 10)
 
 	go network.StateBroadcaster(elevatorStateBroadcast, systemState, id)
-	// go PeerConnector(id, systemState)
 	go backup.WriteBackup(elevatorStateBackup)
 	go elev.RunElev(
 		elevatorStateBackup,
@@ -75,7 +74,5 @@ func main() {
 		systemState,
 		incomingOrder)
 
-	//go Assigner(channels, systemState)
-	//go printsystemState(systemState)
 	select {}
 }

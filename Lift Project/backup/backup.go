@@ -12,39 +12,34 @@ import (
 )
 
 func Backup(fresh bool) Elev {
-	// Get the initial file info
 
 	if fresh {
 		os.Remove("backup" + config.Self_nr + ".txt")
 		return Elev{}
 	}
-	// Start a ticker that checks the file every second
+
 	ticker := time.NewTicker(10 * time.Second)
 
 	for {
 		<-ticker.C
 
-		// Get the current file info
 		fileInfo, err := os.Stat("backup" + config.Self_nr + ".txt")
 		if err != nil {
 			fmt.Println("Error getting file info:", err)
 			return takeControl()
-
 		}
 
-		// Get the current modification time
 		currentModTime := fileInfo.ModTime()
 
-		// If the file has not been modified in the last 10 seconds, the backup takes over
 		if time.Since(currentModTime) > 10*time.Second {
 			return takeControl()
 		}
 		fmt.Println("Backup is still alive. KJØH ")
-
 	}
 }
 
 func WriteBackup(elevChan <-chan Elev) {
+
 	ticker := time.NewTicker(5 * time.Second)
 	var elev Elev
 
@@ -62,7 +57,6 @@ func WriteBackup(elevChan <-chan Elev) {
 		if err != nil {
 			fmt.Println("Error writing to file:", err)
 			continue
-
 		}
 	}
 }
@@ -88,13 +82,5 @@ func takeControl() Elev {
 			}
 		}
 	}
-
-	// cmd := exec.Command("gnome-terminal", "--", "go", "run", "main.go")
-	// err = cmd.Run()
-	// if err != nil {
-	// 	fmt.Println("THis sucks")
-	// 	log.Fatal(err)
-	// }
-	// Here you can add the code for the backup to take over
 	return elev
 }

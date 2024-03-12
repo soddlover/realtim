@@ -7,7 +7,8 @@ import (
 	"mymodule/elevator/elevio"
 )
 
-//this is where all universally used types are definedtype ElevatorState ints
+// this is where all universally used types are definedtype ElevatorState ints
+type Button int
 
 type Orderstatus struct {
 	Owner  string

@@ -104,8 +104,6 @@ func NetworkFSM(
 				continue
 			}
 
-			// 	//the highest IP wins
-
 		case dt_wrangler:
 			networkOrderData := <-sheriffDead
 
@@ -137,13 +135,11 @@ func NetworkFSM(
 
 func Heartbeats(lostConns <-chan string) {
 	for {
-		select {
-		case id := <-lostConns:
-			if currentDuty == dt_sherriff {
-				sheriff.CloseConns(id)
-			} else {
-				wrangler.CloseSheriffConn()
-			}
+		id := <-lostConns
+		if currentDuty == dt_sherriff {
+			sheriff.CloseConns(id)
+		} else {
+			wrangler.CloseSheriffConn()
 		}
 	}
 }
@@ -196,7 +192,6 @@ func orderForwarder(
 }
 
 func checkSync(systemState map[string]Elev, networkOrders *[config.N_FLOORS][config.N_BUTTONS]string, orderAssigned chan<- Order) {
-	//check if the network orders are in sync with the system state
 	for {
 		for floor := 0; floor < config.N_FLOORS; floor++ {
 			for button := 0; button < config.N_BUTTONS; button++ {

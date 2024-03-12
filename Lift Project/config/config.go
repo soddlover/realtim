@@ -18,8 +18,6 @@ const (
 	HEARTBEAT_DEADLINE   = 1000 * time.Millisecond
 )
 
-type Button int
-
 var Self_id string = ""
 var Self_nr string = "0"
 
