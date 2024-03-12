@@ -46,6 +46,7 @@ func Assigner(
 		select {
 		case order := <-incomingOrder:
 			//channels.OrderAssigned <- order
+
 			if order.Served {
 				fmt.Println("Order being deletetet")
 				networkOrders[order.Floor][order.Button] = ""
@@ -107,8 +108,7 @@ func Assigner(
 					}
 				}
 			}
-		case <-quitAssigner:
-			remainingOrders <- *networkOrders
+
 		}
 
 	}

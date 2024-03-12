@@ -11,6 +11,9 @@ func LocalIP() (string, error) {
 	if localIP == "" {
 		conn, err := net.DialTCP("tcp4", nil, &net.TCPAddr{IP: []byte{8, 8, 8, 8}, Port: 53})
 		if err != nil {
+			if strings.Contains(err.Error(), "network is unreachable") {
+				return "offline", nil
+			}
 			return "", err
 		}
 		defer conn.Close()
