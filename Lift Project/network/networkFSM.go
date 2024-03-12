@@ -37,7 +37,7 @@ func NetworkFSM(
 	remainingOrders := make(chan [config.N_FLOORS][config.N_BUTTONS]string)
 	lostConns := make(chan string)
 	go CheckHeartbeats(lostConns)
-	go Heartbeats(lostConns)
+	go Heartbeats(lostConns, systemState)
 	go checkSync(systemState, networkOrders, orderAssigned)
 
 	currentDuty = dt_initial
@@ -107,7 +107,7 @@ func NetworkFSM(
 	}
 }
 
-func Heartbeats(lostConns <-chan string) {
+func Heartbeats(lostConns <-chan string, systemState map[string]Elev) {
 	for {
 		id := <-lostConns
 		if currentDuty == dt_sherriff {
@@ -115,6 +115,7 @@ func Heartbeats(lostConns <-chan string) {
 		} else {
 			wrangler.CloseSheriffConn()
 		}
+		delete(systemState, id)
 	}
 }
 
