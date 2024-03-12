@@ -7,25 +7,7 @@ import (
 	"mymodule/elevator/elevio"
 )
 
-//this is where all universally used types are definedtype ElevatorState int
-
-type Channels struct {
-	ElevatorStates          chan Elev
-	ElevatorStatesBroadcast chan Elev
-	OrderRequest            chan Order
-	OrderComplete           chan Order
-	OrderAssigned           chan Orderstatus
-	OrderDelete             chan Orderstatus
-	IncomingOrder           chan Orderstatus
-}
-
-type NetworkChannels struct {
-	DeputyPromotion   chan map[string]Orderstatus
-	WranglerPromotion chan bool
-	SheriffDead       chan NetworkOrdersData
-	RelievedOfDuty    chan bool
-	RemaindingOrders  chan [N_FLOORS][N_BUTTONS]string
-}
+//this is where all universally used types are definedtype ElevatorState ints
 
 type Orderstatus struct {
 	Owner  string
@@ -38,14 +20,6 @@ type BcastState struct {
 	ElevState      Elev
 	ID             string
 	SequenceNumber int
-}
-
-type BcastSystem struct {
-	Map map[string]BcastState
-}
-
-type SystemState struct {
-	Map map[string]Elev
 }
 
 type ElevatorState int
