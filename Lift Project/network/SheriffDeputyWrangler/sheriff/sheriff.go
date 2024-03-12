@@ -104,7 +104,7 @@ func listenForWranglerConnections(
 			reader := bufio.NewReader(conn)
 			message, err := reader.ReadString('\n')
 			if err != nil {
-				fmt.Println("Error reading from connection:", err)
+				fmt.Println("Error reading from connection while listeing for wranglers:", err)
 				continue
 			}
 
@@ -243,8 +243,13 @@ func ReceiveMessage(
 
 			} else {
 				fmt.Println("Error reading from connection:", err)
+				fmt.Println("closing connection to", peerID)
+				conn.Close()
+				nodeLeftNetwork <- peerID
+				delete(WranglerConnections, peerID)
+				return Orderstatus{}, nil
 			}
-			continue
+
 		}
 
 		// Convert the message from JSON to Orderstatus
