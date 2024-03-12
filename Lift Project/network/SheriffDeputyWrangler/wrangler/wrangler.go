@@ -161,7 +161,8 @@ func acknowledger(OrderSent <-chan Orderstatus, networkOrdersRecieved <-chan Net
 // ReceiveMessageFromsheriff receives an order from the sheriff and sends an acknowledgement
 func ReceiveMessageFromSheriff(
 	orderAssigned chan<- Order,
-	sheriffDead chan<- NetworkOrdersData) {
+	sheriffDead chan<- NetworkOrdersData,
+	networkorders *[config.N_FLOORS][config.N_BUTTONS]string) {
 
 	var lastnodeOrdersData NetworkOrdersData
 
@@ -189,6 +190,7 @@ func ReceiveMessageFromSheriff(
 			err = json.Unmarshal([]byte(message), &msg)
 			if err != nil {
 				fmt.Println("Error parsing message:", err)
+				time.Sleep(1 * time.Second)
 				continue
 			}
 
@@ -214,10 +216,12 @@ func ReceiveMessageFromSheriff(
 					fmt.Println("Error parsing order:", err)
 					continue
 				}
+
 				fmt.Println("Received nodeOrdersData from sheriff:")
 				NodeOrdersReceived <- nodeOrdersData
 				elevatorFSM.UpdateLightsFromNetworkOrders(nodeOrdersData.NetworkOrders)
 				lastnodeOrdersData = nodeOrdersData
+				*networkorders = nodeOrdersData.NetworkOrders
 
 			default:
 				fmt.Println("Unknown message type:", msg.Type)

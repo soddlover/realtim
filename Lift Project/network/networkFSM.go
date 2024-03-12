@@ -34,11 +34,12 @@ func NetworkFSM(
 	sheriffDead := make(chan NetworkOrdersData)
 	relievedOfDuty := make(chan bool)
 	remainingOrders := make(chan [config.N_FLOORS][config.N_BUTTONS]string)
-
+	NetworkOrders := [config.N_FLOORS][config.N_BUTTONS]string{}
 	currentDuty = dt_initial
 	lostConns := make(chan string)
 	go CheckHeartbeats(lostConns)
 	go Heartbeats(lostConns)
+	go checkSync(systemState, &NetworkOrders, orderAssigned)
 
 	for {
 		switch currentDuty {
@@ -46,14 +47,13 @@ func NetworkFSM(
 			sIP := wrangler.GetSheriffIP()
 			if sIP == "" {
 
-				NetworkOrders := [config.N_FLOORS][config.N_BUTTONS]string{}
 				InitSherrif(incommingOrder, systemState, &NetworkOrders, relievedOfDuty, remainingOrders, orderAssigned)
 				currentDuty = dt_sherriff
 			} else {
 				fmt.Println("I am not the only Wrangler in town, connecting to Sheriff:")
 				if wrangler.ConnectWranglerToSheriff(sIP) {
 					fmt.Println("Me, a Wrangler connected to Sheriff")
-					go wrangler.ReceiveMessageFromSheriff(orderAssigned, sheriffDead)
+					go wrangler.ReceiveMessageFromSheriff(orderAssigned, sheriffDead, &NetworkOrders)
 					currentDuty = dt_wrangler
 				}
 			}
@@ -84,7 +84,7 @@ func NetworkFSM(
 				if wrangler.ConnectWranglerToSheriff(sIP) {
 					fmt.Println("Me, a Wrangler connected to Sheriff")
 					currentDuty = dt_wrangler
-					go wrangler.ReceiveMessageFromSheriff(orderAssigned, sheriffDead)
+					go wrangler.ReceiveMessageFromSheriff(orderAssigned, sheriffDead, &NetworkOrders)
 					relievedOfDuty <- true
 					o := <-remainingOrders
 					time.Sleep(5 * time.Second)
@@ -191,5 +191,30 @@ func orderForwarder(
 				wrangler.SendOrderToSheriff(orderstat)
 			}
 		}
+	}
+}
+
+func checkSync(systemState *SystemState, networkOrders *[config.N_FLOORS][config.N_BUTTONS]string, orderAssigned chan<- Order) {
+	//check if the network orders are in sync with the system state
+	for {
+		for floor := 0; floor < config.N_FLOORS; floor++ {
+			for button := 0; button < config.N_BUTTONS; button++ {
+				if networkOrders[floor][button] != "" {
+					_, existsInSystemState := systemState.Map[networkOrders[floor][button]]
+					if !existsInSystemState || !systemState.Map[networkOrders[floor][button]].Queue[floor][button] {
+
+						if networkOrders[floor][button] == config.Self_id {
+							orderAssigned <- Order{Floor: floor, Button: elevio.ButtonType(button)}
+							fmt.Println("WARNING - Order not in sync with system state, reassigning order TO MYSELF KJØH")
+						}
+
+						//send order to sheriff
+
+					}
+				}
+			}
+		}
+
+		time.Sleep(1 * time.Second)
 	}
 }

@@ -14,8 +14,8 @@ const (
 	Peer_port            = 15647
 	TCP_port             = 16000
 	SimulatorPort        = 15657
-	HEARTBEAT            = 1000 * time.Millisecond
-	HEARTBEAT_DEADLINE   = 2000 * time.Millisecond
+	HEARTBEAT            = 20 * time.Millisecond
+	HEARTBEAT_DEADLINE   = 1000 * time.Millisecond
 )
 
 type Button int
