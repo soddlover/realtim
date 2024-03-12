@@ -30,30 +30,30 @@ func NetworkFSM(
 	systemState map[string]Elev,
 	incommingOrder chan Orderstatus,
 ) {
+	networkOrders := &NetworkOrders{}
 
 	sheriffDead := make(chan NetworkOrdersData)
 	relievedOfDuty := make(chan bool)
 	remainingOrders := make(chan [config.N_FLOORS][config.N_BUTTONS]string)
-	NetworkOrders := [config.N_FLOORS][config.N_BUTTONS]string{}
-	currentDuty = dt_initial
 	lostConns := make(chan string)
 	go CheckHeartbeats(lostConns)
 	go Heartbeats(lostConns)
-	go checkSync(systemState, &NetworkOrders, orderAssigned)
+	go checkSync(systemState, networkOrders, orderAssigned)
 
+	currentDuty = dt_initial
 	for {
 		switch currentDuty {
 		case dt_initial:
 			sIP := wrangler.GetSheriffIP()
 			if sIP == "" {
 
-				InitSherrif(incommingOrder, systemState, &NetworkOrders, relievedOfDuty, remainingOrders, orderAssigned)
+				InitSherrif(incommingOrder, systemState, networkOrders, relievedOfDuty, remainingOrders, orderAssigned)
 				currentDuty = dt_sherriff
 			} else {
 				fmt.Println("I am not the only Wrangler in town, connecting to Sheriff:")
 				if wrangler.ConnectWranglerToSheriff(sIP) {
 					fmt.Println("Me, a Wrangler connected to Sheriff")
-					go wrangler.ReceiveMessageFromSheriff(orderAssigned, sheriffDead, &NetworkOrders)
+					go wrangler.ReceiveMessageFromSheriff(orderAssigned, sheriffDead, networkOrders)
 					currentDuty = dt_wrangler
 				}
 			}
@@ -70,51 +70,15 @@ func NetworkFSM(
 			}
 			time.Sleep(1 * time.Second)
 
-			/*
-				case sIP == "offline":
-					fmt.Println("Once i was afraid i was petrified, killing myself")
-					os.Exit(1)
-
-				case sIP == "DISCONNECTED":
-					fmt.Println("Something is wrong, read ", sIP, " as broadcasted IP")
-
-				case sIP != selfIP[0]:
-					fmt.Println("Sheriff Conflict, my IP:", selfIP[0], "other Sheriff IP:", sIP)
-					fmt.Println("Preparing for shootout!!!!")
-					fmt.Println("Allahu Akbar")
-
-					if selfIP[0] > sIP {
-						fmt.Println("I won the shootout! Theres a new sheriff in town.")
-						time.Sleep(1 * time.Second)
-						continue
-					}
-					fmt.Println("I died.")
-
-					if wrangler.ConnectWranglerToSheriff(sIP) {
-						fmt.Println("Me, a Wrangler connected to Sheriff")
-						currentDuty = dt_wrangler
-						go wrangler.ReceiveMessageFromSheriff(orderAssigned, sheriffDead, &NetworkOrders)
-						relievedOfDuty <- true
-						o := <-remainingOrders
-						time.Sleep(5 * time.Second)
-
-						for i := 0; i < len(o); i++ {
-							for j := 0; j < len(o[i]); j++ {
-								if o[i][j] != "" {
-									orderRequest <- Order{Floor: i, Button: elevio.ButtonType(j)}
-								}
-							}
-						}
-						fmt.Println("Transferred orders to new Sheriff")
-					}
-			*/
-
 		case dt_wrangler:
 			networkOrderData := <-sheriffDead
 
 			if networkOrderData.TheChosenOne {
 				fmt.Println("I am the chosen one, I am the Sheriff!")
-				InitSherrif(incommingOrder, systemState, &networkOrderData.NetworkOrders, relievedOfDuty, remainingOrders, orderAssigned)
+				networkOrders.Mutex.Lock()
+				networkOrders.Orders = networkOrderData.NetworkOrders
+				networkOrders.Mutex.Unlock()
+				InitSherrif(incommingOrder, systemState, networkOrders, relievedOfDuty, remainingOrders, orderAssigned)
 				currentDuty = dt_sherriff
 
 			} else {
@@ -157,19 +121,18 @@ func Heartbeats(lostConns <-chan string) {
 func InitSherrif(
 	incomingOrder chan Orderstatus,
 	systemState map[string]Elev,
-	networkorders *[config.N_FLOORS][config.N_BUTTONS]string,
+	networkorders *NetworkOrders,
 	relievedOfDuty <-chan bool,
 	remainingOrders chan<- [config.N_FLOORS][config.N_BUTTONS]string,
 	orderAssigned chan<- Order,
 ) {
-
 	nodeLeftNetwork := make(chan string)
 	quitAssigner := make(chan bool)
 	fmt.Println("I am the only Wrangler in town, I am the Sheriff!")
 	networkUpdate := make(chan bool)
 	go sheriff.Sheriff(incomingOrder, networkorders, nodeLeftNetwork, networkUpdate, relievedOfDuty, quitAssigner)
 	go Assigner(networkUpdate, orderAssigned, systemState, networkorders, nodeLeftNetwork, incomingOrder, quitAssigner, remainingOrders)
-	//go redistributor(nodeLeftNetwork, channels.IncomingOrder, world, networkorders)
+	go redistributor(nodeLeftNetwork, incomingOrder, systemState, networkorders)
 }
 
 func orderForwarder(
@@ -205,15 +168,15 @@ func orderForwarder(
 	}
 }
 
-func checkSync(systemState map[string]Elev, networkOrders *[config.N_FLOORS][config.N_BUTTONS]string, orderAssigned chan<- Order) {
+func checkSync(systemState map[string]Elev, networkOrders *NetworkOrders, orderAssigned chan<- Order) {
 	for {
+		networkOrders.Mutex.Lock()
 		for floor := 0; floor < config.N_FLOORS; floor++ {
 			for button := 0; button < config.N_BUTTONS; button++ {
-				if networkOrders[floor][button] != "" {
-					assignedElev, existsInSystemState := systemState[networkOrders[floor][button]]
+				if networkOrders.Orders[floor][button] != "" {
+					assignedElev, existsInSystemState := systemState[networkOrders.Orders[floor][button]]
 					if !existsInSystemState || !assignedElev.Queue[floor][button] {
-						if networkOrders[floor][button] == config.Self_id {
-							fmt.Println("Elevator queueueueu", assignedElev.Queue)
+						if networkOrders.Orders[floor][button] == config.Self_id {
 							//delete(systemState, networkOrders[floor][button])
 							//networkOrders[floor][button] = ""
 
@@ -222,15 +185,16 @@ func checkSync(systemState map[string]Elev, networkOrders *[config.N_FLOORS][con
 							//elev.Queue[floor][button] = true
 							// Put the struct back into the map
 							//systemState[config.Self_id] = elev
-
+							networkOrders.Mutex.Unlock()
 							orderAssigned <- Order{Floor: floor, Button: elevio.ButtonType(button)}
+							networkOrders.Mutex.Lock()
 							fmt.Println("WARNING - Order not in sync with system state, reassigning order TO MYSELF KJØH")
-
 						}
 					}
 				}
 			}
 		}
+		networkOrders.Mutex.Unlock()
 		time.Sleep(5 * time.Second)
 	}
 }

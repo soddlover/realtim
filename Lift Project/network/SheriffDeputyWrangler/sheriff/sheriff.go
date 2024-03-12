@@ -18,15 +18,18 @@ const DEPUTY_SEND_FREQ = 3 * time.Second
 
 var WranglerConnections = make(map[string]net.Conn)
 
-func CheckMissingConnToOrders(networkOrders [config.N_FLOORS][config.N_BUTTONS]string, nodeLeftNetwork chan<- string) {
+func CheckMissingConnToOrders(networkOrders *NetworkOrders, nodeLeftNetwork chan<- string) {
 	processedIDs := make(map[string]bool)
 	fmt.Println("Checking for missing connections to orders")
-	for floor := 0; floor < len(networkOrders); floor++ {
-		for button := 0; button < len(networkOrders[floor]); button++ {
-			id := networkOrders[floor][button]
+	networkOrders.Mutex.Lock()
+	for floor := 0; floor < len(networkOrders.Orders); floor++ {
+		for button := 0; button < len(networkOrders.Orders[floor]); button++ {
+			id := networkOrders.Orders[floor][button]
 			//fmt.Printf("Checking order at floor %d, button %d, id: %s\n", floor, button, id) // Print the current order being checked
 			if id != "" && WranglerConnections[id] == nil && id != config.Self_id && !processedIDs[id] {
+				networkOrders.Mutex.Unlock()
 				nodeLeftNetwork <- id
+				networkOrders.Mutex.Lock()
 				fmt.Println("***Missing connection to ACTIVE ORDER Reassigning order!!!***", id)
 				processedIDs[id] = true
 			} else {
@@ -34,11 +37,12 @@ func CheckMissingConnToOrders(networkOrders [config.N_FLOORS][config.N_BUTTONS]s
 			}
 		}
 	}
+	networkOrders.Mutex.Unlock()
 }
 
 func Sheriff(
 	incomingOrder chan<- Orderstatus,
-	networkOrders *[config.N_FLOORS][config.N_BUTTONS]string,
+	networkOrders *NetworkOrders,
 	nodeLeftNetwork chan string,
 	nodeOrdersUpdateChan chan bool,
 	relievedOfDuty <-chan bool,
@@ -53,7 +57,7 @@ func Sheriff(
 	go listenForWranglerConnections(incomingOrder, nodeLeftNetwork, listenWranglerEnable)
 	go SendNodeOrdersToDeputy(networkOrders, nodeOrdersUpdateChan, sendOrderToDeputyEnable)
 	time.Sleep(1 * time.Second)
-	CheckMissingConnToOrders(*networkOrders, nodeLeftNetwork)
+	CheckMissingConnToOrders(networkOrders, nodeLeftNetwork)
 
 	<-relievedOfDuty
 	fmt.Println("Relieved of duty")
@@ -120,7 +124,7 @@ func listenForWranglerConnections(
 	}
 }
 
-func SendNodeOrdersToDeputy(networkOrders *[config.N_FLOORS][config.N_BUTTONS]string, nodeOrdersUpdateChan chan bool, sendOrderToDeputyEnable <-chan bool) {
+func SendNodeOrdersToDeputy(networkOrders *NetworkOrders, nodeOrdersUpdateChan chan bool, sendOrderToDeputyEnable <-chan bool) {
 	ticker := time.NewTicker(DEPUTY_SEND_FREQ)
 	defer ticker.Stop()
 
@@ -143,14 +147,16 @@ func SendNodeOrdersToDeputy(networkOrders *[config.N_FLOORS][config.N_BUTTONS]st
 	}
 }
 
-func SendDeputyMessage(networkOrders *[config.N_FLOORS][config.N_BUTTONS]string) {
+func SendDeputyMessage(networkOrders *NetworkOrders) {
+	networkOrders.Mutex.Lock()
+	defer networkOrders.Mutex.Unlock()
 	var chosenOneID string
 	for id, conn := range WranglerConnections {
 		if chosenOneID == "" || WranglerConnections[chosenOneID] == nil {
 			chosenOneID = id
 		}
 		nodeOrdersData := NetworkOrdersData{
-			NetworkOrders: *networkOrders,
+			NetworkOrders: networkOrders.Orders,
 			TheChosenOne:  id == chosenOneID, // or false, depending on your logic
 		}
 		nodeOrdersDataJSON, err := json.Marshal(nodeOrdersData)
@@ -177,8 +183,7 @@ func SendDeputyMessage(networkOrders *[config.N_FLOORS][config.N_BUTTONS]string)
 			//DeputyDisconnectChan <- deputyConn
 		}
 		fmt.Println("Sent node orders to deputy.")
-		fmt.Println("Nodeorders:", *networkOrders)
-
+		fmt.Println("Nodeorders:", networkOrders.Orders)
 	}
 }
 
