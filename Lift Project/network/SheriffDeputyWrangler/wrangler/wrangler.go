@@ -179,7 +179,6 @@ func ReceiveMessageFromSheriff(
 					fmt.Println("Connection closed by sheriff in wrangler")
 					sheriffConn.Close()
 					sheriffDead <- lastnodeOrdersData
-					fmt.Println("we did it")
 					return
 				}
 				fmt.Println("Error reading from sheriff as wrangles\r:", err)
@@ -190,8 +189,9 @@ func ReceiveMessageFromSheriff(
 			err = json.Unmarshal([]byte(message), &msg)
 			if err != nil {
 				fmt.Println("Error parsing message:", err)
-				time.Sleep(1 * time.Second)
-				continue
+				sheriffConn.Close()
+				sheriffDead <- lastnodeOrdersData
+				return
 			}
 
 			switch msg.Type {

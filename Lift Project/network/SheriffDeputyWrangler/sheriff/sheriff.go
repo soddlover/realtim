@@ -3,6 +3,7 @@ package sheriff
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"mymodule/config"
 	"mymodule/network/peers"
@@ -85,6 +86,9 @@ func listenForWranglerConnections(
 		for {
 			conn, err := ln.Accept()
 			if err != nil {
+				if errors.Is(err, net.ErrClosed) {
+					return // if the listener is closed, return from the goroutine
+				}
 				fmt.Println("Error accepting connection:", err)
 				continue
 			}
