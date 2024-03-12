@@ -222,9 +222,6 @@ func checkSync(systemState map[string]Elev, networkOrders *[config.N_FLOORS][con
 							orderAssigned <- Order{Floor: floor, Button: elevio.ButtonType(button)}
 							fmt.Println("WARNING - Order not in sync with system state, reassigning order TO MYSELF KJØH")
 						}
-
-						//send order to sheriff
-
 					}
 				}
 			}
