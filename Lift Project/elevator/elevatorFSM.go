@@ -33,7 +33,7 @@ func RunElev(
 			Obstr: false,
 		}
 	}
-
+	elevatorStateBackup <- elevator
 	doorTimer := time.NewTimer(config.DOOR_OPEN_TIME)
 	doorTimer.Stop()
 	motorErrorTimer := time.NewTimer(config.MOTOR_ERROR_TIME)
