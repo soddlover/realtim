@@ -47,8 +47,6 @@ func NetworkFSM(
 		systemState,
 	)
 
-	networkOrders := &NetworkOrders{}
-
 	sheriffDead := make(chan NetworkOrdersData)
 	relievedOfDuty := make(chan bool)
 	remainingOrders := make(chan [config.N_FLOORS][config.N_BUTTONS]string)
@@ -109,21 +107,21 @@ func NetworkFSM(
 					networkOrders.Mutex.Lock()
 					networkOrders.Orders = networkOrderData.NetworkOrders
 					networkOrders.Mutex.Unlock()
-                    InitSherrif(
-					incommingOrder,
-					requestSystemState,
-					systemState,
-					networkOrders,
-					relievedOfDuty,
-					remainingOrders,
-					orderAssigned)
-            		currentDuty = dt_sherriff
-                else {
+					InitSherrif(
+						incommingOrder,
+						requestSystemState,
+						systemState,
+						networkOrders,
+						relievedOfDuty,
+						remainingOrders,
+						orderAssigned)
+					currentDuty = dt_sherriff
+				} else {
 					fmt.Println("I am not the chosen one, I am a Deputy")
 					currentDuty = dt_initial
 				}
-                    
-            else {
+
+			} else {
 				currentDuty = dt_initial
 			}
 			//listen for incoming orders
@@ -167,7 +165,6 @@ func CloseTCPConns(lostConns <-chan string, sheriffID <-chan string) {
 		case id := <-sheriffID:
 			lastSheriffID = id
 		}
-		delete(systemState, id)
 	}
 }
 
