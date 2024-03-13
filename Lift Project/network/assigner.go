@@ -13,14 +13,17 @@ import (
 func redistributor(
 	nodeLeftNetwork <-chan string,
 	incomingOrder chan<- Orderstatus,
-	systemState map[string]Elev,
+	requestSystemState chan<- bool,
+	systemState <-chan map[string]Elev,
 	networkOrders *NetworkOrders) {
 	for {
 		select {
 		case peerID := <-nodeLeftNetwork:
 			networkOrders.Mutex.Lock()
-			delete(systemState, peerID)
-			fmt.Printf("world.Map: %v\n", systemState)
+			//delete(systemState, peerID)
+			requestSystemState <- true
+			localSystemState := <-systemState
+			fmt.Printf("world.Map: %v\n", localSystemState)
 			fmt.Println("Node left network, redistributing orders")
 			fmt.Println("NetworkOrders: ", networkOrders.Orders)
 			//check for orders owned by the leaving node
@@ -44,7 +47,8 @@ func redistributor(
 func Assigner(
 	networkUpdate chan<- bool,
 	orderAssigned chan<- Order,
-	systemState map[string]Elev,
+	requestSystemState chan<- bool,
+	systemState <-chan map[string]Elev,
 	networkOrders *NetworkOrders,
 	nodeLeftNetwork <-chan string,
 	incomingOrder chan Orderstatus,
@@ -65,7 +69,9 @@ func Assigner(
 				continue
 			}
 			networkOrders.Mutex.Lock()
-			best_id := calculateFastestID(systemState, networkOrders, Order{Floor: order.Floor, Button: order.Button})
+			requestSystemState <- true
+			localSystemState := <-systemState
+			best_id := calculateFastestID(localSystemState, networkOrders, Order{Floor: order.Floor, Button: order.Button})
 			order.Owner = best_id
 			networkOrders.Orders[order.Floor][order.Button] = best_id
 			UpdateLightsFromNetworkOrders(networkOrders.Orders)

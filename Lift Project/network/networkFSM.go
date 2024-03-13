@@ -6,6 +6,7 @@ import (
 	"mymodule/elevator/elevio"
 	"mymodule/network/SheriffDeputyWrangler/sheriff"
 	"mymodule/network/SheriffDeputyWrangler/wrangler"
+	"mymodule/systemStateSynchronizer"
 	. "mymodule/types"
 	"os"
 	"time"
@@ -24,21 +25,35 @@ const (
 var currentDuty duty
 
 func NetworkFSM(
+	elevatorState <-chan Elev,
 	orderRequest chan Order,
 	orderAssigned chan Order,
 	orderDelete chan Orderstatus,
-	systemState map[string]Elev,
 	incommingOrder chan Orderstatus,
+
 ) {
+
+	requestSystemState := make(chan bool, 10)
+	systemState := make(chan map[string]Elev, 10)
+	nodeLeftNetwork := make(chan string, 10)
+
+	go systemStateSynchronizer.SystemStateSynchronizer(
+		requestSystemState,
+		nodeLeftNetwork,
+		elevatorState,
+		systemState,
+	)
+
 	networkOrders := &NetworkOrders{}
 
 	sheriffDead := make(chan NetworkOrdersData)
 	relievedOfDuty := make(chan bool)
 	remainingOrders := make(chan [config.N_FLOORS][config.N_BUTTONS]string)
-	lostConns := make(chan string)
-	go CheckHeartbeats(lostConns)
-	go Heartbeats(lostConns, systemState)
-	go checkSync(systemState, networkOrders, orderAssigned)
+
+	//lostConns := make(chan string)
+	go CloseTCPConns(nodeLeftNetwork)
+	//go Heartbeats(lostConns, systemState)
+	go checkSync(requestSystemState, systemState, networkOrders, orderAssigned)
 
 	currentDuty = dt_initial
 	for {
@@ -47,7 +62,14 @@ func NetworkFSM(
 			sIP := wrangler.GetSheriffIP()
 			if sIP == "" {
 
-				InitSherrif(incommingOrder, systemState, networkOrders, relievedOfDuty, remainingOrders, orderAssigned)
+				InitSherrif(
+					incommingOrder,
+					requestSystemState,
+					systemState,
+					networkOrders,
+					relievedOfDuty,
+					remainingOrders,
+					orderAssigned)
 				currentDuty = dt_sherriff
 			} else {
 				fmt.Println("I am not the only Wrangler in town, connecting to Sheriff:")
@@ -78,7 +100,14 @@ func NetworkFSM(
 				networkOrders.Mutex.Lock()
 				networkOrders.Orders = networkOrderData.NetworkOrders
 				networkOrders.Mutex.Unlock()
-				InitSherrif(incommingOrder, systemState, networkOrders, relievedOfDuty, remainingOrders, orderAssigned)
+				InitSherrif(
+					incommingOrder,
+					requestSystemState,
+					systemState,
+					networkOrders,
+					relievedOfDuty,
+					remainingOrders,
+					orderAssigned)
 				currentDuty = dt_sherriff
 
 			} else {
@@ -107,21 +136,25 @@ func NetworkFSM(
 	}
 }
 
-func Heartbeats(lostConns <-chan string, systemState map[string]Elev) {
+func CloseTCPConns(lostConns <-chan string) {
 	for {
 		id := <-lostConns
+		if id == config.Self_id {
+			fmt.Println("I am the lost connection")
+			continue
+		}
 		if currentDuty == dt_sherriff {
 			sheriff.CloseConns(id)
 		} else {
 			wrangler.CloseSheriffConn()
 		}
-		delete(systemState, id)
 	}
 }
 
 func InitSherrif(
 	incomingOrder chan Orderstatus,
-	systemState map[string]Elev,
+	requestSystemState chan<- bool,
+	systemState <-chan map[string]Elev,
 	networkorders *NetworkOrders,
 	relievedOfDuty <-chan bool,
 	remainingOrders chan<- [config.N_FLOORS][config.N_BUTTONS]string,
@@ -132,8 +165,22 @@ func InitSherrif(
 	fmt.Println("I am the only Wrangler in town, I am the Sheriff!")
 	networkUpdate := make(chan bool)
 	go sheriff.Sheriff(incomingOrder, networkorders, nodeLeftNetwork, networkUpdate, relievedOfDuty, quitAssigner)
-	go Assigner(networkUpdate, orderAssigned, systemState, networkorders, nodeLeftNetwork, incomingOrder, quitAssigner, remainingOrders)
-	go redistributor(nodeLeftNetwork, incomingOrder, systemState, networkorders)
+	go Assigner(
+		networkUpdate,
+		orderAssigned,
+		requestSystemState,
+		systemState,
+		networkorders,
+		nodeLeftNetwork,
+		incomingOrder,
+		quitAssigner,
+		remainingOrders)
+	go redistributor(
+		nodeLeftNetwork,
+		incomingOrder,
+		requestSystemState,
+		systemState,
+		networkorders)
 }
 
 func orderForwarder(
@@ -169,13 +216,15 @@ func orderForwarder(
 	}
 }
 
-func checkSync(systemState map[string]Elev, networkOrders *NetworkOrders, orderAssigned chan<- Order) {
+func checkSync(requestSystemState chan<- bool, systemState <-chan map[string]Elev, networkOrders *NetworkOrders, orderAssigned chan<- Order) {
 	for {
 		networkOrders.Mutex.Lock()
 		for floor := 0; floor < config.N_FLOORS; floor++ {
 			for button := 0; button < config.N_BUTTONS; button++ {
 				if networkOrders.Orders[floor][button] != "" {
-					assignedElev, existsInSystemState := systemState[networkOrders.Orders[floor][button]]
+					requestSystemState <- true
+					localSystemState := <-systemState
+					assignedElev, existsInSystemState := localSystemState[networkOrders.Orders[floor][button]]
 					if !existsInSystemState || !assignedElev.Queue[floor][button] {
 						if networkOrders.Orders[floor][button] == config.Self_id {
 							//delete(systemState, networkOrders[floor][button])
