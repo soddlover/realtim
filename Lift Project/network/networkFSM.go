@@ -8,6 +8,7 @@ import (
 	"mymodule/network/SheriffDeputyWrangler/wrangler"
 	. "mymodule/types"
 	"os"
+	"sync"
 	"time"
 )
 
@@ -31,6 +32,7 @@ func NetworkFSM(
 	incommingOrder chan Orderstatus,
 ) {
 	networkOrders := &NetworkOrders{}
+	var startOrderForwarderOnce sync.Once
 
 	sheriffDead := make(chan NetworkOrdersData)
 	relievedOfDuty := make(chan bool)
@@ -57,7 +59,9 @@ func NetworkFSM(
 					currentDuty = dt_wrangler
 				}
 			}
-			go orderForwarder(incommingOrder, orderAssigned, orderRequest, orderDelete)
+			startOrderForwarderOnce.Do(func() {
+				go orderForwarder(incommingOrder, orderAssigned, orderRequest, orderDelete)
+			})
 		case dt_sherriff:
 
 			sIP := wrangler.GetSheriffIP()
@@ -72,20 +76,24 @@ func NetworkFSM(
 
 		case dt_wrangler:
 			networkOrderData := <-sheriffDead
+			fmt.Println("Lets double check if sherriff actually is dead")
+			sIP := wrangler.GetSheriffIP()
+			if sIP == "" {
+				if networkOrderData.TheChosenOne {
+					fmt.Println("I am the chosen one, I am the Sheriff!")
+					networkOrders.Mutex.Lock()
+					networkOrders.Orders = networkOrderData.NetworkOrders
+					networkOrders.Mutex.Unlock()
+					InitSherrif(incommingOrder, systemState, networkOrders, relievedOfDuty, remainingOrders, orderAssigned)
+					currentDuty = dt_sherriff
 
-			if networkOrderData.TheChosenOne {
-				fmt.Println("I am the chosen one, I am the Sheriff!")
-				networkOrders.Mutex.Lock()
-				networkOrders.Orders = networkOrderData.NetworkOrders
-				networkOrders.Mutex.Unlock()
-				InitSherrif(incommingOrder, systemState, networkOrders, relievedOfDuty, remainingOrders, orderAssigned)
-				currentDuty = dt_sherriff
-
+				} else {
+					fmt.Println("I am not the chosen one, I am a Deputy")
+					currentDuty = dt_initial
+				}
 			} else {
-				fmt.Println("I am not the chosen one, I am a Deputy")
 				currentDuty = dt_initial
 			}
-
 			//listen for incoming orders
 			//listen for new peers
 			//listen for lost peers
