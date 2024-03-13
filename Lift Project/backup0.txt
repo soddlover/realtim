@@ -1,1 +1,0 @@
-{"State":2,"Dir":0,"Floor":3,"Queue":[[true,false,false],[true,true,false],[true,true,false],[false,false,false]],"Obstr":true}
