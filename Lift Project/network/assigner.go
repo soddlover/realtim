@@ -7,8 +7,14 @@ import (
 	"mymodule/elevator/elevio"
 	"mymodule/network/SheriffDeputyWrangler/sheriff"
 	. "mymodule/types"
+	"sort"
 	"time"
 )
+
+type IDAndDuration struct {
+	ID       string
+	Duration time.Duration
+}
 
 func redistributor(
 	nodeLeftNetwork <-chan string,
@@ -65,19 +71,34 @@ func Assigner(
 				continue
 			}
 			networkOrders.Mutex.Lock()
-			best_id := calculateFastestID(systemState, networkOrders, Order{Floor: order.Floor, Button: order.Button})
-			order.Owner = best_id
-			networkOrders.Orders[order.Floor][order.Button] = best_id
-			UpdateLightsFromNetworkOrders(networkOrders.Orders)
+			sortedIDs := calculateSortedIDs(systemState, networkOrders, Order{Floor: order.Floor, Button: order.Button})
 			networkOrders.Mutex.Unlock()
-			networkUpdate <- true
-			fmt.Println("Added to NetworkOrders maps")
-			if best_id == config.Self_id {
-				orderAssigned <- Order{Floor: order.Floor, Button: order.Button}
-			} else {
-				go sheriff.SendOrderMessage(best_id, order)
-				fmt.Println("SystemState: ")
-				fmt.Println(systemState)
+
+			for _, id := range sortedIDs {
+				if id == config.Self_id {
+					orderAssigned <- Order{Floor: order.Floor, Button: order.Button}
+					order.Owner = id
+					networkOrders.Mutex.Lock()
+					networkOrders.Orders[order.Floor][order.Button] = id
+					UpdateLightsFromNetworkOrders(networkOrders.Orders)
+					networkOrders.Mutex.Unlock()
+
+					networkUpdate <- true
+					break
+				} else {
+					success, _ := sheriff.SendOrderMessage(id, order)
+					if success {
+						order.Owner = id
+						networkOrders.Mutex.Lock()
+						networkOrders.Orders[order.Floor][order.Button] = id
+						UpdateLightsFromNetworkOrders(networkOrders.Orders)
+						networkOrders.Mutex.Unlock()
+						networkUpdate <- true
+						fmt.Println("SystemState: ")
+						fmt.Println(systemState)
+						break
+					}
+				}
 			}
 		}
 	}
@@ -149,10 +170,9 @@ func requestsClearAtCurrentFloor(e_old Elev, f func(elevio.ButtonType, int)) Ele
 	return e
 }
 
-func calculateFastestID(systemState map[string]Elev, networkOrders *NetworkOrders, order Order) string {
+func calculateSortedIDs(systemState map[string]Elev, networkOrders *NetworkOrders, order Order) []string {
+	var durations []IDAndDuration
 
-	best_id := config.Self_id
-	best_duration := 1000000 * time.Second
 	for id, elevator := range systemState {
 		if elevator.Obstr {
 			fmt.Println("Elevator with id: ", id, " is obstructed")
@@ -162,21 +182,27 @@ func calculateFastestID(systemState map[string]Elev, networkOrders *NetworkOrder
 		}
 
 		duration := timeToServeRequest(elevator, order.Button, order.Floor)
-		if duration < best_duration {
-			best_duration = duration
-			best_id = id
-		}
+		durations = append(durations, IDAndDuration{ID: id, Duration: duration})
 	}
+
+	sort.Slice(durations, func(i, j int) bool {
+		return durations[i].Duration < durations[j].Duration
+	})
+
 	assigned := networkOrders.Orders[order.Floor][order.Button]
 	if assigned != "" {
 		if elev, ok := systemState[assigned]; ok {
 			if !elev.Obstr && !(elev.State == Undefined) {
-				//do nothing as its already assigned to a working elevator, could send an additional message to it incase?
-				// fmt.Println("Order already assigned to a working elevator")
-				// fmt.Println("SOOME PROBLEMS OCCUR HERE MAYBE???")
-				best_id = assigned
+				// If the order is already assigned to a working elevator, move it to the front of the list
+				durations = append([]IDAndDuration{{ID: assigned, Duration: 0}}, durations...)
 			}
 		}
 	}
-	return best_id
+
+	var sortedIDs []string
+	for _, idAndDuration := range durations {
+		sortedIDs = append(sortedIDs, idAndDuration.ID)
+	}
+
+	return sortedIDs
 }
