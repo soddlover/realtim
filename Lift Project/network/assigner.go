@@ -15,18 +15,20 @@ type IDAndDuration struct {
 	ID       string
 	Duration time.Duration
 }
-
 func redistributor(
 	nodeLeftNetwork <-chan string,
 	incomingOrder chan<- Orderstatus,
-	systemState map[string]Elev,
+	requestSystemState chan<- bool,
+	systemState <-chan map[string]Elev,
 	networkOrders *NetworkOrders) {
 	for {
 		select {
 		case peerID := <-nodeLeftNetwork:
 			networkOrders.Mutex.Lock()
-			delete(systemState, peerID)
-			fmt.Printf("world.Map: %v\n", systemState)
+			//delete(systemState, peerID)
+			requestSystemState <- true
+			localSystemState := <-systemState
+			fmt.Printf("world.Map: %v\n", localSystemState)
 			fmt.Println("Node left network, redistributing orders")
 			fmt.Println("NetworkOrders: ", networkOrders.Orders)
 			//check for orders owned by the leaving node
@@ -50,7 +52,8 @@ func redistributor(
 func Assigner(
 	networkUpdate chan<- bool,
 	orderAssigned chan<- Order,
-	systemState map[string]Elev,
+	requestSystemState chan<- bool,
+	systemState <-chan map[string]Elev,
 	networkOrders *NetworkOrders,
 	nodeLeftNetwork <-chan string,
 	incomingOrder chan Orderstatus,
@@ -70,8 +73,10 @@ func Assigner(
 				networkUpdate <- true
 				continue
 			}
-			networkOrders.Mutex.Lock()
-			sortedIDs := calculateSortedIDs(systemState, networkOrders, Order{Floor: order.Floor, Button: order.Button})
+			requestSystemState <- true
+			localSystemState := <-systemState
+            networkOrders.Mutex.Lock()
+			sortedIDs := calculateSortedIDs(localSystemState, networkOrders, Order{Floor: order.Floor, Button: order.Button})
 			networkOrders.Mutex.Unlock()
 
 			for _, id := range sortedIDs {
