@@ -19,7 +19,6 @@ type duty int
 const (
 	dt_initial duty = iota
 	dt_sherriff
-	dt_deputy
 	dt_wrangler
 	dt_offline
 )
