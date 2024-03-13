@@ -52,7 +52,9 @@ func RunElev(
 	elevator.State = EB_Idle
 	elevator.Floor = elevio.GetFloor()
 	elevio.SetMotorDirection(elevio.MotorDirection(ChooseDirection(elevator)))
-	motorErrorTimer.Reset(config.MOTOR_ERROR_TIME)
+	if elevator.Dir != DirStop {
+		motorErrorTimer.Reset(config.MOTOR_ERROR_TIME)
+	}
 	elevatorStateBackup <- elevator
 	elevatorStateBroadcast <- elevator
 
