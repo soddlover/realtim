@@ -49,8 +49,10 @@ func RunElev(
 	go elevio.PollStopButton(drv_stop)
 	go updateLights(&elevator)
 	elevStart(drv_floors)
+	elevator.State = EB_Idle
 	elevator.Floor = elevio.GetFloor()
 	elevio.SetMotorDirection(elevio.MotorDirection(ChooseDirection(elevator)))
+	motorErrorTimer.Reset(config.MOTOR_ERROR_TIME)
 	elevatorStateBackup <- elevator
 	elevatorStateBroadcast <- elevator
 
