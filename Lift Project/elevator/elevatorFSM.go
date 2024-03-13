@@ -5,6 +5,7 @@ import (
 	"mymodule/config"
 	"mymodule/elevator/elevio"
 	. "mymodule/types"
+	"os"
 	"strconv"
 	"time"
 )
@@ -137,17 +138,12 @@ func RunElev(
 		case <-motorErrorTimer.C:
 			elevio.SetMotorDirection(elevio.MD_Stop)
 			elevator.State = Undefined
-			fmt.Println("Motor error")
-			for i := 0; i < 10; i++ {
-				elevio.SetStopLamp(true)
-				time.Sleep(500 * time.Millisecond)
-				elevio.SetStopLamp(false)
-				time.Sleep(500 * time.Millisecond)
-			}
-			elevStart(drv_floors)
-			elevator.State = EB_Idle
 			elevatorStateBackup <- elevator
 			elevatorStateBroadcast <- elevator
+			fmt.Println("Motor error, killing myself")
+			time.Sleep(1000 * time.Millisecond)
+			os.Exit(1)
+
 		case obstruction := <-drv_obstr:
 			if !obstruction && elevator.Obstr {
 				doorTimer.Reset(config.DOOR_OPEN_TIME)

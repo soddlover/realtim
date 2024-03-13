@@ -3,7 +3,7 @@ package config
 import "time"
 
 const (
-	N_FLOORS             = 9
+	N_FLOORS             = 4
 	N_ELEVATORS          = 1
 	N_BUTTONS            = 3
 	TRAVEL_TIME          = 2
@@ -16,6 +16,8 @@ const (
 	SimulatorPort        = 15657
 	HEARTBEAT            = 20 * time.Millisecond
 	HEARTBEAT_DEADLINE   = 1000 * time.Millisecond
+	BACKUP_INTERVAL      = 1 * time.Second
+	BACKUP_DEADLINE      = 2 * time.Second
 )
 
 var Self_id string = ""
