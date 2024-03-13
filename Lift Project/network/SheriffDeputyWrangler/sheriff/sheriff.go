@@ -234,33 +234,13 @@ func ReceiveMessage(
 	incomingOrder chan<- Orderstatus,
 	peerID string,
 	nodeLeftNetwork chan<- string) (Orderstatus, error) {
-	for {
-		reader := bufio.NewReader(conn)
-		message, err := reader.ReadString('\n')
-		if err != nil {
-
-			if err.Error() == "EOF" {
-				fmt.Println("Connection closed by", peerID)
-
-				conn.Close()
-				nodeLeftNetwork <- peerID
-				delete(WranglerConnections, peerID)
-				return Orderstatus{}, nil
-
-			} else {
-				fmt.Println("Error reading from connection:", err)
-				fmt.Println("closing connection to", peerID)
-				conn.Close()
-				nodeLeftNetwork <- peerID
-				delete(WranglerConnections, peerID)
-				return Orderstatus{}, nil
-			}
-
-		}
+	scanner := bufio.NewScanner(conn)
+	for scanner.Scan() {
+		message := scanner.Text()
 
 		// Convert the message from JSON to Orderstatus
 		var order Orderstatus
-		err = json.Unmarshal([]byte(message), &order)
+		err := json.Unmarshal([]byte(message), &order)
 		if err != nil {
 			fmt.Println("Error unmarshalling order:", err)
 			continue
@@ -271,8 +251,15 @@ func ReceiveMessage(
 		//DeputyUpdateChan <- true
 
 		incomingOrder <- order
-
 	}
+
+	fmt.Println("Error reading from connection:")
+	fmt.Println("closing connection to", peerID)
+	conn.Close()
+	nodeLeftNetwork <- peerID
+	delete(WranglerConnections, peerID)
+	return Orderstatus{}, nil
+
 }
 
 func CloseConns(id string) {

@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"io"
 	"mymodule/config"
 	elevatorFSM "mymodule/elevator"
 	"mymodule/network/conn"
@@ -167,72 +166,63 @@ func ReceiveMessageFromSheriff(
 	var lastnodeOrdersData NetworkOrdersData
 
 	go acknowledger(orderSent, NodeOrdersReceived)
-	for {
-		select {
 
-		default:
-			reader := bufio.NewReader(sheriffConn)
-			message, err := reader.ReadString('\n')
-			fmt.Println("Received something")
-			//fmt.Println("Received message from sheriff:", message)
-			if err != nil {
-				if err == io.EOF {
-					fmt.Println("Connection closed by sheriff in wrangler")
-					sheriffConn.Close()
-					sheriffDead <- lastnodeOrdersData
-					return
-				}
-				fmt.Println("Error reading from sheriff as wrangles\r:", err)
+	scanner := bufio.NewScanner(sheriffConn)
+	for scanner.Scan() {
+		message := scanner.Text()
+		fmt.Println("Received something")
+		//fmt.Println("Received message from sheriff:", message)
 
-			}
-
-			var msg types.Message
-			err = json.Unmarshal([]byte(message), &msg)
-			if err != nil {
-				fmt.Println("Error parsing message:", err)
-				sheriffConn.Close()
-				sheriffDead <- lastnodeOrdersData
-				return
-			}
-
-			switch msg.Type {
-			case "order":
-				var order Orderstatus
-				err = json.Unmarshal(msg.Data, &order)
-				if err != nil {
-					fmt.Println("Error parsing order:", err)
-					continue
-				}
-
-				fmt.Println("Order received from sheriff:", order)
-				orderAssigned <- Order{Floor: order.Floor, Button: order.Button}
-				// Send the order to the elevator
-
-			case "NodeOrders":
-				var nodeOrdersData NetworkOrdersData
-
-				//initDeputy() //not sure if it should be go'ed or not
-				err = json.Unmarshal(msg.Data, &nodeOrdersData)
-				if err != nil {
-					fmt.Println("Error parsing order:", err)
-					continue
-				}
-
-				fmt.Println("Received nodeOrdersData from sheriff:")
-				NodeOrdersReceived <- nodeOrdersData
-				elevatorFSM.UpdateLightsFromNetworkOrders(nodeOrdersData.NetworkOrders)
-				lastnodeOrdersData = nodeOrdersData
-				networkorders.Mutex.Lock()
-				networkorders.Orders = nodeOrdersData.NetworkOrders
-				networkorders.Mutex.Unlock()
-
-			default:
-				fmt.Println("Unknown message type:", msg.Type)
-			}
+		var msg types.Message
+		err := json.Unmarshal([]byte(message), &msg)
+		if err != nil {
+			fmt.Println("Error parsing message:", err)
+			sheriffConn.Close()
+			sheriffDead <- lastnodeOrdersData
+			continue
 		}
 
+		switch msg.Type {
+		case "order":
+			var order Orderstatus
+			err = json.Unmarshal(msg.Data, &order)
+			if err != nil {
+				fmt.Println("Error parsing order:", err)
+				continue
+			}
+
+			fmt.Println("Order received from sheriff:", order)
+			orderAssigned <- Order{Floor: order.Floor, Button: order.Button}
+			// Send the order to the elevator
+
+		case "NodeOrders":
+			var nodeOrdersData NetworkOrdersData
+
+			//initDeputy() //not sure if it should be go'ed or not
+			err = json.Unmarshal(msg.Data, &nodeOrdersData)
+			if err != nil {
+				fmt.Println("Error parsing order:", err)
+				continue
+			}
+
+			fmt.Println("Received nodeOrdersData from sheriff:")
+			NodeOrdersReceived <- nodeOrdersData
+			elevatorFSM.UpdateLightsFromNetworkOrders(nodeOrdersData.NetworkOrders)
+			lastnodeOrdersData = nodeOrdersData
+			networkorders.Mutex.Lock()
+			networkorders.Orders = nodeOrdersData.NetworkOrders
+			networkorders.Mutex.Unlock()
+
+		default:
+			fmt.Println("Unknown message type:", msg.Type)
+		}
 	}
-	//over 3 readerrors
+	err := scanner.Err()
+	fmt.Println("Error reading from sheriff as wrangler:", err)
+	sheriffConn.Close()
+	sheriffDead <- lastnodeOrdersData
+	return
+
 }
 func CloseSheriffConn() {
 	err := sheriffConn.Close()
