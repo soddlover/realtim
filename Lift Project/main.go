@@ -49,8 +49,6 @@ func main() {
 		fmt.Println("Starting with fresh elevator")
 	}
 
-	systemState := make(map[string]Elev)
-
 	elevatorStateBackup := make(chan Elev, 10)
 	elevatorStateBroadcast := make(chan Elev, 10)
 	orderRequest := make(chan Order, 10)
@@ -58,8 +56,9 @@ func main() {
 	orderDelete := make(chan Orderstatus, 10)
 	incomingOrder := make(chan Orderstatus, 10)
 
-	go network.StateBroadcaster(elevatorStateBroadcast, systemState, id)
+	// go network.StateBroadcaster(elevatorStateBroadcast, systemState, id)
 	go backup.WriteBackup(elevatorStateBackup)
+
 	go elev.RunElev(
 		elevatorStateBackup,
 		elevatorStateBroadcast,
@@ -67,11 +66,12 @@ func main() {
 		orderAssigned,
 		orderDelete,
 		initElev)
+
 	go network.NetworkFSM(
+		elevatorStateBroadcast,
 		orderRequest,
 		orderAssigned,
 		orderDelete,
-		systemState,
 		incomingOrder)
 
 	select {}
