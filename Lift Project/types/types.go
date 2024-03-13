@@ -5,6 +5,7 @@ import (
 	. "mymodule/config"
 	"mymodule/elevator/elevio"
 	"sync"
+	"time"
 )
 
 // this is where all universally used types are definedtype ElevatorState ints
@@ -66,4 +67,9 @@ type NetworkOrders struct {
 type NetworkOrdersData struct {
 	NetworkOrders [N_FLOORS][N_BUTTONS]string
 	TheChosenOne  bool
+}
+
+type HeartBeat struct {
+	ID   string
+	Time time.Time
 }
