@@ -2,35 +2,10 @@ package elevatorFSM
 
 import (
 	"fmt"
-	"mymodule/config"
 	. "mymodule/config"
-	"mymodule/elevator/elevio"
 	. "mymodule/elevator/elevio"
 	. "mymodule/types"
-	"os"
-	"time"
 )
-
-func elevStart(drv_floors <-chan int) {
-	for floor := 0; floor < N_FLOORS; floor++ {
-		elevio.SetButtonLamp(BT_HallUp, floor, false)
-		elevio.SetButtonLamp(BT_HallDown, floor, false)
-	}
-	if GetFloor() == -1 {
-		SetMotorDirection(MD_Down)
-		ticker := time.NewTicker(config.MOTOR_ERROR_TIME)
-		defer ticker.Stop()
-		select {
-		case <-drv_floors:
-			SetMotorDirection(MD_Stop)
-		case <-ticker.C:
-			fmt.Println("Failed to arrive at floor within time limit, killing myself")
-			os.Exit(1)
-		}
-	}
-	SetFloorIndicator(GetFloor())
-	fmt.Println("Arrived at floor: ", GetFloor())
-}
 
 func ShouldStop(elevator Elev) bool {
 	switch elevator.Dir {

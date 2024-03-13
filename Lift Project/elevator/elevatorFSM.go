@@ -23,34 +23,26 @@ func RunElev(
 	elevio.Init(addr, config.N_FLOORS)
 
 	elevator := initElev
-	if (elevator == Elev{}) {
-		elevator = Elev{
-			State: EB_Idle,
-			Dir:   DirStop,
-			Floor: elevio.GetFloor(),
-			Queue: [config.N_FLOORS][config.N_BUTTONS]bool{},
-			Obstr: false,
-		}
-	}
-	elevatorStateBackup <- elevator
+
 	doorTimer := time.NewTimer(config.DOOR_OPEN_TIME)
-	doorTimer.Stop()
 	motorErrorTimer := time.NewTimer(config.MOTOR_ERROR_TIME)
+	doorTimer.Stop()
 	motorErrorTimer.Stop()
 
 	drv_buttons := make(chan elevio.ButtonEvent, 10)
 	drv_floors := make(chan int, 10)
 	drv_obstr := make(chan bool, 10)
 	drv_stop := make(chan bool, 10)
+
 	go elevio.PollButtons(drv_buttons)
 	go elevio.PollFloorSensor(drv_floors)
 	go elevio.PollObstructionSwitch(drv_obstr)
 	go elevio.PollStopButton(drv_stop)
 	go updateLights(&elevator)
-	elevStart(drv_floors)
-	elevator.State = EB_Idle
-	elevator.Floor = elevio.GetFloor()
-	elevio.SetMotorDirection(elevio.MotorDirection(ChooseDirection(elevator)))
+
+	elevatorStateBackup <- elevator
+
+	elevator = elevatorInit(elevator, drv_floors)
 	if elevator.Dir != DirStop {
 		motorErrorTimer.Reset(config.MOTOR_ERROR_TIME)
 	}
@@ -147,13 +139,16 @@ func RunElev(
 			elevatorStateBackup <- elevator
 			elevatorStateBroadcast <- elevator
 		case <-motorErrorTimer.C:
-			elevio.SetMotorDirection(elevio.MD_Stop)
 			elevator.State = EB_UNAVAILABLE
 			elevatorStateBackup <- elevator
 			elevatorStateBroadcast <- elevator
 			fmt.Println("Motor error, killing myself")
 			elevio.SetStopLamp(true)
-			time.Sleep(1000 * time.Millisecond)
+			for floor := 0; floor < config.N_FLOORS; floor++ {
+				elevator.Queue[floor][elevio.BT_HallUp] = false
+				elevator.Queue[floor][elevio.BT_HallDown] = false
+			}
+
 			//os.Exit(1)
 
 		case obstruction := <-drv_obstr:
@@ -195,4 +190,41 @@ func UpdateLightsFromNetworkOrders(networkorders [config.N_FLOORS][config.N_BUTT
 			}
 		}
 	}
+}
+
+func elevatorInit(elevator Elev, drv_floors <-chan int) Elev {
+	if (elevator == Elev{}) {
+		elevator = Elev{
+			State: EB_Idle,
+			Dir:   DirStop,
+			Floor: elevio.GetFloor(),
+			Queue: [config.N_FLOORS][config.N_BUTTONS]bool{},
+			Obstr: false,
+		}
+	}
+	for floor := 0; floor < config.N_FLOORS; floor++ {
+		elevio.SetButtonLamp(elevio.BT_HallUp, floor, false)
+		elevio.SetButtonLamp(elevio.BT_HallDown, floor, false)
+	}
+	if elevio.GetFloor() == -1 {
+		elevio.SetMotorDirection(elevio.MD_Down)
+		ticker := time.NewTicker(config.MOTOR_ERROR_TIME)
+		defer ticker.Stop()
+		select {
+		case <-drv_floors:
+			elevio.SetMotorDirection(elevio.MD_Stop)
+			ticker.Stop()
+			elevio.SetFloorIndicator(elevio.GetFloor())
+			fmt.Println("Arrived at floor: ", elevio.GetFloor())
+			elevator.State = EB_Idle
+			elevator.Floor = elevio.GetFloor()
+			elevio.SetMotorDirection(elevio.MotorDirection(ChooseDirection(elevator)))
+
+		case <-ticker.C:
+			fmt.Println("Failed to arrive at floor within time limit, killing myself")
+			elevator.State = EB_UNAVAILABLE
+			ticker.Stop()
+		}
+	}
+	return elevator
 }
