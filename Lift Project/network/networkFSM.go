@@ -9,6 +9,7 @@ import (
 	"mymodule/systemStateSynchronizer"
 	. "mymodule/types"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -151,7 +152,7 @@ func CloseTCPConns(lostConns <-chan string, sheriffID <-chan string) {
 		select {
 		case id := <-lostConns:
 			fmt.Println("Lost connection to:", id)
-			fmt.Println("current state is:", currentDuty, "last sheriff", sheriffID)
+			fmt.Println("current state is:", currentDuty, "last sheriff", lastSheriffID)
 			if id == config.Self_id {
 				fmt.Println("I am the lost connection, I dont have a TCP connection to my self to close")
 				continue
@@ -160,7 +161,7 @@ func CloseTCPConns(lostConns <-chan string, sheriffID <-chan string) {
 				fmt.Println("I am the Sheriff, I am closing the connection to:", id)
 				sheriff.CloseConns(id)
 			}
-
+			id = strings.Split(id, ":")[0]
 			if currentDuty == dt_wrangler && lastSheriffID == id {
 				fmt.Println("I am the Wrangler, I am closing the connection to:", id)
 				wrangler.CloseSheriffConn()
