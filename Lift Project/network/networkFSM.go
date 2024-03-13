@@ -33,9 +33,9 @@ func NetworkFSM(
 
 ) {
 
-	requestSystemState := make(chan bool, 10)
-	systemState := make(chan map[string]Elev, 10)
-	nodeLeftNetwork := make(chan string, 10)
+	requestSystemState := make(chan bool, 40)
+	systemState := make(chan map[string]Elev, 40)
+	nodeLeftNetwork := make(chan string, 40)
 
 	go systemStateSynchronizer.SystemStateSynchronizer(
 		requestSystemState,
@@ -49,9 +49,10 @@ func NetworkFSM(
 	sheriffDead := make(chan NetworkOrdersData)
 	relievedOfDuty := make(chan bool)
 	remainingOrders := make(chan [config.N_FLOORS][config.N_BUTTONS]string)
+	sheriffIP := make(chan string)
 
 	//lostConns := make(chan string)
-	go CloseTCPConns(nodeLeftNetwork)
+	go CloseTCPConns(nodeLeftNetwork, sheriffIP)
 	//go Heartbeats(lostConns, systemState)
 	go checkSync(requestSystemState, systemState, networkOrders, orderAssigned)
 
@@ -75,6 +76,7 @@ func NetworkFSM(
 				fmt.Println("I am not the only Wrangler in town, connecting to Sheriff:")
 				if wrangler.ConnectWranglerToSheriff(sIP) {
 					fmt.Println("Me, a Wrangler connected to Sheriff")
+					sheriffIP <- sIP
 					go wrangler.ReceiveMessageFromSheriff(orderAssigned, sheriffDead, networkOrders)
 					currentDuty = dt_wrangler
 				}
@@ -136,17 +138,25 @@ func NetworkFSM(
 	}
 }
 
-func CloseTCPConns(lostConns <-chan string) {
+func CloseTCPConns(lostConns <-chan string, sheriffID <-chan string) {
+	var lastSheriffID string
 	for {
-		id := <-lostConns
-		if id == config.Self_id {
-			fmt.Println("I am the lost connection")
-			continue
-		}
-		if currentDuty == dt_sherriff {
-			sheriff.CloseConns(id)
-		} else {
-			wrangler.CloseSheriffConn()
+		select {
+		case id := <-lostConns:
+			if id == config.Self_id {
+				fmt.Println("I am the lost connection, I dont have a TCP connection to my self to close")
+				continue
+			}
+			if currentDuty == dt_sherriff {
+				sheriff.CloseConns(id)
+			}
+
+			if currentDuty == dt_wrangler && lastSheriffID == id {
+				wrangler.CloseSheriffConn()
+			}
+
+		case id := <-sheriffID:
+			lastSheriffID = id
 		}
 	}
 }

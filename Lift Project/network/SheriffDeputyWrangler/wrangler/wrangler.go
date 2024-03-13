@@ -182,7 +182,6 @@ func ReceiveMessageFromSheriff(
 					return
 				}
 				fmt.Println("Error reading from sheriff as wrangles\r:", err)
-
 			}
 
 			var msg types.Message
