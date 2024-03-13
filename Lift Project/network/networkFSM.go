@@ -150,15 +150,19 @@ func CloseTCPConns(lostConns <-chan string, sheriffID <-chan string) {
 	for {
 		select {
 		case id := <-lostConns:
+			fmt.Println("Lost connection to:", id)
+			fmt.Println("current state is:", currentDuty, "last sheriff", sheriffID)
 			if id == config.Self_id {
 				fmt.Println("I am the lost connection, I dont have a TCP connection to my self to close")
 				continue
 			}
 			if currentDuty == dt_sherriff {
+				fmt.Println("I am the Sheriff, I am closing the connection to:", id)
 				sheriff.CloseConns(id)
 			}
 
 			if currentDuty == dt_wrangler && lastSheriffID == id {
+				fmt.Println("I am the Wrangler, I am closing the connection to:", id)
 				wrangler.CloseSheriffConn()
 			}
 

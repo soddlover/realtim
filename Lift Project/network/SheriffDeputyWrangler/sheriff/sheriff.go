@@ -189,8 +189,7 @@ func SendDeputyMessage(networkOrders *NetworkOrders) {
 
 func SendOrderMessage(peer string, order Orderstatus) (bool, error) {
 	//ip := strings.Split(peer, ":")[0]
-	fmt.Println("Connections:", WranglerConnections)
-	fmt.Println("Peer:", peer)
+
 	conn, ok := WranglerConnections[peer]
 
 	if !ok {
