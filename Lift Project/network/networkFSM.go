@@ -122,7 +122,7 @@ func NetworkFSM(
 				}
 
 			} else {
-				currentDuty = dt_initial
+				os.Exit(1)
 			}
 			//listen for incoming orders
 			//listen for new peers

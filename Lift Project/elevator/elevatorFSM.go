@@ -106,7 +106,7 @@ func RunElev(
 				doorTimer.Reset(config.DOOR_OPEN_TIME)
 
 				clearAtFloor(&elevator, orderDelete)
-				elevator.Dir = DirStop
+				//elevator.Dir = DirStop
 
 				elevator.State = EB_DoorOpen
 			} else if elevator.State == EB_Moving {
@@ -114,7 +114,6 @@ func RunElev(
 			}
 			elevatorStateBackup <- elevator
 			elevatorStateBroadcast <- elevator
-
 		case <-doorTimer.C:
 			if elevio.GetObstruction() {
 				doorTimer.Reset(config.DOOR_OPEN_TIME)
@@ -127,7 +126,13 @@ func RunElev(
 				continue
 			}
 			elevio.SetDoorOpenLamp(false)
+			prevdir := elevator.Dir
 			elevator.Dir = ChooseDirection(elevator)
+			if prevdir != elevator.Dir && (elevator.Queue[elevator.Floor][elevio.BT_HallUp] || elevator.Queue[elevator.Floor][elevio.BT_HallDown]) {
+				drv_floors <- elevator.Floor
+				fmt.Println("BOomb booomm baby changing direction")
+				continue
+			}
 			if elevator.Dir == DirStop {
 				elevator.State = EB_Idle
 				motorErrorTimer.Stop()
