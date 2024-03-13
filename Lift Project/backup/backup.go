@@ -3,11 +3,13 @@ package backup
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"mymodule/config"
 	. "mymodule/config"
 	"mymodule/elevator/elevio"
 	. "mymodule/types"
 	"os"
+	"os/exec"
 	"time"
 )
 
@@ -18,7 +20,7 @@ func Backup(fresh bool) Elev {
 		return Elev{}
 	}
 
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(config.BACKUP_DEADLINE)
 
 	for {
 		<-ticker.C
@@ -31,7 +33,7 @@ func Backup(fresh bool) Elev {
 
 		currentModTime := fileInfo.ModTime()
 
-		if time.Since(currentModTime) > 10*time.Second {
+		if time.Since(currentModTime) > config.BACKUP_DEADLINE {
 			return takeControl()
 		}
 		fmt.Println("Backup is still alive. KJØH ")
@@ -40,7 +42,7 @@ func Backup(fresh bool) Elev {
 
 func WriteBackup(elevChan <-chan Elev) {
 
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(config.BACKUP_INTERVAL)
 	var elev Elev
 
 	for {
@@ -81,6 +83,12 @@ func takeControl() Elev {
 				fmt.Println("Index out of range")
 			}
 		}
+	}
+	cmd := exec.Command("gnome-terminal", "--", "go", "run", "main.go")
+	err = cmd.Run()
+	if err != nil {
+		fmt.Println("THis sucks")
+		log.Fatal(err)
 	}
 	return elev
 }
