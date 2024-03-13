@@ -15,6 +15,7 @@ type IDAndDuration struct {
 	ID       string
 	Duration time.Duration
 }
+
 func redistributor(
 	nodeLeftNetwork <-chan string,
 	incomingOrder chan<- Orderstatus,
@@ -26,20 +27,18 @@ func redistributor(
 		case peerID := <-nodeLeftNetwork:
 			networkOrders.Mutex.Lock()
 			//delete(systemState, peerID)
-			requestSystemState <- true
-			localSystemState := <-systemState
-			fmt.Printf("world.Map: %v\n", localSystemState)
+			//requestSystemState <- true
+			//localSystemState := <-systemState
+			//fmt.Printf("world.Map: %v\n", localSystemState)
 			fmt.Println("Node left network, redistributing orders")
-			fmt.Println("NetworkOrders: ", networkOrders.Orders)
+			//fmt.Println("NetworkOrders: ", networkOrders.Orders)
 			//check for orders owned by the leaving node
 
-			for floor := 0; floor < len(networkOrders.Orders); floor++ {
-				for button := 0; button < len(networkOrders.Orders[button]); button++ {
+			for floor := 0; floor < config.N_FLOORS; floor++ {
+				for button := 0; button < config.N_BUTTONS; button++ {
 					if networkOrders.Orders[floor][button] == peerID {
 						// Send to assigner for reassignment
-						networkOrders.Mutex.Unlock()
 						incomingOrder <- Orderstatus{Floor: floor, Button: elevio.ButtonType(button), Served: false, Owner: peerID}
-						networkOrders.Mutex.Lock()
 
 					}
 				}
@@ -75,7 +74,7 @@ func Assigner(
 			}
 			requestSystemState <- true
 			localSystemState := <-systemState
-            networkOrders.Mutex.Lock()
+			networkOrders.Mutex.Lock()
 			sortedIDs := calculateSortedIDs(localSystemState, networkOrders, Order{Floor: order.Floor, Button: order.Button})
 			networkOrders.Mutex.Unlock()
 
@@ -182,7 +181,7 @@ func calculateSortedIDs(systemState map[string]Elev, networkOrders *NetworkOrder
 		if elevator.Obstr {
 			fmt.Println("Elevator with id: ", id, " is obstructed")
 		}
-		if elevator.State == Undefined || elevator.Obstr {
+		if elevator.State == EB_UNAVAILABLE {
 			continue
 		}
 
@@ -197,7 +196,7 @@ func calculateSortedIDs(systemState map[string]Elev, networkOrders *NetworkOrder
 	assigned := networkOrders.Orders[order.Floor][order.Button]
 	if assigned != "" {
 		if elev, ok := systemState[assigned]; ok {
-			if !elev.Obstr && !(elev.State == Undefined) {
+			if elev.State != EB_UNAVAILABLE {
 				// If the order is already assigned to a working elevator, move it to the front of the list
 				durations = append([]IDAndDuration{{ID: assigned, Duration: 0}}, durations...)
 			}

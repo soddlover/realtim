@@ -30,7 +30,7 @@ const (
 	EB_Idle ElevatorState = iota
 	EB_Moving
 	EB_DoorOpen
-	Undefined
+	EB_UNAVAILABLE
 )
 
 type ElevatorDirection int

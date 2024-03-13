@@ -136,11 +136,7 @@ func NetworkFSM(
 				os.Exit(1)
 			}
 			time.Sleep(1 * time.Second)
-			//listen for incoming orders
-			//listen for new peers
-			//listen for lost peers
-			//listen for orders to delete
-			//listen for orders to assign
+
 		}
 	}
 }
@@ -202,6 +198,10 @@ func InitSherrif(
 		requestSystemState,
 		systemState,
 		networkorders)
+	go checkForUnavailable(
+		requestSystemState,
+		systemState,
+		nodeLeftNetwork)
 }
 
 func orderForwarder(
@@ -248,17 +248,7 @@ func checkSync(requestSystemState chan<- bool, systemState <-chan map[string]Ele
 					assignedElev, existsInSystemState := localSystemState[networkOrders.Orders[floor][button]]
 					if !existsInSystemState || !assignedElev.Queue[floor][button] {
 						if networkOrders.Orders[floor][button] == config.Self_id {
-							//delete(systemState, networkOrders[floor][button])
-							//networkOrders[floor][button] = ""
-
-							//elev := systemState[config.Self_id]
-							// Modify the struct
-							//elev.Queue[floor][button] = true
-							// Put the struct back into the map
-							//systemState[config.Self_id] = elev
-							networkOrders.Mutex.Unlock()
 							orderAssigned <- Order{Floor: floor, Button: elevio.ButtonType(button)}
-							networkOrders.Mutex.Lock()
 							fmt.Println("WARNING - Order not in sync with system state, reassigning order TO MYSELF KJØH")
 						}
 					}
@@ -267,5 +257,32 @@ func checkSync(requestSystemState chan<- bool, systemState <-chan map[string]Ele
 		}
 		networkOrders.Mutex.Unlock()
 		time.Sleep(5 * time.Second)
+	}
+}
+
+func checkForUnavailable(
+	requestSystemState chan<- bool,
+	systemState <-chan map[string]Elev,
+	nodeLeftNetwork chan<- string,
+) {
+	unavailableIDs := make(map[string]bool)
+
+	for {
+		requestSystemState <- true
+		localSystemState := <-systemState
+
+		for id, elev := range localSystemState {
+			if elev.State == EB_UNAVAILABLE {
+				if _, alreadyUnavailable := unavailableIDs[id]; !alreadyUnavailable {
+					unavailableIDs[id] = true
+					fmt.Println("Elevator", id, "is unavailable")
+					nodeLeftNetwork <- id
+				}
+			} else {
+				delete(unavailableIDs, id)
+			}
+		}
+
+		time.Sleep(3 * time.Second)
 	}
 }

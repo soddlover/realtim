@@ -5,7 +5,6 @@ import (
 	"mymodule/config"
 	"mymodule/elevator/elevio"
 	. "mymodule/types"
-	"os"
 	"strconv"
 	"time"
 )
@@ -91,7 +90,8 @@ func RunElev(
 
 					doorTimer.Reset(config.DOOR_OPEN_TIME)
 				}
-			case Undefined:
+			case EB_UNAVAILABLE:
+				fmt.Println("Elevator is unavailable SO THIS NEW ORDER BETTER FUCKING BE A CAB ORDER")
 			default:
 				fmt.Println("Undefined state WTF")
 			}
@@ -100,6 +100,11 @@ func RunElev(
 			elevatorStateBroadcast <- elevator
 
 		case elevator.Floor = <-drv_floors:
+			if elevator.State == EB_UNAVAILABLE {
+				elevio.SetStopLamp(false)
+				elevator.State = EB_Moving
+			}
+
 			fmt.Println("Arrived at floor", elevator.Floor)
 			elevio.SetFloorIndicator(elevator.Floor)
 			if ShouldStop(elevator) {
@@ -122,6 +127,8 @@ func RunElev(
 			if elevio.GetObstruction() {
 				doorTimer.Reset(config.DOOR_OPEN_TIME)
 				elevator.Obstr = true
+				elevio.SetStopLamp(true)
+				elevator.State = EB_UNAVAILABLE
 				fmt.Println("Obstruction detected")
 				elevatorStateBackup <- elevator
 				elevatorStateBroadcast <- elevator
@@ -141,17 +148,20 @@ func RunElev(
 			elevatorStateBroadcast <- elevator
 		case <-motorErrorTimer.C:
 			elevio.SetMotorDirection(elevio.MD_Stop)
-			elevator.State = Undefined
+			elevator.State = EB_UNAVAILABLE
 			elevatorStateBackup <- elevator
 			elevatorStateBroadcast <- elevator
 			fmt.Println("Motor error, killing myself")
+			elevio.SetStopLamp(true)
 			time.Sleep(1000 * time.Millisecond)
-			os.Exit(1)
+			//os.Exit(1)
 
 		case obstruction := <-drv_obstr:
-			if !obstruction && elevator.Obstr {
+			if !obstruction && elevator.State == EB_UNAVAILABLE {
 				doorTimer.Reset(config.DOOR_OPEN_TIME)
 				elevator.Obstr = false
+				elevio.SetStopLamp(false)
+				elevator.State = EB_DoorOpen
 				elevatorStateBackup <- elevator
 				elevatorStateBroadcast <- elevator
 			}
