@@ -105,7 +105,7 @@ func acknowledger(OrderSent <-chan Orderstatus, networkOrdersRecieved <-chan Net
 			} else {
 				unacknowledgedButtons[orderstatus.Floor][orderstatus.Button] = true
 			}
-			ticker := time.NewTicker(time.Second * 3) // Resend the order every 10 seconds
+			ticker := time.NewTicker(500 * time.Millisecond) // Resend the order every 10 seconds
 			orderTickers[orderstatus.Floor][orderstatus.Button] = ticker
 			go func(order Orderstatus) {
 				for range ticker.C {
@@ -173,6 +173,7 @@ func ReceiveMessageFromSheriff(
 		default:
 			reader := bufio.NewReader(sheriffConn)
 			message, err := reader.ReadString('\n')
+			fmt.Println("Received something")
 			//fmt.Println("Received message from sheriff:", message)
 			if err != nil {
 				if err == io.EOF {
