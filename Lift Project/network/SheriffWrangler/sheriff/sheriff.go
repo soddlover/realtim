@@ -203,7 +203,12 @@ func ReceiveMessage(
 }
 
 func CloseConns(id string) {
-
+	if id == "ALL" {
+		for id, conn := range WranglerConnections {
+			fmt.Println("Closing connection to", id)
+			conn.Close()
+		}
+	}
 	if WranglerConnections[id] != nil {
 		fmt.Println("Closing connection to", id)
 		WranglerConnections[id].Close()

@@ -97,6 +97,7 @@ func NetworkFSM(
 			if sIP == "" {
 				fmt.Println("This is weird, I should have been broadcasting my IP, read '' as broadcasted IP")
 				fmt.Println("I must be offline so sad")
+				sheriff.CloseConns("ALL")
 				currentDuty = dt_offline
 				//relievedOfDuty <- true
 			}
@@ -110,6 +111,7 @@ func NetworkFSM(
 			currentDuty = dt_initial
 
 		case dt_offline:
+
 			sIP := wrangler.GetSheriffIP()
 			if sIP != "" {
 				fmt.Println("Back online, time to restart")
