@@ -52,15 +52,9 @@ func elevatorInit(elevator Elev, drv_floors <-chan int) Elev {
 func ShouldStop(elevator Elev) bool {
 	switch elevator.Dir {
 	case DirUp:
-		if elevator.Floor < len(elevator.Queue) &&
-			4 > len(elevator.Queue[elevator.Floor]) {
-			return elevator.Queue[elevator.Floor][elevio.BT_HallUp] ||
-				elevator.Queue[elevator.Floor][elevio.BT_Cab] || !OrdersAbove(elevator)
+		return elevator.Queue[elevator.Floor][elevio.BT_HallUp] ||
+			elevator.Queue[elevator.Floor][elevio.BT_Cab] || !OrdersAbove(elevator)
 
-		} else {
-			fmt.Println("ERROR: Index out of bounds. The floor number is greater than the length of the queue.")
-			return false
-		}
 	case DirDown:
 		return elevator.Queue[elevator.Floor][elevio.BT_HallDown] ||
 			elevator.Queue[elevator.Floor][elevio.BT_Cab] ||
@@ -141,7 +135,7 @@ func clearAtFloor(elevator *Elev, orderDelete chan<- Orderstatus) {
 		}
 		if elevator.Queue[elevator.Floor][elevio.BT_HallDown] {
 			elevator.Queue[elevator.Floor][elevio.BT_HallDown] = false
-			orderDelete <- Orderstatus{Floor: elevator.Floor, Button: elevio.BT_HallUp, Served: true}
+			orderDelete <- Orderstatus{Floor: elevator.Floor, Button: elevio.BT_HallDown, Served: true}
 		}
 	}
 }
