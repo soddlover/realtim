@@ -13,8 +13,8 @@ func RunElev(
 	elevatorStateBackup chan<- Elev,
 	elevatorStateBroadcast chan<- Elev,
 	orderRequest chan<- Order,
-	orderAssigned <-chan Order,
-	orderDelete chan<- Orderstatus,
+	addToQueue <-chan Order,
+	orderServed chan<- Orderstatus,
 	initElev Elev) {
 
 	idInt, _ := strconv.Atoi(config.Self_nr)
@@ -55,7 +55,7 @@ func RunElev(
 			fmt.Println("Button event at floor", buttonEvent.Floor, "button", buttonEvent.Button)
 			orderRequest <- Order{Floor: buttonEvent.Floor, Button: buttonEvent.Button}
 
-		case order := <-orderAssigned:
+		case order := <-addToQueue:
 			fmt.Println("Order assigned: ", order)
 			elevator.Queue[order.Floor][order.Button] = true
 			switch elevator.State {
@@ -66,7 +66,7 @@ func RunElev(
 					elevator.State = EB_DoorOpen
 					doorTimer.Reset(config.DOOR_OPEN_TIME)
 					elevio.SetDoorOpenLamp(true)
-					clearAtFloor(&elevator, orderDelete)
+					clearAtFloor(&elevator, orderServed)
 
 				} else {
 					elevator.State = EB_Moving
@@ -77,7 +77,7 @@ func RunElev(
 				if elevator.Floor == order.Floor {
 					if elevator.Queue[order.Floor][order.Button] {
 						elevator.Queue[order.Floor][order.Button] = false
-						orderDelete <- Orderstatus{Owner: config.Self_nr, Floor: order.Floor, Button: order.Button, Served: true}
+						orderServed <- Orderstatus{Owner: config.Self_nr, Floor: order.Floor, Button: order.Button, Served: true}
 					}
 
 					doorTimer.Reset(config.DOOR_OPEN_TIME)
@@ -109,7 +109,7 @@ func RunElev(
 				elevio.SetDoorOpenLamp(true)
 				doorTimer.Reset(config.DOOR_OPEN_TIME)
 
-				clearAtFloor(&elevator, orderDelete)
+				clearAtFloor(&elevator, orderServed)
 				//elevator.Dir = DirStop
 
 				elevator.State = EB_DoorOpen
@@ -135,7 +135,7 @@ func RunElev(
 			if prevdir != elevator.Dir && (elevator.Queue[elevator.Floor][elevio.BT_HallUp] || elevator.Queue[elevator.Floor][elevio.BT_HallDown]) {
 				elevio.SetDoorOpenLamp(true)
 				doorTimer.Reset(config.DOOR_OPEN_TIME)
-				clearAtFloor(&elevator, orderDelete)
+				clearAtFloor(&elevator, orderServed)
 				fmt.Println("BOomb booomm baby changing direction")
 				continue
 			}

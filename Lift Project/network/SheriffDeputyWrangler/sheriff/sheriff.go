@@ -18,7 +18,7 @@ const DEPUTY_SEND_FREQ = 3 * time.Second
 
 var WranglerConnections = make(map[string]net.Conn)
 
-func CheckMissingConnToOrders(networkOrders *NetworkOrders, nodeLeftNetwork chan<- string) {
+func CheckMissingConnToOrders(networkOrders *NetworkOrders, nodeUnavailabe chan<- string) {
 	processedIDs := make(map[string]bool)
 	fmt.Println("Checking for missing connections to orders")
 	networkOrders.Mutex.Lock()
@@ -28,7 +28,7 @@ func CheckMissingConnToOrders(networkOrders *NetworkOrders, nodeLeftNetwork chan
 			//fmt.Printf("Checking order at floor %d, button %d, id: %s\n", floor, button, id) // Print the current order being checked
 			if id != "" && WranglerConnections[id] == nil && id != config.Self_id && !processedIDs[id] {
 				networkOrders.Mutex.Unlock()
-				nodeLeftNetwork <- id
+				nodeUnavailabe <- id
 				networkOrders.Mutex.Lock()
 				fmt.Println("***Missing connection to ACTIVE ORDER Reassigning order!!!***", id)
 				processedIDs[id] = true
@@ -41,39 +41,26 @@ func CheckMissingConnToOrders(networkOrders *NetworkOrders, nodeLeftNetwork chan
 }
 
 func Sheriff(
-	incomingOrder chan<- Orderstatus,
+	assignOrder chan<- Orderstatus,
 	networkOrders *NetworkOrders,
-	nodeLeftNetwork chan string,
+	nodeUnavailabe chan string,
 	nodeOrdersUpdateChan chan bool,
-	relievedOfDuty <-chan bool,
-	quitAssigner chan<- bool) {
-
+) {
 	ipID := strings.Split(string(config.Self_id), ":")
 	transmitEnable := make(chan bool)
 	listenWranglerEnable := make(chan bool)
 	sendOrderToDeputyEnable := make(chan bool)
 	go peers.Transmitter(config.Sheriff_port, ipID[0], transmitEnable) //channel for turning off sheriff transmitt?
 	//go peers.Receiver(15647, peerUpdateCh)
-	go listenForWranglerConnections(incomingOrder, nodeLeftNetwork, listenWranglerEnable)
+	go listenForWranglerConnections(assignOrder, nodeUnavailabe, listenWranglerEnable)
 	go SendNodeOrdersToDeputy(networkOrders, nodeOrdersUpdateChan, sendOrderToDeputyEnable)
 	time.Sleep(1 * time.Second)
-	CheckMissingConnToOrders(networkOrders, nodeLeftNetwork)
-
-	<-relievedOfDuty
-	fmt.Println("Relieved of duty")
-	transmitEnable <- false
-	fmt.Println("Stopped transmitter")
-	listenWranglerEnable <- false
-	fmt.Println("Stopped glistenForWranglerConnections")
-	sendOrderToDeputyEnable <- false
-	fmt.Println("Stopped SendNodeOrdersToDeputy")
-	quitAssigner <- true
-	fmt.Println("Stopped Assigner")
-
+	CheckMissingConnToOrders(networkOrders, nodeUnavailabe)
 }
+
 func listenForWranglerConnections(
-	incomingOrder chan<- Orderstatus,
-	nodeLeftNetwork chan<- string,
+	assignOrder chan<- Orderstatus,
+	nodeUnavailabe chan<- string,
 	listenWranglerEnable <-chan bool) {
 
 	ln, err := net.Listen("tcp", ":"+strconv.Itoa(config.TCP_port))
@@ -119,7 +106,7 @@ func listenForWranglerConnections(
 
 			fmt.Println("Accepted Wrangler", peerID)
 			fmt.Println(WranglerConnections)
-			go ReceiveMessage(conn, incomingOrder, peerID, nodeLeftNetwork)
+			go ReceiveMessage(conn, assignOrder, peerID, nodeUnavailabe)
 		}
 	}
 }
@@ -230,9 +217,9 @@ func SendOrderMessage(peer string, order Orderstatus) (bool, error) {
 
 func ReceiveMessage(
 	conn net.Conn,
-	incomingOrder chan<- Orderstatus,
+	assignOrder chan<- Orderstatus,
 	peerID string,
-	nodeLeftNetwork chan<- string) (Orderstatus, error) {
+	nodeUnavailabe chan<- string) (Orderstatus, error) {
 	scanner := bufio.NewScanner(conn)
 	for scanner.Scan() {
 		message := scanner.Text()
@@ -249,16 +236,15 @@ func ReceiveMessage(
 
 		//DeputyUpdateChan <- true
 
-		incomingOrder <- order
+		assignOrder <- order
 	}
 
 	fmt.Println("Error reading from connection:")
 	fmt.Println("closing connection to", peerID)
 	conn.Close()
-	nodeLeftNetwork <- peerID
+	nodeUnavailabe <- peerID
 	delete(WranglerConnections, peerID)
 	return Orderstatus{}, nil
-
 }
 
 func CloseConns(id string) {

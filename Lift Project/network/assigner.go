@@ -17,20 +17,20 @@ type IDAndDuration struct {
 }
 
 func redistributor(
-	nodeLeftNetwork <-chan string,
-	incomingOrder chan<- Orderstatus,
+	nodeUnavailabe <-chan string,
+	assignOrder chan<- Orderstatus,
 	requestSystemState chan<- bool,
 	systemState <-chan map[string]Elev,
 	networkOrders *NetworkOrders) {
 	for {
 		select {
-		case peerID := <-nodeLeftNetwork:
+		case peerID := <-nodeUnavailabe:
 			networkOrders.Mutex.Lock()
 			//delete(systemState, peerID)
 			//requestSystemState <- true
 			//localSystemState := <-systemState
 			//fmt.Printf("world.Map: %v\n", localSystemState)
-			fmt.Println("Node left network, redistributing orders")
+			fmt.Println("Node is unavailable, redistributing orders")
 			//fmt.Println("NetworkOrders: ", networkOrders.Orders)
 			//check for orders owned by the leaving node
 
@@ -38,7 +38,7 @@ func redistributor(
 				for button := 0; button < config.N_BUTTONS; button++ {
 					if networkOrders.Orders[floor][button] == peerID {
 						// Send to assigner for reassignment
-						incomingOrder <- Orderstatus{Floor: floor, Button: elevio.ButtonType(button), Served: false, Owner: peerID}
+						assignOrder <- Orderstatus{Floor: floor, Button: elevio.ButtonType(button), Served: false, Owner: peerID}
 
 					}
 				}
@@ -50,18 +50,15 @@ func redistributor(
 
 func Assigner(
 	networkUpdate chan<- bool,
-	orderAssigned chan<- Order,
+	addToLocalQueue chan<- Order,
 	requestSystemState chan<- bool,
 	systemState <-chan map[string]Elev,
 	networkOrders *NetworkOrders,
-	nodeLeftNetwork <-chan string,
-	incomingOrder chan Orderstatus,
-	quitAssigner <-chan bool,
-	remainingOrders chan<- [config.N_FLOORS][config.N_BUTTONS]string,
+	assignOrder chan Orderstatus,
 ) {
 	for {
 		select {
-		case order := <-incomingOrder:
+		case order := <-assignOrder:
 			//channels.OrderAssigned <- order
 			if order.Served {
 				fmt.Println("Order being deletetet")
@@ -80,7 +77,7 @@ func Assigner(
 
 			for _, id := range sortedIDs {
 				if id == config.Self_id {
-					orderAssigned <- Order{Floor: order.Floor, Button: order.Button}
+					addToLocalQueue <- Order{Floor: order.Floor, Button: order.Button}
 					order.Owner = id
 					networkOrders.Mutex.Lock()
 					networkOrders.Orders[order.Floor][order.Button] = id

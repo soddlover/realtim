@@ -26,13 +26,13 @@ const (
 var currentDuty duty
 
 func NetworkFSM(
-	elevatorState <-chan Elev,
-	orderRequest chan Order,
-	orderAssigned chan Order,
-	orderDelete chan Orderstatus,
-	incommingOrder chan Orderstatus,
-
+	elevatorStateBcast <-chan Elev,
+	localRequest <-chan Order,
+	addToLocalQueue chan<- Order,
+	localOrderServed <-chan Orderstatus,
 ) {
+
+	assignOrder := make(chan Orderstatus, 10)
 	networkOrders := &NetworkOrders{}
 	var startOrderForwarderOnce sync.Once
 
@@ -43,17 +43,15 @@ func NetworkFSM(
 	go systemStateSynchronizer.SystemStateSynchronizer(
 		requestSystemState,
 		nodeLeftNetwork,
-		elevatorState,
+		elevatorStateBcast,
 		systemState,
 	)
 
 	sheriffDead := make(chan NetworkOrdersData)
-	relievedOfDuty := make(chan bool)
-	remainingOrders := make(chan [config.N_FLOORS][config.N_BUTTONS]string)
 	sheriffIP := make(chan string)
-
 	go CloseTCPConns(nodeLeftNetwork, sheriffIP)
-	go checkSync(requestSystemState, systemState, networkOrders, orderAssigned)
+
+	go checkSync(requestSystemState, systemState, networkOrders, addToLocalQueue)
 
 	currentDuty = dt_initial
 	for {
@@ -63,25 +61,23 @@ func NetworkFSM(
 			if sIP == "" {
 
 				InitSherrif(
-					incommingOrder,
+					assignOrder,
 					requestSystemState,
 					systemState,
 					networkOrders,
-					relievedOfDuty,
-					remainingOrders,
-					orderAssigned)
+					addToLocalQueue)
 				currentDuty = dt_sherriff
 			} else {
 				fmt.Println("I am not the only Wrangler in town, connecting to Sheriff:")
 				if wrangler.ConnectWranglerToSheriff(sIP) {
 					fmt.Println("Me, a Wrangler connected to Sheriff")
 					sheriffIP <- sIP
-					go wrangler.ReceiveMessageFromSheriff(orderAssigned, sheriffDead, networkOrders)
+					go wrangler.ReceiveMessageFromSheriff(addToLocalQueue, sheriffDead, networkOrders)
 					currentDuty = dt_wrangler
 				}
 			}
 			startOrderForwarderOnce.Do(func() {
-				go orderForwarder(incommingOrder, orderAssigned, orderRequest, orderDelete)
+				go orderForwarder(assignOrder, addToLocalQueue, localRequest, localOrderServed)
 			})
 		case dt_sherriff:
 
@@ -106,13 +102,12 @@ func NetworkFSM(
 					networkOrders.Orders = networkOrderData.NetworkOrders
 					networkOrders.Mutex.Unlock()
 					InitSherrif(
-						incommingOrder,
+						assignOrder,
 						requestSystemState,
 						systemState,
 						networkOrders,
-						relievedOfDuty,
-						remainingOrders,
-						orderAssigned)
+						addToLocalQueue,
+					)
 					currentDuty = dt_sherriff
 				} else {
 					fmt.Println("I am not the chosen one, I am a Deputy")
@@ -134,7 +129,6 @@ func NetworkFSM(
 				os.Exit(1)
 			}
 			time.Sleep(1 * time.Second)
-
 		}
 	}
 }
@@ -167,53 +161,47 @@ func CloseTCPConns(lostConns <-chan string, sheriffID <-chan string) {
 }
 
 func InitSherrif(
-	incomingOrder chan Orderstatus,
+	assignOrder chan Orderstatus,
 	requestSystemState chan<- bool,
 	systemState <-chan map[string]Elev,
 	networkorders *NetworkOrders,
-	relievedOfDuty <-chan bool,
-	remainingOrders chan<- [config.N_FLOORS][config.N_BUTTONS]string,
-	orderAssigned chan<- Order,
+	addToLocalQueue chan<- Order,
 ) {
-	nodeLeftNetwork := make(chan string)
-	quitAssigner := make(chan bool)
+	nodeUnavailabe := make(chan string)
 	fmt.Println("I am the only Wrangler in town, I am the Sheriff!")
 	networkUpdate := make(chan bool)
-	go sheriff.Sheriff(incomingOrder, networkorders, nodeLeftNetwork, networkUpdate, relievedOfDuty, quitAssigner)
+	go sheriff.Sheriff(assignOrder, networkorders, nodeUnavailabe, networkUpdate)
 	go Assigner(
 		networkUpdate,
-		orderAssigned,
+		addToLocalQueue,
 		requestSystemState,
 		systemState,
 		networkorders,
-		nodeLeftNetwork,
-		incomingOrder,
-		quitAssigner,
-		remainingOrders)
+		assignOrder)
 	go redistributor(
-		nodeLeftNetwork,
-		incomingOrder,
+		nodeUnavailabe,
+		assignOrder,
 		requestSystemState,
 		systemState,
 		networkorders)
 	go checkForUnavailable(
 		requestSystemState,
 		systemState,
-		nodeLeftNetwork)
+		nodeUnavailabe)
 }
 
 func orderForwarder(
-	incomingOrder chan<- Orderstatus,
-	orderAssigned chan<- Order,
-	orderRequest <-chan Order,
-	orderDelete <-chan Orderstatus,
+	assignOrder chan<- Orderstatus,
+	addToLocalQueue chan<- Order,
+	localRequest <-chan Order,
+	localOrderServed <-chan Orderstatus,
 ) {
 	for {
 		select {
-		case order := <-orderRequest:
+		case order := <-localRequest:
 			orderstat := Orderstatus{Owner: config.Self_id, Floor: order.Floor, Button: order.Button, Served: false}
 			if order.Button == elevio.BT_Cab {
-				orderAssigned <- Order{Floor: order.Floor, Button: order.Button}
+				addToLocalQueue <- Order{Floor: order.Floor, Button: order.Button}
 				continue
 			}
 			if currentDuty == dt_offline {
@@ -221,13 +209,13 @@ func orderForwarder(
 			}
 
 			if currentDuty == dt_sherriff {
-				incomingOrder <- orderstat
+				assignOrder <- orderstat
 			} else {
 				wrangler.SendOrderToSheriff(orderstat)
 			}
-		case orderstat := <-orderDelete:
+		case orderstat := <-localOrderServed:
 			if currentDuty == dt_sherriff || currentDuty == dt_offline {
-				incomingOrder <- orderstat
+				assignOrder <- orderstat
 			} else {
 				wrangler.SendOrderToSheriff(orderstat)
 			}
@@ -235,7 +223,7 @@ func orderForwarder(
 	}
 }
 
-func checkSync(requestSystemState chan<- bool, systemState <-chan map[string]Elev, networkOrders *NetworkOrders, orderAssigned chan<- Order) {
+func checkSync(requestSystemState chan<- bool, systemState <-chan map[string]Elev, networkOrders *NetworkOrders, addToLocalQueue chan<- Order) {
 	for {
 		networkOrders.Mutex.Lock()
 		for floor := 0; floor < config.N_FLOORS; floor++ {
@@ -246,7 +234,7 @@ func checkSync(requestSystemState chan<- bool, systemState <-chan map[string]Ele
 					assignedElev, existsInSystemState := localSystemState[networkOrders.Orders[floor][button]]
 					if !existsInSystemState || !assignedElev.Queue[floor][button] {
 						if networkOrders.Orders[floor][button] == config.Self_id {
-							orderAssigned <- Order{Floor: floor, Button: elevio.ButtonType(button)}
+							addToLocalQueue <- Order{Floor: floor, Button: elevio.ButtonType(button)}
 							fmt.Println("WARNING - Order not in sync with system state, reassigning order TO MYSELF KJØH")
 						}
 					}
@@ -261,7 +249,7 @@ func checkSync(requestSystemState chan<- bool, systemState <-chan map[string]Ele
 func checkForUnavailable(
 	requestSystemState chan<- bool,
 	systemState <-chan map[string]Elev,
-	nodeLeftNetwork chan<- string,
+	nodeUnavailabe chan<- string,
 ) {
 	unavailableIDs := make(map[string]bool)
 
@@ -274,7 +262,7 @@ func checkForUnavailable(
 				if _, alreadyUnavailable := unavailableIDs[id]; !alreadyUnavailable {
 					unavailableIDs[id] = true
 					fmt.Println("Elevator", id, "is unavailable")
-					nodeLeftNetwork <- id
+					nodeUnavailabe <- id
 				}
 			} else {
 				delete(unavailableIDs, id)

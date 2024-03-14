@@ -167,7 +167,14 @@ func CloseSheriffConn() {
 	fmt.Println("Sheriff connection closed")
 }
 
-func handleOrderSent(orderstatus Orderstatus, unacknowledgedButtons *[config.N_FLOORS][config.N_BUTTONS]bool, unacknowledgedComplete *[config.N_FLOORS][config.N_BUTTONS]bool, orderTickers *[config.N_FLOORS][config.N_BUTTONS]*time.Ticker, orderRetryCounts *[config.N_FLOORS][config.N_BUTTONS]int, quitChannels *[config.N_FLOORS][config.N_BUTTONS]chan bool) {
+func handleOrderSent(
+	orderstatus Orderstatus,
+	unacknowledgedButtons *[config.N_FLOORS][config.N_BUTTONS]bool,
+	unacknowledgedComplete *[config.N_FLOORS][config.N_BUTTONS]bool,
+	orderTickers *[config.N_FLOORS][config.N_BUTTONS]*time.Ticker,
+	orderRetryCounts *[config.N_FLOORS][config.N_BUTTONS]int,
+	quitChannels *[config.N_FLOORS][config.N_BUTTONS]chan bool,
+) {
 	if orderstatus.Served {
 		unacknowledgedComplete[orderstatus.Floor][orderstatus.Button] = true
 	} else {
@@ -183,7 +190,12 @@ func handleOrderSent(orderstatus Orderstatus, unacknowledgedButtons *[config.N_F
 	go resendOrder(orderstatus, ticker, quit, orderRetryCounts)
 }
 
-func resendOrder(order Orderstatus, ticker *time.Ticker, quit <-chan bool, orderRetryCounts *[config.N_FLOORS][config.N_BUTTONS]int) {
+func resendOrder(
+	order Orderstatus,
+	ticker *time.Ticker,
+	quit <-chan bool,
+	orderRetryCounts *[config.N_FLOORS][config.N_BUTTONS]int,
+) {
 	const maxRetries = 5
 	for {
 		select {
@@ -205,7 +217,12 @@ func resendOrder(order Orderstatus, ticker *time.Ticker, quit <-chan bool, order
 	}
 }
 
-func handleNetworkOrders(networkorders NetworkOrdersData, unacknowledgedButtons *[config.N_FLOORS][config.N_BUTTONS]bool, unacknowledgedComplete *[config.N_FLOORS][config.N_BUTTONS]bool, quitChannels *[config.N_FLOORS][config.N_BUTTONS]chan bool) {
+func handleNetworkOrders(
+	networkorders NetworkOrdersData,
+	unacknowledgedButtons *[config.N_FLOORS][config.N_BUTTONS]bool,
+	unacknowledgedComplete *[config.N_FLOORS][config.N_BUTTONS]bool,
+	quitChannels *[config.N_FLOORS][config.N_BUTTONS]chan bool,
+) {
 	fmt.Println("Received network orders from ", networkorders)
 
 	for floor := 0; floor < config.N_FLOORS; floor++ {

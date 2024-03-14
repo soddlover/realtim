@@ -51,10 +51,10 @@ func main() {
 
 	elevatorStateBackup := make(chan Elev, 10)
 	elevatorStateBroadcast := make(chan Elev, 10)
-	orderRequest := make(chan Order, 10)
-	orderAssigned := make(chan Order, 10)
-	orderDelete := make(chan Orderstatus, 10)
-	incomingOrder := make(chan Orderstatus, 10)
+	localRequest := make(chan Order, 10)
+	addToLocalQueue := make(chan Order, 10)
+	localOrderServed := make(chan Orderstatus, 10)
+	//incomingOrder := make(chan Orderstatus, 10)
 
 	// go network.StateBroadcaster(elevatorStateBroadcast, systemState, id)
 	go backup.WriteBackup(elevatorStateBackup)
@@ -62,17 +62,16 @@ func main() {
 	go elev.RunElev(
 		elevatorStateBackup,
 		elevatorStateBroadcast,
-		orderRequest,
-		orderAssigned,
-		orderDelete,
+		localRequest,
+		addToLocalQueue,
+		localOrderServed,
 		initElev)
 
 	go network.NetworkFSM(
 		elevatorStateBroadcast,
-		orderRequest,
-		orderAssigned,
-		orderDelete,
-		incomingOrder)
+		localRequest,
+		addToLocalQueue,
+		localOrderServed)
 
 	select {}
 }
