@@ -34,15 +34,15 @@ func NetworkFSM(
 	addToLocalQueue chan<- Order,
 	localOrderServed <-chan Orderstatus,
 ) {
-
+	
 	var startOrderForwarderOnce sync.Once
 	var LastnetworkOrders [N_FLOORS][N_BUTTONS]string
 	var ChosenOne bool = true
 
-	requestSystemState := make(chan bool, 40)
-	systemState := make(chan map[string]Elev, 40)
-	nodeLeftNetwork := make(chan string, 40)
-	assignOrder := make(chan Orderstatus, 10)
+	requestSystemState := make(chan bool, config.NETWORK_BUFFER_SIZE)
+	systemState := make(chan map[string]Elev, config.NETWORK_BUFFER_SIZE)
+	nodeLeftNetwork := make(chan string, config.NETWORK_BUFFER_SIZE)
+    assignOrder := make(chan Orderstatus, config.NETWORK_BUFFER_SIZE)
 
 	go systemStateSynchronizer.SystemStateSynchronizer(
 		requestSystemState,

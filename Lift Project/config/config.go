@@ -4,7 +4,7 @@ import "time"
 
 const (
 	N_FLOORS             = 4
-	N_ELEVATORS          = 1
+	N_ELEVATORS          = 3
 	N_BUTTONS            = 3
 	TRAVEL_TIME          = 2
 	DOOR_OPEN_TIME       = 3 * time.Second
@@ -19,6 +19,8 @@ const (
 	BACKUP_INTERVAL      = 1 * time.Second
 	BACKUP_DEADLINE      = 2 * time.Second
 	SHERIFF_IP_DEADLINE  = 1 * time.Second
+	ELEVATOR_BUFFER_SIZE = N_FLOORS * N_BUTTONS
+	NETWORK_BUFFER_SIZE  = ELEVATOR_BUFFER_SIZE * N_ELEVATORS
 )
 
 var Self_id string = ""

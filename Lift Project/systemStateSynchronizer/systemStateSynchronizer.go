@@ -14,16 +14,16 @@ func SystemStateSynchronizer(
 	elevatorState <-chan Elev,
 	systemState chan<- map[string]Elev,
 ) {
-	broadcastStateTx := make(chan BcastState, 10)
+	broadcastStateTx := make(chan BcastState, config.ELEVATOR_BUFFER_SIZE)
 	go repeater(elevatorState, broadcastStateTx)
 	go bcast.Transmitter(config.Broadcast_state_port, broadcastStateTx)
-	broadcastStateRx := make(chan BcastState, 10)
+	broadcastStateRx := make(chan BcastState, config.ELEVATOR_BUFFER_SIZE)
 	go bcast.Receiver(config.Broadcast_state_port, broadcastStateRx)
-	updateFromBcast := make(chan map[string]Elev, 10)
-	removeBcastNode := make(chan string, 10)
-	heartBeat := make(chan HeartBeat, 256)
+	updateFromBcast := make(chan map[string]Elev, config.ELEVATOR_BUFFER_SIZE)
+	removeBcastNode := make(chan string, config.ELEVATOR_BUFFER_SIZE)
+	heartBeat := make(chan HeartBeat, config.ELEVATOR_BUFFER_SIZE)
 	go updateBcastSystemState(updateFromBcast, broadcastStateRx, removeBcastNode, heartBeat)
-	heartBeatMissing := make(chan string, 10)
+	heartBeatMissing := make(chan string, config.ELEVATOR_BUFFER_SIZE)
 	go checkHeartbeats(heartBeat, heartBeatMissing)
 
 	localSystemState := make(map[string]Elev)

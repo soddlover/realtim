@@ -41,8 +41,8 @@ func main() {
 
 	initElev := backup.Backup(*fresh)
 
-	elevatorStateBackup := make(chan Elev, 10)
-	elevatorStateBroadcast := make(chan Elev, 10)
+	elevatorStateBackup := make(chan Elev, config.ELEVATOR_BUFFER_SIZE)
+	elevatorStateBroadcast := make(chan Elev, config.NETWORK_BUFFER_SIZE)
 	localRequest := make(chan Order, 10)
 	addToLocalQueue := make(chan Order, 10)
 	localOrderServed := make(chan Orderstatus, 10)
