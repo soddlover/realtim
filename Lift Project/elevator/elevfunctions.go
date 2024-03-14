@@ -159,7 +159,7 @@ func updateLights(elevator *Elev) {
 	}
 }
 
-func UpdateLightsFromNetworkOrders(networkorders [config.N_FLOORS][config.N_BUTTONS]string) {
+func UpdateLightsFromNetworkOrders(networkorders [N_FLOORS][N_BUTTONS]string) {
 	for floor := 0; floor < N_FLOORS; floor++ {
 		for button := 0; button < N_BUTTONS; button++ {
 			if elevio.ButtonType(button) != elevio.BT_Cab {

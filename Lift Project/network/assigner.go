@@ -29,8 +29,8 @@ func redistributor(
 			//fmt.Println("NetworkOrders: ", networkOrders.Orders)
 			//check for orders owned by the leaving node
 
-			for floor := 0; floor < config.N_FLOORS; floor++ {
-				for button := 0; button < config.N_BUTTONS; button++ {
+			for floor := 0; floor < N_FLOORS; floor++ {
+				for button := 0; button < N_BUTTONS; button++ {
 					if networkOrders.Orders[floor][button] == peerID {
 						// Send to assigner for reassignment
 						assignOrder <- Orderstatus{Floor: floor, Button: elevio.ButtonType(button), Served: false}
@@ -153,7 +153,7 @@ func timeToServeRequest(e_old Elev, b elevio.ButtonType, f int) time.Duration { 
 
 func requestsClearAtCurrentFloor(e_old Elev, f func(elevio.ButtonType, int)) Elev {
 	e := e_old
-	for b := elevio.ButtonType(0); b < config.N_BUTTONS; b++ {
+	for b := elevio.ButtonType(0); b < N_BUTTONS; b++ {
 		if e.Queue[e.Floor][b] {
 			e.Queue[e.Floor][b] = false
 			if f != nil {
