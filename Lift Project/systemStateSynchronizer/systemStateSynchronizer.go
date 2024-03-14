@@ -54,7 +54,6 @@ func updateBcastSystemState(
 	for {
 		select {
 		case bcastState := <-broadcastStateRx:
-			fmt.Println("Received broadcast state from:", bcastState.ID)
 
 			heartBeat <- HeartBeat{ID: bcastState.ID, Time: time.Now()}
 			currentBcastState, existsInBcastSystem := bcastSystem[bcastState.ID]
@@ -85,19 +84,23 @@ func convertToSystemState(bcastSystem map[string]BcastState) map[string]Elev {
 func checkHeartbeats(heartBeat <-chan HeartBeat, lostConn chan<- string) {
 	lastHeartBeat := make(map[string]time.Time)
 	lastReported := make(map[string]bool)
-	for {
-		hb := <-heartBeat
-		lastHeartBeat[hb.ID] = hb.Time
+	ticker := time.NewTicker(config.HEARTBEAT_DEADLINE)
 
-		for id, last := range lastHeartBeat {
-			if time.Since(last) > config.HEARTBEAT_DEADLINE {
-				if !lastReported[id] {
-					fmt.Printf("No heartbeat from %s for more than 3 seconds\n", id)
-					lostConn <- id
-					lastReported[id] = true
+	for {
+		select {
+		case hb := <-heartBeat:
+			lastHeartBeat[hb.ID] = hb.Time
+		case <-ticker.C:
+			for id, last := range lastHeartBeat {
+				if time.Since(last) > config.HEARTBEAT_DEADLINE {
+					if !lastReported[id] {
+						fmt.Printf("No heartbeat from %s for more than 3 seconds\n", id)
+						lostConn <- id
+						lastReported[id] = true
+					}
+				} else {
+					lastReported[id] = false
 				}
-			} else {
-				lastReported[id] = false
 			}
 		}
 	}

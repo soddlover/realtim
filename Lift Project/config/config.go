@@ -15,7 +15,7 @@ const (
 	TCP_port             = 16000
 	SimulatorPort        = 15657
 	HEARTBEAT            = 20 * time.Millisecond
-	HEARTBEAT_DEADLINE   = 1000 * time.Millisecond
+	HEARTBEAT_DEADLINE   = 2000 * time.Millisecond
 	BACKUP_INTERVAL      = 1 * time.Second
 	BACKUP_DEADLINE      = 2 * time.Second
 	SHERIFF_IP_DEADLINE  = 1 * time.Second
