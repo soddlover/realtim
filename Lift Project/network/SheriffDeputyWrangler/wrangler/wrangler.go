@@ -177,7 +177,7 @@ func handleOrderSent(orderstatus Orderstatus, unacknowledgedButtons *[config.N_F
 	ticker := time.NewTicker(500 * time.Millisecond)
 	orderTickers[orderstatus.Floor][orderstatus.Button] = ticker
 
-	quit := make(chan bool)
+	quit := make(chan bool, 10)
 	quitChannels[orderstatus.Floor][orderstatus.Button] = quit
 
 	go resendOrder(orderstatus, ticker, quit, orderRetryCounts)
