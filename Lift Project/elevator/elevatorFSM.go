@@ -20,7 +20,7 @@ func RunElev(
 	idInt, _ := strconv.Atoi(config.Self_nr)
 	port := config.SimulatorPort + idInt
 	addr := "localhost:" + fmt.Sprint(port)
-	elevio.Init(addr, config.N_FLOORS)
+	elevio.Init(addr, N_FLOORS)
 
 	elevator := initElev
 
@@ -155,7 +155,7 @@ func RunElev(
 			elevatorStateBroadcast <- elevator
 			fmt.Println("Motor error, killing myself")
 			elevio.SetStopLamp(true)
-			for floor := 0; floor < config.N_FLOORS; floor++ {
+			for floor := 0; floor < N_FLOORS; floor++ {
 				elevator.Queue[floor][elevio.BT_HallUp] = false
 				elevator.Queue[floor][elevio.BT_HallDown] = false
 			}
@@ -175,68 +175,4 @@ func RunElev(
 		}
 
 	}
-}
-func updateLights(elevator *Elev) {
-	for {
-		for floor := 0; floor < config.N_FLOORS; floor++ {
-			for button := 0; button < config.N_BUTTONS; button++ {
-				if elevio.ButtonType(button) == elevio.BT_Cab {
-					elevio.SetButtonLamp(elevio.ButtonType(button), floor, elevator.Queue[floor][button])
-				}
-			}
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
-}
-
-func UpdateLightsFromNetworkOrders(networkorders [config.N_FLOORS][config.N_BUTTONS]string) {
-	for floor := 0; floor < config.N_FLOORS; floor++ {
-		for button := 0; button < config.N_BUTTONS; button++ {
-			if elevio.ButtonType(button) != elevio.BT_Cab {
-				if networkorders[floor][button] != "" {
-					elevio.SetButtonLamp(elevio.ButtonType(button), floor, true)
-				} else {
-					elevio.SetButtonLamp(elevio.ButtonType(button), floor, false)
-				}
-			}
-		}
-	}
-}
-
-func elevatorInit(elevator Elev, drv_floors <-chan int) Elev {
-	if (elevator == Elev{}) {
-		elevator = Elev{
-			State: EB_Idle,
-			Dir:   DirStop,
-			Floor: elevio.GetFloor(),
-			Queue: [config.N_FLOORS][config.N_BUTTONS]bool{},
-			Obstr: false,
-		}
-	}
-	for floor := 0; floor < config.N_FLOORS; floor++ {
-		elevio.SetButtonLamp(elevio.BT_HallUp, floor, false)
-		elevio.SetButtonLamp(elevio.BT_HallDown, floor, false)
-	}
-	if elevio.GetFloor() == -1 {
-		elevio.SetMotorDirection(elevio.MD_Down)
-		ticker := time.NewTicker(config.MOTOR_ERROR_TIME)
-		defer ticker.Stop()
-		select {
-		case <-drv_floors:
-			elevio.SetMotorDirection(elevio.MD_Stop)
-			ticker.Stop()
-			elevio.SetFloorIndicator(elevio.GetFloor())
-			fmt.Println("Arrived at floor: ", elevio.GetFloor())
-			elevator.State = EB_Idle
-			elevator.Floor = elevio.GetFloor()
-			elevator.Dir = ChooseDirection(elevator)
-			elevio.SetMotorDirection(elevio.MotorDirection(elevator.Dir))
-
-		case <-ticker.C:
-			fmt.Println("Failed to arrive at floor within time limit, killing myself")
-			elevator.State = EB_UNAVAILABLE
-			ticker.Stop()
-		}
-	}
-	return elevator
 }
