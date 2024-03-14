@@ -46,9 +46,7 @@ func main() {
 	localRequest := make(chan Order, 10)
 	addToLocalQueue := make(chan Order, 10)
 	localOrderServed := make(chan Orderstatus, 10)
-	//incomingOrder := make(chan Orderstatus, 10)
 
-	// go network.StateBroadcaster(elevatorStateBroadcast, systemState, id)
 	go backup.WriteBackup(elevatorStateBackup)
 
 	go elev.RunElev(

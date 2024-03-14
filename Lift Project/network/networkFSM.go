@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"mymodule/config"
 	"mymodule/elevator/elevio"
-	"mymodule/network/SheriffDeputyWrangler/sheriff"
-	"mymodule/network/SheriffDeputyWrangler/wrangler"
+	"mymodule/network/SheriffWrangler/sheriff"
+	"mymodule/network/SheriffWrangler/wrangler"
 	"mymodule/systemStateSynchronizer"
 	. "mymodule/types"
 	"os"
@@ -14,16 +14,7 @@ import (
 	"time"
 )
 
-type duty int
-
-const (
-	dt_initial duty = iota
-	dt_sherriff
-	dt_wrangler
-	dt_offline
-)
-
-var currentDuty duty
+var currentDuty Duty
 
 func NetworkFSM(
 	elevatorStateBcast <-chan Elev,
@@ -53,10 +44,10 @@ func NetworkFSM(
 
 	go checkSync(requestSystemState, systemState, networkOrders, addToLocalQueue)
 
-	currentDuty = dt_initial
+	currentDuty = DT_initial
 	for {
 		switch currentDuty {
-		case dt_initial:
+		case DT_initial:
 			fmt.Println("Currently in inital condition, attetming to get sheriff ip")
 			sIP := wrangler.GetSheriffIP()
 			fmt.Println("Sheriff IP is:", sIP)
@@ -68,7 +59,7 @@ func NetworkFSM(
 					systemState,
 					networkOrders,
 					addToLocalQueue)
-				currentDuty = dt_sherriff
+				currentDuty = DT_sherriff
 			} else {
 				fmt.Println("Attempting Connecting to Sheriff:")
 				if wrangler.ConnectWranglerToSheriff(sIP) {
@@ -76,25 +67,25 @@ func NetworkFSM(
 					sheriffIP <- sIP
 					go wrangler.ReceiveMessageFromSheriff(addToLocalQueue, sheriffDead, networkOrders)
 					fmt.Println("IP recieved on channel, starting message reciever")
-					currentDuty = dt_wrangler
+					currentDuty = DT_wrangler
 				}
 			}
 			startOrderForwarderOnce.Do(func() {
 				go orderForwarder(assignOrder, addToLocalQueue, localRequest, localOrderServed)
 			})
-		case dt_sherriff:
+		case DT_sherriff:
 
 			sIP := wrangler.GetSheriffIP()
 
 			if sIP == "" {
 				fmt.Println("This is weird, I should have been broadcasting my IP, read '' as broadcasted IP")
 				fmt.Println("I must be offline so sad")
-				currentDuty = dt_offline
+				currentDuty = DT_offline
 				//relievedOfDuty <- true
 			}
 			time.Sleep(1 * time.Second)
 
-		case dt_wrangler:
+		case DT_wrangler:
 			networkOrderData := <-sheriffDead
 			fmt.Println("Lets double check if sherriff actually is dead")
 			sIP := wrangler.GetSheriffIP()
@@ -111,10 +102,10 @@ func NetworkFSM(
 						networkOrders,
 						addToLocalQueue,
 					)
-					currentDuty = dt_sherriff
+					currentDuty = DT_sherriff
 				} else {
 					fmt.Println("I am not the chosen one, I am a Deputy")
-					currentDuty = dt_initial
+					currentDuty = DT_initial
 				}
 
 			} else {
@@ -125,7 +116,7 @@ func NetworkFSM(
 			//listen for lost peers
 			//listen for orders to delete
 			//listen for orders to assign
-		case dt_offline:
+		case DT_offline:
 			sIP := wrangler.GetSheriffIP()
 			if sIP != "" {
 				fmt.Println("Back online, time to restart")
@@ -147,12 +138,12 @@ func CloseTCPConns(lostConns <-chan string, sheriffID <-chan string) {
 				fmt.Println("I am the lost connection, I dont have a TCP connection to my self to close")
 				continue
 			}
-			if currentDuty == dt_sherriff {
+			if currentDuty == DT_sherriff {
 				fmt.Println("I am the Sheriff, I am closing the connection to:", id)
 				sheriff.CloseConns(id)
 			}
 			id = strings.Split(id, ":")[0] //remove this??
-			if currentDuty == dt_wrangler && lastSheriffID == id {
+			if currentDuty == DT_wrangler && lastSheriffID == id {
 				fmt.Println("I am the Wrangler, I am closing the connection to:", id)
 				wrangler.CloseSheriffConn()
 			}
@@ -202,22 +193,22 @@ func orderForwarder(
 	for {
 		select {
 		case order := <-localRequest:
-			orderstat := Orderstatus{Owner: config.Self_id, Floor: order.Floor, Button: order.Button, Served: false}
+			orderstat := Orderstatus{Floor: order.Floor, Button: order.Button, Served: false}
 			if order.Button == elevio.BT_Cab {
 				addToLocalQueue <- Order{Floor: order.Floor, Button: order.Button}
 				continue
 			}
-			if currentDuty == dt_offline {
+			if currentDuty == DT_offline {
 				continue
 			}
 
-			if currentDuty == dt_sherriff {
+			if currentDuty == DT_sherriff {
 				assignOrder <- orderstat
 			} else {
 				wrangler.SendOrderToSheriff(orderstat)
 			}
 		case orderstat := <-localOrderServed:
-			if currentDuty == dt_sherriff || currentDuty == dt_offline {
+			if currentDuty == DT_sherriff || currentDuty == DT_offline {
 				assignOrder <- orderstat
 			} else {
 				wrangler.SendOrderToSheriff(orderstat)

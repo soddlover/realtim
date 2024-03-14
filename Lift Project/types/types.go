@@ -8,11 +8,9 @@ import (
 	"time"
 )
 
-// this is where all universally used types are definedtype ElevatorState ints
 type Button int
 
 type Orderstatus struct {
-	Owner  string
 	Floor  int
 	Button elevio.ButtonType
 	Served bool
@@ -72,4 +70,18 @@ type NetworkOrdersData struct {
 type HeartBeat struct {
 	ID   string
 	Time time.Time
+}
+
+type Duty int
+
+const (
+	DT_initial Duty = iota
+	DT_sherriff
+	DT_wrangler
+	DT_offline
+)
+
+type IDAndDuration struct {
+	ID       string
+	Duration time.Duration
 }

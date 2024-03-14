@@ -88,18 +88,18 @@ func clearAtFloor(elevator *Elev, orderDelete chan<- Orderstatus) {
 	elevator.Queue[elevator.Floor][BT_Cab] = false
 	if elevator.Dir == DirUp && elevator.Queue[elevator.Floor][BT_HallUp] {
 		elevator.Queue[elevator.Floor][BT_HallUp] = false
-		orderDelete <- Orderstatus{Owner: Self_nr, Floor: elevator.Floor, Button: BT_HallUp, Served: true}
+		orderDelete <- Orderstatus{Floor: elevator.Floor, Button: BT_HallUp, Served: true}
 	} else if elevator.Dir == DirDown && elevator.Queue[elevator.Floor][BT_HallDown] {
 		elevator.Queue[elevator.Floor][BT_HallDown] = false
-		orderDelete <- Orderstatus{Owner: Self_nr, Floor: elevator.Floor, Button: BT_HallDown, Served: true}
+		orderDelete <- Orderstatus{Floor: elevator.Floor, Button: BT_HallDown, Served: true}
 	} else if elevator.Dir == DirStop || elevator.Floor == 0 || elevator.Floor == N_FLOORS-1 {
 		if elevator.Queue[elevator.Floor][BT_HallUp] {
 			elevator.Queue[elevator.Floor][BT_HallUp] = false
-			orderDelete <- Orderstatus{Owner: Self_nr, Floor: elevator.Floor, Button: BT_HallUp, Served: true}
+			orderDelete <- Orderstatus{Floor: elevator.Floor, Button: BT_HallUp, Served: true}
 		}
 		if elevator.Queue[elevator.Floor][BT_HallDown] {
 			elevator.Queue[elevator.Floor][BT_HallDown] = false
-			orderDelete <- Orderstatus{Owner: Self_nr, Floor: elevator.Floor, Button: BT_HallDown, Served: true}
+			orderDelete <- Orderstatus{Floor: elevator.Floor, Button: BT_HallDown, Served: true}
 		}
 	}
 }

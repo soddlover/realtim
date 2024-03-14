@@ -5,16 +5,11 @@ import (
 	"mymodule/config"
 	. "mymodule/elevator"
 	"mymodule/elevator/elevio"
-	"mymodule/network/SheriffDeputyWrangler/sheriff"
+	"mymodule/network/SheriffWrangler/sheriff"
 	. "mymodule/types"
 	"sort"
 	"time"
 )
-
-type IDAndDuration struct {
-	ID       string
-	Duration time.Duration
-}
 
 func redistributor(
 	nodeUnavailabe <-chan string,
@@ -38,7 +33,7 @@ func redistributor(
 				for button := 0; button < config.N_BUTTONS; button++ {
 					if networkOrders.Orders[floor][button] == peerID {
 						// Send to assigner for reassignment
-						assignOrder <- Orderstatus{Floor: floor, Button: elevio.ButtonType(button), Served: false, Owner: peerID}
+						assignOrder <- Orderstatus{Floor: floor, Button: elevio.ButtonType(button), Served: false}
 
 					}
 				}
@@ -78,7 +73,6 @@ func Assigner(
 			for _, id := range sortedIDs {
 				if id == config.Self_id {
 					addToLocalQueue <- Order{Floor: order.Floor, Button: order.Button}
-					order.Owner = id
 					networkOrders.Mutex.Lock()
 					networkOrders.Orders[order.Floor][order.Button] = id
 					UpdateLightsFromNetworkOrders(networkOrders.Orders)
@@ -89,7 +83,6 @@ func Assigner(
 				} else {
 					success, _ := sheriff.SendOrderMessage(id, order)
 					if success {
-						order.Owner = id
 						networkOrders.Mutex.Lock()
 						networkOrders.Orders[order.Floor][order.Button] = id
 						UpdateLightsFromNetworkOrders(networkOrders.Orders)
