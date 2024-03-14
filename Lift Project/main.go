@@ -13,7 +13,6 @@ import (
 )
 
 func main() {
-
 	// WHen starting
 	var id string
 	flag.StringVar(&id, "id", "", "id of this peer")
@@ -44,10 +43,6 @@ func main() {
 	config.Self_id = id
 
 	initElev := backup.Backup(*fresh)
-
-	if (initElev == Elev{}) {
-		fmt.Println("Starting with fresh elevator")
-	}
 
 	elevatorStateBackup := make(chan Elev, 10)
 	elevatorStateBroadcast := make(chan Elev, 10)

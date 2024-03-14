@@ -59,7 +59,9 @@ func NetworkFSM(
 	for {
 		switch currentDuty {
 		case dt_initial:
+			fmt.Println("Currently in inital condition, attetming to get sheriff ip")
 			sIP := wrangler.GetSheriffIP()
+			fmt.Println("Sheriff IP is:", sIP)
 			if sIP == "" {
 
 				InitSherrif(
@@ -72,10 +74,11 @@ func NetworkFSM(
 					orderAssigned)
 				currentDuty = dt_sherriff
 			} else {
-				fmt.Println("I am not the only Wrangler in town, connecting to Sheriff:")
+				fmt.Println("Attempting Connecting to Sheriff:")
 				if wrangler.ConnectWranglerToSheriff(sIP) {
-					fmt.Println("Me, a Wrangler connected to Sheriff")
+					fmt.Println("CONNECTED TO SHERIFF WAITING TO RECIEVE IOP")
 					sheriffIP <- sIP
+					fmt.Println("IP recieved on channel, starting message reciever")
 					go wrangler.ReceiveMessageFromSheriff(orderAssigned, sheriffDead, networkOrders)
 					currentDuty = dt_wrangler
 				}

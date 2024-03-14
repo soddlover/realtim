@@ -18,6 +18,7 @@ var orderSent = make(chan Orderstatus)
 var NodeOrdersReceived = make(chan NetworkOrdersData)
 
 func ConnectWranglerToSheriff(sheriffIP string) bool {
+	fmt.Println("netdial to sheriff:", sheriffIP)
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", sheriffIP, config.TCP_port))
 	if err != nil {
 		fmt.Println("Error connecting to sheriff:", err)
