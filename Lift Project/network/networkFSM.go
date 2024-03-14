@@ -57,9 +57,9 @@ func NetworkFSM(
 		switch currentDuty {
 		case dt_initial:
 			sIP := wrangler.GetSheriffIP()
-			fmt.Println("Sheriff IP is:", sIP)
 			if sIP == "" {
 				if chosenOne {
+					fmt.Println("I am sheriff!")
 					currentDuty = dt_sherriff
 					go sheriff.Sheriff(assignOrder,
 						lastnetworkOrders,
@@ -78,6 +78,7 @@ func NetworkFSM(
 					sheriffIP <- sIP
 					go wrangler.ReceiveMessageFromSheriff(addToLocalQueue, sheriffDead, requestSystemState, systemState, addToLocalQueue)
 					currentDuty = dt_wrangler
+					fmt.Println("I am wrangler!")
 				}
 			}
 			startOrderForwarderOnce.Do(func() {
