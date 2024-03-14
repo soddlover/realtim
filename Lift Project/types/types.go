@@ -44,7 +44,6 @@ type Elev struct {
 	Dir   ElevatorDirection
 	Floor int
 	Queue [config.N_FLOORS][config.N_BUTTONS]bool
-	Obstr bool
 }
 
 type Order struct {

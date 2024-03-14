@@ -1,11 +1,10 @@
-package network
+package sheriff
 
 import (
 	"fmt"
 	"mymodule/config"
-	. "mymodule/elevator"
+	"mymodule/elevator"
 	"mymodule/elevator/elevio"
-	"mymodule/network/SheriffWrangler/sheriff"
 	. "mymodule/types"
 	"sort"
 	"time"
@@ -36,12 +35,12 @@ func Assigner(
 
 			sortedIDs := calculateSortedIDs(localSystemState, networkOrders, Order{Floor: order.Floor, Button: order.Button})
 			for _, id := range sortedIDs {
-				if id == config.Self_id {
+				if id == config.Id {
 					addToLocalQueue <- Order{Floor: order.Floor, Button: order.Button}
 					writeNetworkOrders <- OrderID{Floor: order.Floor, Button: order.Button, ID: id}
 					break
 				} else {
-					success, _ := sheriff.SendOrderMessage(id, order)
+					success, _ := SendOrderMessage(id, order)
 					if success {
 						writeNetworkOrders <- OrderID{Floor: order.Floor, Button: order.Button, ID: id}
 						break
@@ -77,15 +76,7 @@ func redistributor(
 	}
 }
 
-func timeToServeRequest(e_old Elev, b elevio.ButtonType, f int) time.Duration { //FIX THIS FUCKING FUNCTION
-	defer func() {
-		if r := recover(); r != nil {
-			fmt.Println("*****************************************")
-			fmt.Println("Recovered from panic in timeToServeRequest:", r)
-			fmt.Println("*****************************************")
-			fmt.Println(e_old)
-		}
-	}()
+func timeToServeRequest(e_old Elev, b elevio.ButtonType, f int) time.Duration {
 
 	e := e_old
 	e.Queue[f][b] = true
@@ -102,7 +93,7 @@ func timeToServeRequest(e_old Elev, b elevio.ButtonType, f int) time.Duration { 
 
 	switch e.State {
 	case EB_Idle:
-		e.Dir = ChooseDirection(e)
+		e.Dir = elevator.ChooseDirection(e)
 		if e.Dir == DirStop {
 			return duration
 		}
@@ -111,19 +102,19 @@ func timeToServeRequest(e_old Elev, b elevio.ButtonType, f int) time.Duration { 
 		e.Floor += int(e.Dir)
 	case EB_DoorOpen:
 		duration -= config.DOOR_OPEN_TIME / 2
-		if !OrdersAbove(e) && !OrdersBelow(e) {
+		if !elevator.OrdersAbove(e) && !elevator.OrdersBelow(e) {
 			return duration
 		}
 	}
 
 	for {
-		if ShouldStop(e) {
+		if elevator.ShouldStop(e) {
 			e = requestsClearAtCurrentFloor(e, ifEqual)
 			if arrivedAtRequest == 1 {
 				return duration
 			}
 			duration += config.DOOR_OPEN_TIME
-			e.Dir = ChooseDirection(e)
+			e.Dir = elevator.ChooseDirection(e)
 		}
 		e.Floor += int(e.Dir)
 		duration += config.TRAVEL_TIME
@@ -132,7 +123,7 @@ func timeToServeRequest(e_old Elev, b elevio.ButtonType, f int) time.Duration { 
 
 func requestsClearAtCurrentFloor(e_old Elev, f func(elevio.ButtonType, int)) Elev {
 	e := e_old
-	for b := elevio.ButtonType(0); b < N_BUTTONS; b++ {
+	for b := elevio.ButtonType(0); b < config.N_BUTTONS; b++ {
 		if e.Queue[e.Floor][b] {
 			e.Queue[e.Floor][b] = false
 			if f != nil {
@@ -147,9 +138,7 @@ func calculateSortedIDs(systemState map[string]Elev, networkOrders [config.N_FLO
 	var durations []IDAndDuration
 
 	for id, elevator := range systemState {
-		if elevator.Obstr {
-			fmt.Println("Elevator with id: ", id, " is obstructed")
-		}
+
 		if elevator.State == EB_UNAVAILABLE {
 			continue
 		}

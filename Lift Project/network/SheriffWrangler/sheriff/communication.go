@@ -14,48 +14,8 @@ import (
 	"time"
 )
 
-const DEPUTY_SEND_FREQ = 3 * time.Second
-
 var chosenOneID string
-var WranglerConnections = make(map[string]net.Conn)
-
-func CheckMissingConnToOrders(
-	networkOrders [config.N_FLOORS][config.N_BUTTONS]string,
-	nodeUnavailabe chan<- string) {
-
-	processedIDs := make(map[string]bool)
-
-	fmt.Println("Checking for missing connections to orders")
-
-	for floor := 0; floor < config.N_FLOORS; floor++ {
-		for button := 0; button < config.N_BUTTONS; button++ {
-			id := networkOrders[floor][button]
-			//fmt.Printf("Checking order at floor %d, button %d, id: %s\n", floor, button, id) // Print the current order being checked
-			if id != "" && WranglerConnections[id] == nil && id != config.Self_id && !processedIDs[id] {
-				nodeUnavailabe <- id
-				fmt.Println("***Missing connection to ACTIVE ORDER Reassigning order!!!***", id)
-				processedIDs[id] = true
-			} else {
-				//fmt.Printf("Order at floor %d, button %d is not missing connection\n", floor, button) // Print a message if the order is not missing connection
-			}
-		}
-	}
-}
-
-func Sheriff(
-	assignOrder chan<- Orderstatus,
-	requestNetworkOrders chan<- bool,
-	networkorders <-chan [config.N_FLOORS][config.N_BUTTONS]string,
-	nodeUnavailabe chan<- string) {
-
-	ip := strings.Split(string(config.Self_id), ":")[0]
-	go Transmitter(config.Sheriff_port, ip)
-	go listenForWranglerConnections(assignOrder, nodeUnavailabe)
-	time.Sleep(1 * time.Second)
-	requestNetworkOrders <- true
-	networkOrders := <-networkorders
-	CheckMissingConnToOrders(networkOrders, nodeUnavailabe)
-}
+var wranglerConnections = make(map[string]net.Conn)
 
 func listenForWranglerConnections(
 	assignOrder chan<- Orderstatus,
@@ -93,10 +53,10 @@ func listenForWranglerConnections(
 
 		peerID := strings.TrimSpace(message)
 
-		WranglerConnections[peerID] = conn
+		wranglerConnections[peerID] = conn
 
 		fmt.Println("Accepted Wrangler", peerID)
-		fmt.Println(WranglerConnections)
+		fmt.Println(wranglerConnections)
 		go ReceiveMessage(conn, assignOrder, peerID, nodeUnavailabe)
 
 	}
@@ -104,8 +64,8 @@ func listenForWranglerConnections(
 
 func SendNetworkOrders(networkOrders [config.N_FLOORS][config.N_BUTTONS]string) {
 
-	for id, conn := range WranglerConnections {
-		if chosenOneID == "" || WranglerConnections[chosenOneID] == nil {
+	for id, conn := range wranglerConnections {
+		if chosenOneID == "" || wranglerConnections[chosenOneID] == nil {
 			chosenOneID = id
 		}
 		nodeOrdersData := NetworkOrdersData{
@@ -140,7 +100,7 @@ func SendNetworkOrders(networkOrders [config.N_FLOORS][config.N_BUTTONS]string) 
 
 func SendOrderMessage(peer string, order Orderstatus) (bool, error) {
 
-	conn, ok := WranglerConnections[peer]
+	conn, ok := wranglerConnections[peer]
 	if !ok {
 		fmt.Println("No connection to ", peer)
 
@@ -162,7 +122,7 @@ func SendOrderMessage(peer string, order Orderstatus) (bool, error) {
 	if err != nil {
 		fmt.Println("Error sending order:", err)
 		conn.Close()
-		delete(WranglerConnections, peer)
+		delete(wranglerConnections, peer)
 		return false, err
 	}
 	fmt.Println("successs Sent order to", peer, "order:", order)
@@ -197,20 +157,20 @@ func ReceiveMessage(
 	fmt.Println("closing connection to", peerID)
 	conn.Close()
 	nodeUnavailabe <- peerID
-	delete(WranglerConnections, peerID)
+	delete(wranglerConnections, peerID)
 	return Orderstatus{}, nil
 }
 
 func CloseConns(id string) {
 	if id == "ALL" {
-		for id, conn := range WranglerConnections {
+		for id, conn := range wranglerConnections {
 			fmt.Println("Closing connection to", id)
 			conn.Close()
 		}
 	}
-	if WranglerConnections[id] != nil {
+	if wranglerConnections[id] != nil {
 		fmt.Println("Closing connection to", id)
-		WranglerConnections[id].Close()
+		wranglerConnections[id].Close()
 	} else {
 		fmt.Println("Connection already closed", id)
 	}

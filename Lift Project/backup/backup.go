@@ -3,40 +3,47 @@ package backup
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"mymodule/config"
-	. "mymodule/config"
 	"mymodule/elevator/elevio"
 	. "mymodule/types"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 )
 
 func Backup(fresh bool) Elev {
-
-	if fresh {
-		os.Remove("backup" + config.Self_nr + ".txt")
-		return Elev{}
-	}
+	fmt.Println("config id:", config.Id)
+	if fresh { //remove before delivery
+		os.Remove("backup_" + strings.Split(config.Id, ":")[1] + ".txt") //remove before delivery
+		return Elev{}                                                    //remove before delivery
+	} //remove before delivery
 
 	ticker := time.NewTicker(config.BACKUP_DEADLINE)
 
 	for {
 		<-ticker.C
 
-		fileInfo, err := os.Stat("backup" + config.Self_nr + ".txt")
+		fileInfo, err := os.Stat("backup_" + strings.Split(config.Id, ":")[1] + ".txt")
 		if err != nil {
-			fmt.Println("Error getting file info:", err)
-			return takeControl()
+			if os.IsNotExist(err) {
+				// The file doesn't exist, create it
+				_, err := os.Create("backup_" + strings.Split(config.Id, ":")[1] + ".txt")
+				if err != nil {
+					fmt.Println("Error creating file:", err)
+					return takeControl()
+				}
+			} else {
+				fmt.Println("Error getting file info:", err)
+				return takeControl()
+			}
 		}
-
 		currentModTime := fileInfo.ModTime()
 
 		if time.Since(currentModTime) > config.BACKUP_DEADLINE {
 			return takeControl()
 		}
-		fmt.Println("Backup is still alive. KJØH ")
+		fmt.Println("Process alive ...")
 	}
 }
 
@@ -55,7 +62,7 @@ func WriteBackup(elevChan <-chan Elev) {
 			fmt.Println("Error marshalling json:", err)
 			continue
 		}
-		err = os.WriteFile("backup"+config.Self_nr+".txt", stateJson, 0644)
+		err = os.WriteFile("backup"+strings.Split(config.Id, ":")[1]+".txt", stateJson, 0644)
 		if err != nil {
 			fmt.Println("Error writing to file:", err)
 			continue
@@ -66,7 +73,7 @@ func WriteBackup(elevChan <-chan Elev) {
 func takeControl() Elev {
 	fmt.Println("Backup is taking over.")
 
-	stateJson, err := os.ReadFile("backup" + config.Self_nr + ".txt")
+	stateJson, err := os.ReadFile("backup" + strings.Split(config.Id, ":")[1] + ".txt")
 	if err != nil {
 		fmt.Println("Error reading file:", err)
 	}
@@ -75,20 +82,16 @@ func takeControl() Elev {
 	if err != nil {
 		fmt.Println("Error unmarshalling json:", err)
 	} else {
-		for Floor := 0; Floor < N_FLOORS; Floor++ {
-			if Floor < len(elev.Queue) && int(elevio.BT_HallUp) < len(elev.Queue[Floor]) && int(elevio.BT_HallDown) < len(elev.Queue[Floor]) {
-				elev.Queue[Floor][elevio.BT_HallUp] = false
-				elev.Queue[Floor][elevio.BT_HallDown] = false
-			} else {
-				fmt.Println("Index out of range")
-			}
+
+		for Floor := range elev.Queue {
+			elev.Queue[Floor][elevio.BT_HallUp] = false
+			elev.Queue[Floor][elevio.BT_HallDown] = false
 		}
 	}
 	cmd := exec.Command("gnome-terminal", "--", "go", "run", "main.go")
 	err = cmd.Run()
 	if err != nil {
-		fmt.Println("THis sucks")
-		log.Fatal(err)
+		fmt.Println("Failed to spawn pair proccess, entering the DANGER ZONE")
 	}
 	return elev
 }

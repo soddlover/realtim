@@ -1,4 +1,4 @@
-package elevatorFSM
+package elevator
 
 import (
 	"fmt"
@@ -18,10 +18,9 @@ func elevatorInit(elevator Elev, drv_floors <-chan int) Elev {
 			Dir:   DirStop,
 			Floor: elevio.GetFloor(),
 			Queue: [N_FLOORS][N_BUTTONS]bool{},
-			Obstr: false,
 		}
 	}
-	for floor := 0; floor < N_FLOORS; floor++ {
+	for floor := range elevator.Queue {
 		elevio.SetButtonLamp(elevio.BT_HallUp, floor, false)
 		elevio.SetButtonLamp(elevio.BT_HallDown, floor, false)
 	}
@@ -41,8 +40,9 @@ func elevatorInit(elevator Elev, drv_floors <-chan int) Elev {
 			elevio.SetMotorDirection(elevio.MotorDirection(elevator.Dir))
 
 		case <-ticker.C:
-			fmt.Println("Failed to arrive at floor within time limit, killing myself")
+			fmt.Println("Failed to arrive at floor within time limit initallym, motor error assumed")
 			elevator.State = EB_UNAVAILABLE
+			elevio.SetMotorDirection(elevio.MD_Down)
 			ticker.Stop()
 		}
 	}
@@ -53,14 +53,13 @@ func ShouldStop(elevator Elev) bool {
 	switch elevator.Dir {
 	case DirUp:
 		return elevator.Queue[elevator.Floor][elevio.BT_HallUp] ||
-			elevator.Queue[elevator.Floor][elevio.BT_Cab] || !OrdersAbove(elevator)
+			elevator.Queue[elevator.Floor][elevio.BT_Cab] ||
+			!OrdersAbove(elevator)
 
 	case DirDown:
 		return elevator.Queue[elevator.Floor][elevio.BT_HallDown] ||
 			elevator.Queue[elevator.Floor][elevio.BT_Cab] ||
 			!OrdersBelow(elevator)
-	case DirStop:
-		return true //??
 	default:
 		return true
 	}

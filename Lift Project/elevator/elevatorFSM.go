@@ -1,4 +1,4 @@
-package elevatorFSM
+package elevator
 
 import (
 	"fmt"
@@ -6,19 +6,20 @@ import (
 	"mymodule/elevator/elevio"
 	. "mymodule/types"
 	"strconv"
+	"strings"
 	"time"
 )
 
 func RunElev(
 	elevatorStateBackup chan<- Elev,
 	elevatorStateBroadcast chan<- Elev,
-	orderRequest chan<- Order,
+	localOrderRequest chan<- Order,
 	addToQueue <-chan Order,
 	orderServed chan<- Orderstatus,
 	initElev Elev) {
 
-	idInt, _ := strconv.Atoi(config.Self_nr)
-	port := config.SimulatorPort + idInt
+	nr, _ := strconv.Atoi(strings.Split(config.Id, ":")[0]) //remove before delivery
+	port := config.SimulatorPort + nr
 	addr := "localhost:" + fmt.Sprint(port)
 	elevio.Init(addr, N_FLOORS)
 
@@ -29,16 +30,16 @@ func RunElev(
 	doorTimer.Stop()
 	motorErrorTimer.Stop()
 
-	drv_buttons := make(chan elevio.ButtonEvent, 10)
-	drv_floors := make(chan int, 10)
-	drv_obstr := make(chan bool, 10)
-	drv_stop := make(chan bool, 10)
+	drv_buttons := make(chan elevio.ButtonEvent, config.ELEVATOR_BUFFER_SIZE)
+	drv_floors := make(chan int, config.ELEVATOR_BUFFER_SIZE)
+	drv_obstr := make(chan bool, config.ELEVATOR_BUFFER_SIZE)
+	drv_stop := make(chan bool, config.ELEVATOR_BUFFER_SIZE)
 
 	go elevio.PollButtons(drv_buttons)
 	go elevio.PollFloorSensor(drv_floors)
 	go elevio.PollObstructionSwitch(drv_obstr)
 	go elevio.PollStopButton(drv_stop)
-	go updateLights(&elevator)
+	go updateLights(&elevator) //SPM: OK to use a pointer here?
 
 	elevatorStateBackup <- elevator
 
@@ -46,19 +47,19 @@ func RunElev(
 	if elevator.Dir != DirStop {
 		motorErrorTimer.Reset(config.MOTOR_ERROR_TIME)
 	}
+
 	elevatorStateBackup <- elevator
 	elevatorStateBroadcast <- elevator
 
 	for {
 		select {
 		case buttonEvent := <-drv_buttons:
-			fmt.Println("Button event at floor", buttonEvent.Floor, "button", buttonEvent.Button)
-			orderRequest <- Order{Floor: buttonEvent.Floor, Button: buttonEvent.Button}
+			localOrderRequest <- Order{Floor: buttonEvent.Floor, Button: buttonEvent.Button}
 
 		case order := <-addToQueue:
-			fmt.Println("Order assigned: ", order)
 			elevator.Queue[order.Floor][order.Button] = true
 			switch elevator.State {
+
 			case EB_Idle:
 				elevator.Dir = ChooseDirection(elevator)
 				elevio.SetMotorDirection(elevio.MotorDirection(elevator.Dir))
@@ -72,7 +73,9 @@ func RunElev(
 					elevator.State = EB_Moving
 					motorErrorTimer.Reset(config.MOTOR_ERROR_TIME)
 				}
+
 			case EB_Moving:
+
 			case EB_DoorOpen:
 				if elevator.Floor == order.Floor {
 					if elevator.Queue[order.Floor][order.Button] {
@@ -82,14 +85,11 @@ func RunElev(
 
 					doorTimer.Reset(config.DOOR_OPEN_TIME)
 				}
+
 			case EB_UNAVAILABLE:
 				if order.Button == elevio.BT_Cab && elevator.Floor == order.Floor && elevio.GetObstruction() {
 					elevator.Queue[order.Floor][order.Button] = false
 				}
-
-				fmt.Println("Elevator is unavailable SO THIS NEW ORDER BETTER FUCKING BE A CAB ORDER")
-			default:
-				fmt.Println("Undefined state WTF")
 			}
 
 			elevatorStateBackup <- elevator
@@ -100,18 +100,13 @@ func RunElev(
 				elevio.SetStopLamp(false)
 				elevator.State = EB_Moving
 			}
-
-			fmt.Println("Arrived at floor", elevator.Floor)
 			elevio.SetFloorIndicator(elevator.Floor)
 			if ShouldStop(elevator) {
 				motorErrorTimer.Stop()
 				elevio.SetMotorDirection(elevio.MD_Stop)
 				elevio.SetDoorOpenLamp(true)
 				doorTimer.Reset(config.DOOR_OPEN_TIME)
-
 				clearAtFloor(&elevator, orderServed)
-				//elevator.Dir = DirStop
-
 				elevator.State = EB_DoorOpen
 			} else if elevator.State == EB_Moving {
 				motorErrorTimer.Reset(config.MOTOR_ERROR_TIME)
@@ -121,7 +116,6 @@ func RunElev(
 		case <-doorTimer.C:
 			if elevio.GetObstruction() {
 				doorTimer.Reset(config.DOOR_OPEN_TIME)
-				elevator.Obstr = true
 				elevio.SetStopLamp(true)
 				elevator.State = EB_UNAVAILABLE
 				fmt.Println("Obstruction detected")
@@ -151,21 +145,18 @@ func RunElev(
 			elevatorStateBroadcast <- elevator
 		case <-motorErrorTimer.C:
 			elevator.State = EB_UNAVAILABLE
-			elevatorStateBackup <- elevator
-			elevatorStateBroadcast <- elevator
 			fmt.Println("Motor error, killing myself")
 			elevio.SetStopLamp(true)
-			for floor := 0; floor < N_FLOORS; floor++ {
+			for floor := range elevator.Queue {
 				elevator.Queue[floor][elevio.BT_HallUp] = false
 				elevator.Queue[floor][elevio.BT_HallDown] = false
 			}
-
-			//os.Exit(1)
+			elevatorStateBackup <- elevator
+			elevatorStateBroadcast <- elevator
 
 		case obstruction := <-drv_obstr:
 			if !obstruction && elevator.State == EB_UNAVAILABLE {
 				doorTimer.Reset(config.DOOR_OPEN_TIME)
-				elevator.Obstr = false
 				elevio.SetStopLamp(false)
 				elevator.State = EB_DoorOpen
 				elevatorStateBackup <- elevator

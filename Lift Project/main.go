@@ -2,64 +2,49 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"mymodule/backup"
 	"mymodule/config"
 	elev "mymodule/elevator"
 	"mymodule/network"
 	"mymodule/network/localip"
 	. "mymodule/types"
-	"time"
 )
 
 func main() {
 	var id string
 	flag.StringVar(&id, "id", "", "id of this peer")
-	fresh := flag.Bool("fresh", false, "Start a fresh elevator")
+	fresh := flag.Bool("fresh", false, "Start a fresh elevator") //remove before delivery
 	flag.Parse()
-
-	var localIP string
-
-	for {
-		var err error
-		localIP, err = localip.LocalIP()
-		if err != nil {
-			fmt.Println(err)
-			time.Sleep(1 * time.Second)
-		} else {
-			break
-		}
-	}
-
 	if id == "" {
 		id = "0"
-	}
 
-	config.Self_nr = id
-	id = localIP + ":" + id
-	config.Self_id = id
+	}
+	localIP := localip.LocalIP()
+
+	config.Id = localIP + ":" + id
 
 	initElev := backup.Backup(*fresh)
 
 	elevatorStateBackup := make(chan Elev, config.ELEVATOR_BUFFER_SIZE)
 	elevatorStateBroadcast := make(chan Elev, config.NETWORK_BUFFER_SIZE)
-	localRequest := make(chan Order, 10)
-	addToLocalQueue := make(chan Order, 10)
-	localOrderServed := make(chan Orderstatus, 10)
+	localOrderRequest := make(chan Order, config.ELEVATOR_BUFFER_SIZE)
+	addToLocalQueue := make(chan Order, config.ELEVATOR_BUFFER_SIZE)
+	localOrderServed := make(chan Orderstatus, config.ELEVATOR_BUFFER_SIZE)
 
-	go backup.WriteBackup(elevatorStateBackup)
+	go backup.WriteBackup(
+		elevatorStateBackup)
 
 	go elev.RunElev(
 		elevatorStateBackup,
 		elevatorStateBroadcast,
-		localRequest,
+		localOrderRequest,
 		addToLocalQueue,
 		localOrderServed,
 		initElev)
 
 	go network.NetworkFSM(
 		elevatorStateBroadcast,
-		localRequest,
+		localOrderRequest,
 		addToLocalQueue,
 		localOrderServed)
 

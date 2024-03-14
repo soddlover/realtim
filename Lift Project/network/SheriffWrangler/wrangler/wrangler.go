@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"mymodule/config"
-	elevatorFSM "mymodule/elevator"
+	"mymodule/elevator"
 	"mymodule/elevator/elevio"
 	"mymodule/network/conn"
 	"mymodule/types"
@@ -45,8 +45,8 @@ func ConnectWranglerToSheriff(sheriffIP string) bool {
 		return false
 	}
 
-	fmt.Fprintf(conn, "%s\n", config.Self_id)
-	fmt.Println("sent id to sheriff:", config.Self_id)
+	fmt.Fprintf(conn, "%s\n", config.Id)
+	fmt.Println("sent id to sheriff:", config.Id)
 	sheriffConn = conn
 	return true
 }
@@ -145,7 +145,7 @@ func ReceiveMessageFromSheriff(
 
 			fmt.Println("Received nodeOrdersData from sheriff:")
 			nodeOrdersReceived <- nodeOrdersData
-			elevatorFSM.UpdateLightsFromNetworkOrders(nodeOrdersData.NetworkOrders)
+			elevator.UpdateLightsFromNetworkOrders(nodeOrdersData.NetworkOrders)
 			lastNetworkOrdersData = nodeOrdersData
 
 		default:
@@ -269,7 +269,7 @@ func checkSync(requestSystemState chan<- bool, systemState <-chan map[string]Ele
 				localSystemState := <-systemState
 				assignedElev, existsInSystemState := localSystemState[networkOrders[floor][button]]
 				if !existsInSystemState || !assignedElev.Queue[floor][button] {
-					if networkOrders[floor][button] == config.Self_id {
+					if networkOrders[floor][button] == config.Id {
 						addToLocalQueue <- Order{Floor: floor, Button: elevio.ButtonType(button)}
 						fmt.Println("WARNING - Order not in sync with system state, reassigning order TO MYSELF KJØH")
 					}

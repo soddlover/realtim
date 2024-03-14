@@ -24,5 +24,4 @@ const (
 	ORDER_DEADLINE       = TRAVEL_TIME * N_FLOORS * time.Second
 )
 
-var Self_id string = ""
-var Self_nr string = "0"
+var Id string = ""

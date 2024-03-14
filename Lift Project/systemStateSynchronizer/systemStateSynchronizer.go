@@ -117,7 +117,7 @@ func repeater(elevatorState <-chan Elev, broadcastStateTx chan<- BcastState) {
 		case <-ticker.C:
 			broadcastState = BcastState{
 				ElevState:      lastElev,
-				ID:             config.Self_id,
+				ID:             config.Id,
 				SequenceNumber: i,
 			}
 			broadcastStateTx <- broadcastState
