@@ -52,6 +52,12 @@ type Order struct {
 	Button elevio.ButtonType
 }
 
+type OrderID struct {
+	Floor  int
+	Button elevio.ButtonType
+	ID     string
+}
+
 type Message struct {
 	Type string          `json:"type"`
 	Data json.RawMessage `json:"data"`
