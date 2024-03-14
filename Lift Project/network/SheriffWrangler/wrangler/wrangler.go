@@ -13,6 +13,9 @@ import (
 	"time"
 )
 
+const N_FLOORS = config.N_FLOORS
+const N_BUTTONS = config.N_BUTTONS
+
 var sheriffConn net.Conn
 var orderSent = make(chan Orderstatus)
 var nodeOrdersReceived = make(chan NetworkOrdersData)
@@ -163,11 +166,11 @@ func CloseSheriffConn() {
 
 func handleOrderSent(
 	orderstatus Orderstatus,
-	unacknowledgedButtons *[config.N_FLOORS][config.N_BUTTONS]bool,
-	unacknowledgedComplete *[config.N_FLOORS][config.N_BUTTONS]bool,
-	orderTickers *[config.N_FLOORS][config.N_BUTTONS]*time.Ticker,
-	orderRetryCounts *[config.N_FLOORS][config.N_BUTTONS]int,
-	quitChannels *[config.N_FLOORS][config.N_BUTTONS]chan bool,
+	unacknowledgedButtons *[N_FLOORS][N_BUTTONS]bool,
+	unacknowledgedComplete *[N_FLOORS][N_BUTTONS]bool,
+	orderTickers *[N_FLOORS][N_BUTTONS]*time.Ticker,
+	orderRetryCounts *[N_FLOORS][N_BUTTONS]int,
+	quitChannels *[N_FLOORS][N_BUTTONS]chan bool,
 ) {
 	if orderstatus.Served {
 		unacknowledgedComplete[orderstatus.Floor][orderstatus.Button] = true
@@ -188,7 +191,7 @@ func resendOrder(
 	order Orderstatus,
 	ticker *time.Ticker,
 	quit <-chan bool,
-	orderRetryCounts *[config.N_FLOORS][config.N_BUTTONS]int,
+	orderRetryCounts *[N_FLOORS][N_BUTTONS]int,
 ) {
 	const maxRetries = 5
 	for {
@@ -212,14 +215,14 @@ func resendOrder(
 
 func handleNetworkOrders(
 	networkorders NetworkOrdersData,
-	unacknowledgedButtons *[config.N_FLOORS][config.N_BUTTONS]bool,
-	unacknowledgedComplete *[config.N_FLOORS][config.N_BUTTONS]bool,
-	quitChannels *[config.N_FLOORS][config.N_BUTTONS]chan bool,
+	unacknowledgedButtons *[N_FLOORS][N_BUTTONS]bool,
+	unacknowledgedComplete *[N_FLOORS][N_BUTTONS]bool,
+	quitChannels *[N_FLOORS][N_BUTTONS]chan bool,
 ) {
 	fmt.Println("Received network orders from ", networkorders)
 
-	for floor := 0; floor < config.N_FLOORS; floor++ {
-		for button := 0; button < config.N_BUTTONS; button++ {
+	for floor := 0; floor < N_FLOORS; floor++ {
+		for button := 0; button < N_BUTTONS; button++ {
 			if networkorders.NetworkOrders[floor][button] != "" {
 				if unacknowledgedButtons[floor][button] {
 					unacknowledgedButtons[floor][button] = false
@@ -236,11 +239,11 @@ func handleNetworkOrders(
 }
 
 func acknowledger(OrderSent <-chan Orderstatus, networkOrdersRecieved <-chan NetworkOrdersData) {
-	unacknowledgedButtons := [config.N_FLOORS][config.N_BUTTONS]bool{}
-	unacknowledgedComplete := [config.N_FLOORS][config.N_BUTTONS]bool{}
-	orderTickers := [config.N_FLOORS][config.N_BUTTONS]*time.Ticker{}
-	orderRetryCounts := [config.N_FLOORS][config.N_BUTTONS]int{}
-	quitChannels := [config.N_FLOORS][config.N_BUTTONS]chan bool{}
+	unacknowledgedButtons := [N_FLOORS][N_BUTTONS]bool{}
+	unacknowledgedComplete := [N_FLOORS][N_BUTTONS]bool{}
+	orderTickers := [N_FLOORS][N_BUTTONS]*time.Ticker{}
+	orderRetryCounts := [N_FLOORS][N_BUTTONS]int{}
+	quitChannels := [N_FLOORS][N_BUTTONS]chan bool{}
 
 	for {
 		select {

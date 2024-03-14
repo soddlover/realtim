@@ -132,7 +132,7 @@ func timeToServeRequest(e_old Elev, b elevio.ButtonType, f int) time.Duration { 
 
 func requestsClearAtCurrentFloor(e_old Elev, f func(elevio.ButtonType, int)) Elev {
 	e := e_old
-	for b := elevio.ButtonType(0); b < config.N_BUTTONS; b++ {
+	for b := elevio.ButtonType(0); b < N_BUTTONS; b++ {
 		if e.Queue[e.Floor][b] {
 			e.Queue[e.Floor][b] = false
 			if f != nil {

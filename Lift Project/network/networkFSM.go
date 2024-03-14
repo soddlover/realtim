@@ -237,8 +237,8 @@ func orderForwarder(
 func checkSync(requestSystemState chan<- bool, systemState <-chan map[string]Elev, networkOrders *NetworkOrders, addToLocalQueue chan<- Order) {
 	for {
 		networkOrders.Mutex.Lock()
-		for floor := 0; floor < config.N_FLOORS; floor++ {
-			for button := 0; button < config.N_BUTTONS; button++ {
+		for floor := 0; floor < N_FLOORS; floor++ {
+			for button := 0; button < N_BUTTONS; button++ {
 				if networkOrders.Orders[floor][button] != "" {
 					requestSystemState <- true
 					localSystemState := <-systemState
@@ -260,9 +260,9 @@ func checkSync(requestSystemState chan<- bool, systemState <-chan map[string]Ele
 func netWorkOrderHandler(
 	requestNetworkOrders <-chan bool,
 	writeNetworkOrders <-chan OrderID,
-	networkorders chan<- [config.N_FLOORS][config.N_BUTTONS]string,
+	networkorders chan<- [N_FLOORS][N_BUTTONS]string,
 	incomingOrder chan<- Orderstatus,
-	lastNetworkOrders [config.N_FLOORS][config.N_BUTTONS]string) {
+	lastNetworkOrders [N_FLOORS][N_BUTTONS]string) {
 
 	NetworkOrders := lastNetworkOrders
 
