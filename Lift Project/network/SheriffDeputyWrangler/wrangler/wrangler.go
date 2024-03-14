@@ -90,72 +90,6 @@ func sendOrderToSheriff(order Orderstatus, OrderSent chan Orderstatus) (bool, er
 }
 
 // THIS FUNCTION DOES NOT WORK AT ALL YET BEWARE WTF!!!!!!!!
-func acknowledger(OrderSent <-chan Orderstatus, networkOrdersRecieved <-chan NetworkOrdersData) {
-	unacknowledgedButtons := [config.N_FLOORS][config.N_BUTTONS]bool{}
-	unacknowledgedComplete := [config.N_FLOORS][config.N_BUTTONS]bool{}
-	orderTickers := [config.N_FLOORS][config.N_BUTTONS]*time.Ticker{}
-	orderRetryCounts := [config.N_FLOORS][config.N_BUTTONS]int{}
-	const maxRetries = 5
-	for {
-		select {
-		case orderstatus := <-OrderSent:
-			if orderstatus.Served {
-				unacknowledgedComplete[orderstatus.Floor][orderstatus.Button] = true
-			} else {
-				unacknowledgedButtons[orderstatus.Floor][orderstatus.Button] = true
-			}
-			ticker := time.NewTicker(500 * time.Millisecond) // Resend the order every 10 seconds
-			orderTickers[orderstatus.Floor][orderstatus.Button] = ticker
-			go func(order Orderstatus) {
-				for range ticker.C {
-					if orderRetryCounts[order.Floor][order.Button] >= maxRetries {
-						ticker.Stop()
-						fmt.Printf("***************************************************************************************************")
-						fmt.Printf("Order withgiving iup")
-						fmt.Printf("***************************************************************************************************")
-						orderRetryCounts[order.Floor][order.Button] = 0
-						return
-					}
-					fmt.Printf("***************************************************************************************************")
-					fmt.Printf("Resending order on floor %d, button %d\n", order.Floor, order.Button)
-					fmt.Printf("***************************************************************************************************")
-
-					resendOrderToSheriff(order)
-					orderRetryCounts[order.Floor][order.Button]++
-				}
-			}(orderstatus)
-
-		case networkorders := <-networkOrdersRecieved:
-			// Which orders have been deleted?
-			fmt.Println("Received network orders from ", networkorders)
-			for floor := 0; floor < config.N_FLOORS; floor++ {
-				for button := 0; button < config.N_BUTTONS; button++ {
-					if networkorders.NetworkOrders[floor][button] != "" {
-						if unacknowledgedButtons[floor][button] {
-							unacknowledgedButtons[floor][button] = false
-							fmt.Println("Order acknowledged by sheriff:", floor, button)
-							if ticker := orderTickers[floor][button]; ticker != nil {
-								ticker.Stop()
-								orderTickers[floor][button] = nil
-							}
-						}
-					} else {
-						if unacknowledgedComplete[floor][button] {
-							fmt.Println("Order acknowledged by sheriff:", floor, button)
-							unacknowledgedComplete[floor][button] = false
-							if ticker := orderTickers[floor][button]; ticker != nil {
-								ticker.Stop()
-								orderTickers[floor][button] = nil
-							}
-
-						}
-
-					}
-				}
-			}
-		}
-	}
-}
 
 // ReceiveMessageFromsheriff receives an order from the sheriff and sends an acknowledgement
 func ReceiveMessageFromSheriff(
@@ -231,4 +165,79 @@ func CloseSheriffConn() {
 		return
 	}
 	fmt.Println("Sheriff connection closed")
+}
+
+func handleOrderSent(orderstatus Orderstatus, unacknowledgedButtons *[config.N_FLOORS][config.N_BUTTONS]bool, unacknowledgedComplete *[config.N_FLOORS][config.N_BUTTONS]bool, orderTickers *[config.N_FLOORS][config.N_BUTTONS]*time.Ticker, orderRetryCounts *[config.N_FLOORS][config.N_BUTTONS]int, quitChannels *[config.N_FLOORS][config.N_BUTTONS]chan bool) {
+	if orderstatus.Served {
+		unacknowledgedComplete[orderstatus.Floor][orderstatus.Button] = true
+	} else {
+		unacknowledgedButtons[orderstatus.Floor][orderstatus.Button] = true
+	}
+
+	ticker := time.NewTicker(500 * time.Millisecond)
+	orderTickers[orderstatus.Floor][orderstatus.Button] = ticker
+
+	quit := make(chan bool)
+	quitChannels[orderstatus.Floor][orderstatus.Button] = quit
+
+	go resendOrder(orderstatus, ticker, quit, orderRetryCounts)
+}
+
+func resendOrder(order Orderstatus, ticker *time.Ticker, quit <-chan bool, orderRetryCounts *[config.N_FLOORS][config.N_BUTTONS]int) {
+	const maxRetries = 5
+	for {
+		select {
+		case <-ticker.C:
+			if orderRetryCounts[order.Floor][order.Button] >= maxRetries {
+				ticker.Stop()
+				fmt.Println("Order withgiving iup")
+				orderRetryCounts[order.Floor][order.Button] = 0
+				return
+			}
+
+			fmt.Printf("Resending order on floor %d, button %d\n", order.Floor, order.Button)
+			resendOrderToSheriff(order)
+			orderRetryCounts[order.Floor][order.Button]++
+		case <-quit:
+			ticker.Stop()
+			return
+		}
+	}
+}
+
+func handleNetworkOrders(networkorders NetworkOrdersData, unacknowledgedButtons *[config.N_FLOORS][config.N_BUTTONS]bool, unacknowledgedComplete *[config.N_FLOORS][config.N_BUTTONS]bool, quitChannels *[config.N_FLOORS][config.N_BUTTONS]chan bool) {
+	fmt.Println("Received network orders from ", networkorders)
+
+	for floor := 0; floor < config.N_FLOORS; floor++ {
+		for button := 0; button < config.N_BUTTONS; button++ {
+			if networkorders.NetworkOrders[floor][button] != "" {
+				if unacknowledgedButtons[floor][button] {
+					unacknowledgedButtons[floor][button] = false
+					fmt.Println("Order acknowledged by sheriff:", floor, button)
+					quitChannels[floor][button] <- true
+				}
+			} else if unacknowledgedComplete[floor][button] {
+				fmt.Println("Order acknowledged by sheriff:", floor, button)
+				unacknowledgedComplete[floor][button] = false
+				quitChannels[floor][button] <- true
+			}
+		}
+	}
+}
+
+func acknowledger(OrderSent <-chan Orderstatus, networkOrdersRecieved <-chan NetworkOrdersData) {
+	unacknowledgedButtons := [config.N_FLOORS][config.N_BUTTONS]bool{}
+	unacknowledgedComplete := [config.N_FLOORS][config.N_BUTTONS]bool{}
+	orderTickers := [config.N_FLOORS][config.N_BUTTONS]*time.Ticker{}
+	orderRetryCounts := [config.N_FLOORS][config.N_BUTTONS]int{}
+	quitChannels := [config.N_FLOORS][config.N_BUTTONS]chan bool{}
+
+	for {
+		select {
+		case orderstatus := <-OrderSent:
+			handleOrderSent(orderstatus, &unacknowledgedButtons, &unacknowledgedComplete, &orderTickers, &orderRetryCounts, &quitChannels)
+		case networkorders := <-networkOrdersRecieved:
+			handleNetworkOrders(networkorders, &unacknowledgedButtons, &unacknowledgedComplete, &quitChannels)
+		}
+	}
 }

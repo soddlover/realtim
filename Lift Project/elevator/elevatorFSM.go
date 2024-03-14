@@ -83,6 +83,10 @@ func RunElev(
 					doorTimer.Reset(config.DOOR_OPEN_TIME)
 				}
 			case EB_UNAVAILABLE:
+				if order.Button == elevio.BT_Cab && elevator.Floor == order.Floor {
+					elevator.Queue[order.Floor][order.Button] = false
+				}
+
 				fmt.Println("Elevator is unavailable SO THIS NEW ORDER BETTER FUCKING BE A CAB ORDER")
 			default:
 				fmt.Println("Undefined state WTF")

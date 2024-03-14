@@ -52,9 +52,7 @@ func NetworkFSM(
 	remainingOrders := make(chan [config.N_FLOORS][config.N_BUTTONS]string)
 	sheriffIP := make(chan string)
 
-	//lostConns := make(chan string)
 	go CloseTCPConns(nodeLeftNetwork, sheriffIP)
-	//go Heartbeats(lostConns, systemState)
 	go checkSync(requestSystemState, systemState, networkOrders, orderAssigned)
 
 	currentDuty = dt_initial
@@ -156,7 +154,7 @@ func CloseTCPConns(lostConns <-chan string, sheriffID <-chan string) {
 				fmt.Println("I am the Sheriff, I am closing the connection to:", id)
 				sheriff.CloseConns(id)
 			}
-			id = strings.Split(id, ":")[0]
+			id = strings.Split(id, ":")[0] //remove this??
 			if currentDuty == dt_wrangler && lastSheriffID == id {
 				fmt.Println("I am the Wrangler, I am closing the connection to:", id)
 				wrangler.CloseSheriffConn()
