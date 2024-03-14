@@ -78,15 +78,6 @@ type HeartBeat struct {
 	Time time.Time
 }
 
-type Duty int
-
-const (
-	DT_initial Duty = iota
-	DT_sherriff
-	DT_wrangler
-	DT_offline
-)
-
 type IDAndDuration struct {
 	ID       string
 	Duration time.Duration

@@ -11,86 +11,65 @@ import (
 	"time"
 )
 
-func redistributor(
-	nodeUnavailabe <-chan string,
-	assignOrder chan<- Orderstatus,
-	requestSystemState chan<- bool,
-	systemState <-chan map[string]Elev,
-	networkOrders *NetworkOrders) {
-	for {
-		select {
-		case peerID := <-nodeUnavailabe:
-			networkOrders.Mutex.Lock()
-			//delete(systemState, peerID)
-			//requestSystemState <- true
-			//localSystemState := <-systemState
-			//fmt.Printf("world.Map: %v\n", localSystemState)
-			fmt.Println("Node is unavailable, redistributing orders")
-			//fmt.Println("NetworkOrders: ", networkOrders.Orders)
-			//check for orders owned by the leaving node
-
-			for floor := 0; floor < config.N_FLOORS; floor++ {
-				for button := 0; button < config.N_BUTTONS; button++ {
-					if networkOrders.Orders[floor][button] == peerID {
-						// Send to assigner for reassignment
-						assignOrder <- Orderstatus{Floor: floor, Button: elevio.ButtonType(button), Served: false}
-
-					}
-				}
-			}
-			networkOrders.Mutex.Unlock()
-		}
-	}
-}
-
 func Assigner(
-	networkUpdate chan<- bool,
 	addToLocalQueue chan<- Order,
 	requestSystemState chan<- bool,
 	systemState <-chan map[string]Elev,
-	networkOrders *NetworkOrders,
-	assignOrder chan Orderstatus,
-) {
+	assignOrder <-chan Orderstatus,
+	writeNetworkOrders chan<- OrderID,
+	requestNetworkOrders chan<- bool,
+	networkOrders <-chan [config.N_FLOORS][config.N_BUTTONS]string) {
 	for {
 		select {
 		case order := <-assignOrder:
 			//channels.OrderAssigned <- order
 			if order.Served {
 				fmt.Println("Order being deletetet")
-				networkOrders.Mutex.Lock()
-				networkOrders.Orders[order.Floor][order.Button] = ""
-				UpdateLightsFromNetworkOrders(networkOrders.Orders)
-				networkOrders.Mutex.Unlock()
-				networkUpdate <- true
+				writeNetworkOrders <- OrderID{Floor: order.Floor, Button: order.Button, ID: ""}
 				continue
 			}
+
 			requestSystemState <- true
 			localSystemState := <-systemState
-			networkOrders.Mutex.Lock()
-			sortedIDs := calculateSortedIDs(localSystemState, networkOrders, Order{Floor: order.Floor, Button: order.Button})
-			networkOrders.Mutex.Unlock()
+			requestNetworkOrders <- true
+			networkOrders := <-networkOrders
 
+			sortedIDs := calculateSortedIDs(localSystemState, networkOrders, Order{Floor: order.Floor, Button: order.Button})
 			for _, id := range sortedIDs {
 				if id == config.Self_id {
 					addToLocalQueue <- Order{Floor: order.Floor, Button: order.Button}
-					networkOrders.Mutex.Lock()
-					networkOrders.Orders[order.Floor][order.Button] = id
-					UpdateLightsFromNetworkOrders(networkOrders.Orders)
-					networkOrders.Mutex.Unlock()
-
-					networkUpdate <- true
+					writeNetworkOrders <- OrderID{Floor: order.Floor, Button: order.Button, ID: id}
 					break
 				} else {
 					success, _ := sheriff.SendOrderMessage(id, order)
 					if success {
-						networkOrders.Mutex.Lock()
-						networkOrders.Orders[order.Floor][order.Button] = id
-						UpdateLightsFromNetworkOrders(networkOrders.Orders)
-						networkOrders.Mutex.Unlock()
-						networkUpdate <- true
-						fmt.Println("SystemState: ")
-						fmt.Println(systemState)
+						writeNetworkOrders <- OrderID{Floor: order.Floor, Button: order.Button, ID: id}
 						break
+					}
+				}
+			}
+		}
+	}
+}
+
+func redistributor(
+	nodeUnavailabe <-chan string,
+	assignOrder chan<- Orderstatus,
+	requestSystemState chan<- bool,
+	systemState <-chan map[string]Elev,
+	requestNetworkOrders chan<- bool,
+	networkOrders <-chan [config.N_FLOORS][config.N_BUTTONS]string) {
+	for {
+		select {
+		case peerID := <-nodeUnavailabe:
+			fmt.Println("Node is unavailable, redistributing orders")
+			requestNetworkOrders <- true
+			networkOrders := <-networkOrders
+			for floor := 0; floor < config.N_FLOORS; floor++ {
+				for button := 0; button < config.N_BUTTONS; button++ {
+					if networkOrders[floor][button] == peerID {
+						// Send to assigner for reassignment
+						assignOrder <- Orderstatus{Floor: floor, Button: elevio.ButtonType(button), Served: false}
 					}
 				}
 			}
@@ -164,7 +143,7 @@ func requestsClearAtCurrentFloor(e_old Elev, f func(elevio.ButtonType, int)) Ele
 	return e
 }
 
-func calculateSortedIDs(systemState map[string]Elev, networkOrders *NetworkOrders, order Order) []string {
+func calculateSortedIDs(systemState map[string]Elev, networkOrders [config.N_FLOORS][config.N_BUTTONS]string, order Order) []string {
 	var durations []IDAndDuration
 
 	for id, elevator := range systemState {
@@ -183,7 +162,7 @@ func calculateSortedIDs(systemState map[string]Elev, networkOrders *NetworkOrder
 		return durations[i].Duration < durations[j].Duration
 	})
 
-	assigned := networkOrders.Orders[order.Floor][order.Button]
+	assigned := networkOrders[order.Floor][order.Button]
 	if assigned != "" {
 		if elev, ok := systemState[assigned]; ok {
 			if elev.State != EB_UNAVAILABLE {

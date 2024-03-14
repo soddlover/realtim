@@ -92,10 +92,9 @@ func sendOrderToSheriff(order Orderstatus, OrderSent chan Orderstatus) (bool, er
 // ReceiveMessageFromsheriff receives an order from the sheriff and sends an acknowledgement
 func ReceiveMessageFromSheriff(
 	orderAssigned chan<- Order,
-	sheriffDead chan<- NetworkOrdersData,
-	networkorders *NetworkOrders) {
+	sheriffDead chan<- NetworkOrdersData) {
 
-	var lastnodeOrdersData NetworkOrdersData
+	var lastNetworkOrdersData NetworkOrdersData
 
 	go acknowledger(orderSent, nodeOrdersReceived)
 
@@ -110,7 +109,7 @@ func ReceiveMessageFromSheriff(
 		if err != nil {
 			fmt.Println("Error parsing message:", err)
 			sheriffConn.Close()
-			sheriffDead <- lastnodeOrdersData
+			sheriffDead <- lastNetworkOrdersData
 			continue
 		}
 
@@ -140,10 +139,7 @@ func ReceiveMessageFromSheriff(
 			fmt.Println("Received nodeOrdersData from sheriff:")
 			nodeOrdersReceived <- nodeOrdersData
 			elevatorFSM.UpdateLightsFromNetworkOrders(nodeOrdersData.NetworkOrders)
-			lastnodeOrdersData = nodeOrdersData
-			networkorders.Mutex.Lock()
-			networkorders.Orders = nodeOrdersData.NetworkOrders
-			networkorders.Mutex.Unlock()
+			lastNetworkOrdersData = nodeOrdersData
 
 		default:
 			fmt.Println("Unknown message type:", msg.Type)
@@ -152,7 +148,7 @@ func ReceiveMessageFromSheriff(
 	err := scanner.Err()
 	fmt.Println("Error reading from sheriff as wrangler:", err)
 	sheriffConn.Close()
-	sheriffDead <- lastnodeOrdersData
+	sheriffDead <- lastNetworkOrdersData
 	return
 
 }

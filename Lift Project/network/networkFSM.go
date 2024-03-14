@@ -3,6 +3,7 @@ package network
 import (
 	"fmt"
 	"mymodule/config"
+	elevatorFSM "mymodule/elevator"
 	"mymodule/elevator/elevio"
 	"mymodule/network/SheriffWrangler/sheriff"
 	"mymodule/network/SheriffWrangler/wrangler"
@@ -14,7 +15,9 @@ import (
 	"time"
 )
 
-var currentDuty Duty
+type duty int
+
+var currentDuty duty
 
 const (
 	dt_initial duty = iota
@@ -25,15 +28,13 @@ const (
 const N_FLOORS = config.N_FLOORS
 const N_BUTTONS = config.N_BUTTONS
 
-var currentDuty duty
-
 func NetworkFSM(
 	elevatorStateBcast <-chan Elev,
 	localRequest <-chan Order,
 	addToLocalQueue chan<- Order,
 	localOrderServed <-chan Orderstatus,
 ) {
-	assignOrder := make(chan Orderstatus, 10)
+
 	var startOrderForwarderOnce sync.Once
 	var LastnetworkOrders [N_FLOORS][N_BUTTONS]string
 	var ChosenOne bool = true
@@ -41,6 +42,7 @@ func NetworkFSM(
 	requestSystemState := make(chan bool, 40)
 	systemState := make(chan map[string]Elev, 40)
 	nodeLeftNetwork := make(chan string, 40)
+	assignOrder := make(chan Orderstatus, 10)
 
 	go systemStateSynchronizer.SystemStateSynchronizer(
 		requestSystemState,
@@ -53,25 +55,23 @@ func NetworkFSM(
 	sheriffIP := make(chan string)
 	go CloseTCPConns(nodeLeftNetwork, sheriffIP)
 
-	go checkSync(requestSystemState, systemState, networkOrders, addToLocalQueue)
+	//go checkSync(requestSystemState, systemState, networkOrders, addToLocalQueue)
 
-	currentDuty = DT_initial
+	currentDuty = dt_initial
 	for {
 		switch currentDuty {
-		case DT_initial:
+		case dt_initial:
 			fmt.Println("Currently in inital condition, attetming to get sheriff ip")
 			sIP := wrangler.GetSheriffIP()
 			fmt.Println("Sheriff IP is:", sIP)
 			if sIP == "" {
 				if ChosenOne {
 					InitSherrif(
-						incommingOrder,
+						assignOrder,
 						requestSystemState,
 						systemState,
 						LastnetworkOrders,
-						relievedOfDuty,
-						remainingOrders,
-						orderAssigned)
+						addToLocalQueue)
 					currentDuty = dt_sherriff
 				} else {
 					fmt.Println("I am not the chosen one , attempting again")
@@ -84,7 +84,7 @@ func NetworkFSM(
 				if wrangler.ConnectWranglerToSheriff(sIP) {
 					fmt.Println("CONNECTED TO SHERIFF WAITING TO RECIEVE IOP")
 					sheriffIP <- sIP
-					go wrangler.ReceiveMessageFromSheriff(addToLocalQueue, sheriffDead, networkOrders)
+					go wrangler.ReceiveMessageFromSheriff(addToLocalQueue, sheriffDead)
 					fmt.Println("IP recieved on channel, starting message reciever")
 					currentDuty = dt_wrangler
 				}
@@ -92,19 +92,19 @@ func NetworkFSM(
 			startOrderForwarderOnce.Do(func() {
 				go orderForwarder(assignOrder, addToLocalQueue, localRequest, localOrderServed)
 			})
-		case DT_sherriff:
+		case dt_sherriff:
 
 			sIP := wrangler.GetSheriffIP()
 
 			if sIP == "" {
 				fmt.Println("This is weird, I should have been broadcasting my IP, read '' as broadcasted IP")
 				fmt.Println("I must be offline so sad")
-				currentDuty = DT_offline
+				currentDuty = dt_offline
 				//relievedOfDuty <- true
 			}
 			time.Sleep(1 * time.Second)
 
-		case DT_wrangler:
+		case dt_wrangler:
 			networkOrderData := <-sheriffDead
 			LastnetworkOrders = networkOrderData.NetworkOrders
 			ChosenOne = networkOrderData.TheChosenOne
@@ -133,12 +133,12 @@ func CloseTCPConns(lostConns <-chan string, sheriffID <-chan string) {
 				fmt.Println("I am the lost connection, I dont have a TCP connection to my self to close")
 				continue
 			}
-			if currentDuty == DT_sherriff {
+			if currentDuty == dt_sherriff {
 				fmt.Println("I am the Sheriff, I am closing the connection to:", id)
 				sheriff.CloseConns(id)
 			}
 			id = strings.Split(id, ":")[0] //remove this??
-			if currentDuty == DT_wrangler && lastSheriffID == id {
+			if currentDuty == dt_wrangler && lastSheriffID == id {
 				fmt.Println("I am the Wrangler, I am closing the connection to:", id)
 				wrangler.CloseSheriffConn()
 			}
@@ -153,30 +153,52 @@ func InitSherrif(
 	assignOrder chan Orderstatus,
 	requestSystemState chan<- bool,
 	systemState <-chan map[string]Elev,
-	networkorders *NetworkOrders,
+	lastnetworkOrders [N_FLOORS][N_BUTTONS]string,
 	addToLocalQueue chan<- Order,
 ) {
+
 	nodeUnavailabe := make(chan string)
+	requestNetworkOrders := make(chan bool)
+	writeNetworkOrders := make(chan OrderID)
+	networkorders := make(chan [config.N_FLOORS][config.N_BUTTONS]string)
+
 	fmt.Println("I am the only Wrangler in town, I am the Sheriff!")
-	networkUpdate := make(chan bool)
-	go sheriff.Sheriff(assignOrder, networkorders, nodeUnavailabe, networkUpdate)
+
+	go netWorkOrderHandler(
+		requestNetworkOrders,
+		writeNetworkOrders,
+		networkorders,
+		assignOrder,
+		lastnetworkOrders)
+
+	go sheriff.Sheriff(
+		assignOrder,
+		requestNetworkOrders,
+		networkorders,
+		nodeUnavailabe)
+
 	go Assigner(
-		networkUpdate,
 		addToLocalQueue,
 		requestSystemState,
 		systemState,
-		networkorders,
-		assignOrder)
+		assignOrder,
+		writeNetworkOrders,
+		requestNetworkOrders,
+		networkorders)
+
 	go redistributor(
 		nodeUnavailabe,
 		assignOrder,
 		requestSystemState,
 		systemState,
+		requestNetworkOrders,
 		networkorders)
+
 	go checkForUnavailable(
 		requestSystemState,
 		systemState,
 		nodeUnavailabe)
+
 }
 
 func orderForwarder(
@@ -193,17 +215,17 @@ func orderForwarder(
 				addToLocalQueue <- Order{Floor: order.Floor, Button: order.Button}
 				continue
 			}
-			if currentDuty == DT_offline {
+			if currentDuty == dt_offline {
 				continue
 			}
 
-			if currentDuty == DT_sherriff {
+			if currentDuty == dt_sherriff {
 				assignOrder <- orderstat
 			} else {
 				wrangler.SendOrderToSheriff(orderstat)
 			}
 		case orderstat := <-localOrderServed:
-			if currentDuty == DT_sherriff || currentDuty == DT_offline {
+			if currentDuty == dt_sherriff || currentDuty == dt_offline {
 				assignOrder <- orderstat
 			} else {
 				wrangler.SendOrderToSheriff(orderstat)
@@ -236,21 +258,31 @@ func checkSync(requestSystemState chan<- bool, systemState <-chan map[string]Ele
 }
 
 func netWorkOrderHandler(
-	readNetworkOrders <-chan bool,
+	requestNetworkOrders <-chan bool,
 	writeNetworkOrders <-chan OrderID,
 	networkorders chan<- [config.N_FLOORS][config.N_BUTTONS]string,
-	incomingOrder chan<- Orderstatus) {
-	orderTickers := [config.N_FLOORS][config.N_BUTTONS]*time.Ticker{}
+	incomingOrder chan<- Orderstatus,
+	lastNetworkOrders [config.N_FLOORS][config.N_BUTTONS]string) {
 
-	NetworkOrders := [config.N_FLOORS][config.N_BUTTONS]string{}
+	NetworkOrders := lastNetworkOrders
+
+	// Create a new ticker that fires every 3 seconds
+	ticker := time.NewTicker(3 * time.Second)
+
 	for {
 		select {
-		case <-readNetworkOrders:
+		case <-requestNetworkOrders:
 			networkorders <- NetworkOrders
 		case orderId := <-writeNetworkOrders:
 			NetworkOrders[orderId.Floor][orderId.Button] = orderId.ID
+			sheriff.SendNetworkOrders(NetworkOrders)
+			elevatorFSM.UpdateLightsFromNetworkOrders(NetworkOrders)
+			ticker.Reset(3 * time.Second)
+		case <-ticker.C:
+			// Send out NetworkOrders every time the ticker fires
+			sheriff.SendNetworkOrders(NetworkOrders)
+			elevatorFSM.UpdateLightsFromNetworkOrders(NetworkOrders)
 		}
-
 	}
 }
 
