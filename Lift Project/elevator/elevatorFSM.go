@@ -83,7 +83,7 @@ func RunElev(
 					doorTimer.Reset(config.DOOR_OPEN_TIME)
 				}
 			case EB_UNAVAILABLE:
-				if order.Button == elevio.BT_Cab && elevator.Floor == order.Floor {
+				if order.Button == elevio.BT_Cab && elevator.Floor == order.Floor && elevio.GetObstruction() {
 					elevator.Queue[order.Floor][order.Button] = false
 				}
 
@@ -133,7 +133,9 @@ func RunElev(
 			prevdir := elevator.Dir
 			elevator.Dir = ChooseDirection(elevator)
 			if prevdir != elevator.Dir && (elevator.Queue[elevator.Floor][elevio.BT_HallUp] || elevator.Queue[elevator.Floor][elevio.BT_HallDown]) {
-				drv_floors <- elevator.Floor
+				elevio.SetDoorOpenLamp(true)
+				doorTimer.Reset(config.DOOR_OPEN_TIME)
+				clearAtFloor(&elevator, orderDelete)
 				fmt.Println("BOomb booomm baby changing direction")
 				continue
 			}
