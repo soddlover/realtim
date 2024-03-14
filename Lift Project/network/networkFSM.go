@@ -238,11 +238,11 @@ func netWorkOrderHandler(
 	requestNetworkOrders <-chan bool,
 	writeNetworkOrders <-chan OrderID,
 	networkorders chan<- [config.N_FLOORS][config.N_BUTTONS]string,
-	incomingOrder chan<- Orderstatus,
+	assignOrder chan<- Orderstatus,
 	lastNetworkOrders [config.N_FLOORS][config.N_BUTTONS]string) {
 
 	NetworkOrders := lastNetworkOrders
-
+	orderTimestamps := [config.N_FLOORS][config.N_BUTTONS]time.Time{}
 	// Create a new ticker that fires every 3 seconds
 	ticker := time.NewTicker(5 * time.Second)
 
@@ -258,13 +258,31 @@ func netWorkOrderHandler(
 				fmt.Println("Sending out NetworkOrders due to change")
 				elevatorFSM.UpdateLightsFromNetworkOrders(NetworkOrders)
 				ticker.Reset(5 * time.Second)
+				if orderId.ID == "" {
+					orderTimestamps[orderId.Floor][orderId.Button] = time.Time{}
+					fmt.Println("Order complete, stopping timer for order: ", orderId.Floor, orderId.Button)
+				} else {
+					orderTimestamps[orderId.Floor][orderId.Button] = time.Now()
+				}
 			}
 
 		case <-ticker.C:
 			// Send out NetworkOrders every time the ticker fires
+			now := time.Now()
+			for floor := 0; floor < config.N_FLOORS; floor++ {
+				for button := 0; button < config.N_BUTTONS; button++ {
+					if NetworkOrders[floor][button] != "" && now.Sub(orderTimestamps[floor][button]) > config.ORDER_DEADLINE {
+						assignOrder <- Orderstatus{Floor: floor, Button: elevio.ButtonType(button), Served: false}
+						fmt.Println("Order expired, reassigning order: ", floor, button)
+						orderTimestamps[floor][button] = now
+					}
+				}
+			}
+
 			sheriff.SendNetworkOrders(NetworkOrders)
 			fmt.Println("Sending out NetworkOrders")
 			elevatorFSM.UpdateLightsFromNetworkOrders(NetworkOrders)
+
 		}
 	}
 }
