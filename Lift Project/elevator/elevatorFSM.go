@@ -229,7 +229,8 @@ func elevatorInit(elevator Elev, drv_floors <-chan int) Elev {
 			fmt.Println("Arrived at floor: ", elevio.GetFloor())
 			elevator.State = EB_Idle
 			elevator.Floor = elevio.GetFloor()
-			elevio.SetMotorDirection(elevio.MotorDirection(ChooseDirection(elevator)))
+			elevator.Dir = ChooseDirection(elevator)
+			elevio.SetMotorDirection(elevio.MotorDirection(elevator.Dir))
 
 		case <-ticker.C:
 			fmt.Println("Failed to arrive at floor within time limit, killing myself")

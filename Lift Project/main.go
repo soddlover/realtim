@@ -13,16 +13,15 @@ import (
 )
 
 func main() {
-	// WHen starting
 	var id string
 	flag.StringVar(&id, "id", "", "id of this peer")
 	fresh := flag.Bool("fresh", false, "Start a fresh elevator")
 	flag.Parse()
 
 	var localIP string
-	var err error
 
 	for {
+		var err error
 		localIP, err = localip.LocalIP()
 		if err != nil {
 			fmt.Println(err)
@@ -33,13 +32,11 @@ func main() {
 	}
 
 	if id == "" {
-		id = localIP + ":0"
-		config.Self_nr = "0"
-	} else {
-		config.Self_nr = id
-		id = localIP + ":" + id
+		id = "0"
 	}
 
+	config.Self_nr = id
+	id = localIP + ":" + id
 	config.Self_id = id
 
 	initElev := backup.Backup(*fresh)
