@@ -30,6 +30,8 @@ func SystemStateSynchronizer(
 	for {
 		select {
 		case id := <-heartBeatMissing:
+			fmt.Println("Heartbeat missing from:", id)
+
 			removeBcastNode <- id
 			nodeLeft <- id
 
@@ -52,6 +54,8 @@ func updateBcastSystemState(
 	for {
 		select {
 		case bcastState := <-broadcastStateRx:
+			fmt.Println("Received broadcast state from:", bcastState.ID)
+
 			heartBeat <- HeartBeat{ID: bcastState.ID, Time: time.Now()}
 			currentBcastState, existsInBcastSystem := bcastSystem[bcastState.ID]
 			if existsInBcastSystem && bcastState.SequenceNumber > currentBcastState.SequenceNumber {
@@ -62,6 +66,8 @@ func updateBcastSystemState(
 			updateFromBcast <- convertToSystemState(bcastSystem)
 
 		case id := <-removeNode:
+			fmt.Println("Removing node:", id)
+
 			delete(bcastSystem, id)
 			updateFromBcast <- convertToSystemState(bcastSystem)
 		}

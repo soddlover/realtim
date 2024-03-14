@@ -135,7 +135,6 @@ func SendNetworkOrders(networkOrders [config.N_FLOORS][config.N_BUTTONS]string) 
 			//deputyConn.Close()
 			//DeputyDisconnectChan <- deputyConn
 		}
-		fmt.Println("Sent node orders to deputy.")
 	}
 }
 
