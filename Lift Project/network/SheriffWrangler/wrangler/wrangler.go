@@ -75,7 +75,7 @@ func resendOrderToSheriff(order Orderstatus) (bool, error) {
 
 func sendOrderToSheriff(order Orderstatus, OrderSent chan Orderstatus) (bool, error) {
 	if OrderSent != nil {
-		OrderSent <- order
+		//OrderSent <- order
 	}
 	orderJSON, err := json.Marshal(order)
 	if err != nil {
@@ -243,18 +243,18 @@ func handleNetworkOrders(
 }
 
 func acknowledger(OrderSent <-chan Orderstatus, networkOrdersRecieved <-chan NetworkOrdersData, requestSystemState chan<- bool, systemState <-chan map[string]Elev, addToLocalQueue chan<- Order) {
-	unacknowledgedButtons := [N_FLOORS][N_BUTTONS]bool{}
-	unacknowledgedComplete := [N_FLOORS][N_BUTTONS]bool{}
-	orderTickers := [N_FLOORS][N_BUTTONS]*time.Ticker{}
-	orderRetryCounts := [N_FLOORS][N_BUTTONS]int{}
-	quitChannels := [N_FLOORS][N_BUTTONS]chan bool{}
+	//unacknowledgedButtons := [N_FLOORS][N_BUTTONS]bool{}
+	//unacknowledgedComplete := [N_FLOORS][N_BUTTONS]bool{}
+	//rderTickers := [N_FLOORS][N_BUTTONS]*time.Ticker{}
+	//orderRetryCounts := [N_FLOORS][N_BUTTONS]int{}
+	//quitChannels := [N_FLOORS][N_BUTTONS]chan bool{}
 
 	for {
 		select {
-		case orderstatus := <-OrderSent:
-			handleOrderSent(orderstatus, &unacknowledgedButtons, &unacknowledgedComplete, &orderTickers, &orderRetryCounts, &quitChannels)
+		//case orderstatus := <-OrderSent:
+		//handleOrderSent(orderstatus, &unacknowledgedButtons, &unacknowledgedComplete, &orderTickers, &orderRetryCounts, &quitChannels)
 		case networkorders := <-networkOrdersRecieved:
-			handleNetworkOrders(networkorders, &unacknowledgedButtons, &unacknowledgedComplete, &quitChannels)
+			//handleNetworkOrders(networkorders, &unacknowledgedButtons, &unacknowledgedComplete, &quitChannels)
 			checkSync(requestSystemState, systemState, networkorders.NetworkOrders, addToLocalQueue)
 		}
 	}

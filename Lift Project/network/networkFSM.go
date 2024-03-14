@@ -244,20 +244,26 @@ func netWorkOrderHandler(
 	NetworkOrders := lastNetworkOrders
 
 	// Create a new ticker that fires every 3 seconds
-	ticker := time.NewTicker(3 * time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 
 	for {
 		select {
 		case <-requestNetworkOrders:
 			networkorders <- NetworkOrders
 		case orderId := <-writeNetworkOrders:
+			prev := NetworkOrders[orderId.Floor][orderId.Button]
 			NetworkOrders[orderId.Floor][orderId.Button] = orderId.ID
-			sheriff.SendNetworkOrders(NetworkOrders)
-			elevatorFSM.UpdateLightsFromNetworkOrders(NetworkOrders)
-			ticker.Reset(3 * time.Second)
+			if prev != orderId.ID {
+				sheriff.SendNetworkOrders(NetworkOrders)
+				fmt.Println("Sending out NetworkOrders due to change")
+				elevatorFSM.UpdateLightsFromNetworkOrders(NetworkOrders)
+				ticker.Reset(5 * time.Second)
+			}
+
 		case <-ticker.C:
 			// Send out NetworkOrders every time the ticker fires
 			sheriff.SendNetworkOrders(NetworkOrders)
+			fmt.Println("Sending out NetworkOrders")
 			elevatorFSM.UpdateLightsFromNetworkOrders(NetworkOrders)
 		}
 	}
