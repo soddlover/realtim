@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"mymodule/config"
-	"mymodule/network/peers"
+	"mymodule/network/conn"
 	. "mymodule/types"
 	"net"
 	"strconv"
@@ -47,10 +47,9 @@ func Sheriff(
 	nodeOrdersUpdateChan chan bool,
 ) {
 	ipID := strings.Split(string(config.Self_id), ":")
-	transmitEnable := make(chan bool)
 	listenWranglerEnable := make(chan bool)
 	sendOrderToDeputyEnable := make(chan bool)
-	go peers.Transmitter(config.Sheriff_port, ipID[0], transmitEnable) //channel for turning off sheriff transmitt?
+	go Transmitter(config.Sheriff_port, ipID[0]) //channel for turning off sheriff transmitt?
 	//go peers.Receiver(15647, peerUpdateCh)
 	go listenForWranglerConnections(assignOrder, nodeUnavailabe, listenWranglerEnable)
 	go SendNodeOrdersToDeputy(networkOrders, nodeOrdersUpdateChan, sendOrderToDeputyEnable)
@@ -175,35 +174,25 @@ func SendDeputyMessage(networkOrders *NetworkOrders) {
 }
 
 func SendOrderMessage(peer string, order Orderstatus) (bool, error) {
-	//ip := strings.Split(peer, ":")[0]
 
 	conn, ok := WranglerConnections[peer]
-
 	if !ok {
 		fmt.Println("No connection to ", peer)
 
 		return false, fmt.Errorf("no connection to peer %s", peer)
 	}
-
-	// Convert the order to JSON
 	orderJSON, err := json.Marshal(order)
 	if err != nil {
 		fmt.Println("Error marshalling order:", err)
 		return false, err
 	}
-
-	// Create a new message with type "order"
 	msg := Message{
 		Type: "order",
 		Data: orderJSON,
 	}
-
-	// Convert the message to JSON
 	msgJSON, err := json.Marshal(msg)
 	if err != nil {
-		// ...
 	}
-
 	_, err = fmt.Fprintln(conn, string(msgJSON))
 	if err != nil {
 		fmt.Println("Error sending order:", err)
@@ -254,5 +243,16 @@ func CloseConns(id string) {
 		WranglerConnections[id].Close()
 	} else {
 		fmt.Println("Connection already closed", id)
+	}
+}
+
+const interval = 15 * time.Millisecond
+
+func Transmitter(port int, id string) {
+	conn := conn.DialBroadcastUDP(port)
+	addr, _ := net.ResolveUDPAddr("udp4", fmt.Sprintf("255.255.255.255:%d", port))
+	for {
+		<-time.After(interval)
+		conn.WriteTo([]byte(id), addr)
 	}
 }

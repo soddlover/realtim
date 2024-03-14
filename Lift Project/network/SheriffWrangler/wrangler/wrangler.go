@@ -15,7 +15,7 @@ import (
 
 var sheriffConn net.Conn
 var orderSent = make(chan Orderstatus)
-var NodeOrdersReceived = make(chan NetworkOrdersData)
+var nodeOrdersReceived = make(chan NetworkOrdersData)
 
 func ConnectWranglerToSheriff(sheriffIP string) bool {
 	fmt.Println("netdial to sheriff:", sheriffIP)
@@ -36,7 +36,6 @@ func ConnectWranglerToSheriff(sheriffIP string) bool {
 		return false
 	}
 
-	// Set the keepalive period to 1 minute.
 	if err := tcpConn.SetKeepAlivePeriod(3 * time.Second); err != nil {
 		fmt.Println("Error setting keepalive period:", err)
 		return false
@@ -90,8 +89,6 @@ func sendOrderToSheriff(order Orderstatus, OrderSent chan Orderstatus) (bool, er
 	return true, nil
 }
 
-// THIS FUNCTION DOES NOT WORK AT ALL YET BEWARE WTF!!!!!!!!
-
 // ReceiveMessageFromsheriff receives an order from the sheriff and sends an acknowledgement
 func ReceiveMessageFromSheriff(
 	orderAssigned chan<- Order,
@@ -100,7 +97,7 @@ func ReceiveMessageFromSheriff(
 
 	var lastnodeOrdersData NetworkOrdersData
 
-	go acknowledger(orderSent, NodeOrdersReceived)
+	go acknowledger(orderSent, nodeOrdersReceived)
 
 	scanner := bufio.NewScanner(sheriffConn)
 	for scanner.Scan() {
@@ -141,7 +138,7 @@ func ReceiveMessageFromSheriff(
 			}
 
 			fmt.Println("Received nodeOrdersData from sheriff:")
-			NodeOrdersReceived <- nodeOrdersData
+			nodeOrdersReceived <- nodeOrdersData
 			elevatorFSM.UpdateLightsFromNetworkOrders(nodeOrdersData.NetworkOrders)
 			lastnodeOrdersData = nodeOrdersData
 			networkorders.Mutex.Lock()
@@ -207,7 +204,6 @@ func resendOrder(
 				orderRetryCounts[order.Floor][order.Button] = 0
 				return
 			}
-
 			fmt.Printf("Resending order on floor %d, button %d\n", order.Floor, order.Button)
 			resendOrderToSheriff(order)
 			orderRetryCounts[order.Floor][order.Button]++
