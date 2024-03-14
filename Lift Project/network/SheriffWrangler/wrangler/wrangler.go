@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"mymodule/config"
 	elevatorFSM "mymodule/elevator"
+	"mymodule/elevator/elevio"
 	"mymodule/network/conn"
 	"mymodule/types"
 	. "mymodule/types"
@@ -95,11 +96,14 @@ func sendOrderToSheriff(order Orderstatus, OrderSent chan Orderstatus) (bool, er
 // ReceiveMessageFromsheriff receives an order from the sheriff and sends an acknowledgement
 func ReceiveMessageFromSheriff(
 	orderAssigned chan<- Order,
-	sheriffDead chan<- NetworkOrdersData) {
+	sheriffDead chan<- NetworkOrdersData,
+	requestSystemState chan<- bool,
+	systemState <-chan map[string]Elev,
+	addToLocalQueue chan<- Order) {
 
 	var lastNetworkOrdersData NetworkOrdersData
 
-	go acknowledger(orderSent, nodeOrdersReceived)
+	go acknowledger(orderSent, nodeOrdersReceived, requestSystemState, systemState, addToLocalQueue)
 
 	scanner := bufio.NewScanner(sheriffConn)
 	for scanner.Scan() {
@@ -238,7 +242,7 @@ func handleNetworkOrders(
 	}
 }
 
-func acknowledger(OrderSent <-chan Orderstatus, networkOrdersRecieved <-chan NetworkOrdersData) {
+func acknowledger(OrderSent <-chan Orderstatus, networkOrdersRecieved <-chan NetworkOrdersData, requestSystemState chan<- bool, systemState <-chan map[string]Elev, addToLocalQueue chan<- Order) {
 	unacknowledgedButtons := [N_FLOORS][N_BUTTONS]bool{}
 	unacknowledgedComplete := [N_FLOORS][N_BUTTONS]bool{}
 	orderTickers := [N_FLOORS][N_BUTTONS]*time.Ticker{}
@@ -251,6 +255,27 @@ func acknowledger(OrderSent <-chan Orderstatus, networkOrdersRecieved <-chan Net
 			handleOrderSent(orderstatus, &unacknowledgedButtons, &unacknowledgedComplete, &orderTickers, &orderRetryCounts, &quitChannels)
 		case networkorders := <-networkOrdersRecieved:
 			handleNetworkOrders(networkorders, &unacknowledgedButtons, &unacknowledgedComplete, &quitChannels)
+			checkSync(requestSystemState, systemState, networkorders.NetworkOrders, addToLocalQueue)
 		}
 	}
+}
+
+func checkSync(requestSystemState chan<- bool, systemState <-chan map[string]Elev, networkOrders [config.N_FLOORS][config.N_BUTTONS]string, addToLocalQueue chan<- Order) {
+
+	for floor := 0; floor < config.N_FLOORS; floor++ {
+		for button := 0; button < config.N_BUTTONS; button++ {
+			if networkOrders[floor][button] != "" {
+				requestSystemState <- true
+				localSystemState := <-systemState
+				assignedElev, existsInSystemState := localSystemState[networkOrders[floor][button]]
+				if !existsInSystemState || !assignedElev.Queue[floor][button] {
+					if networkOrders[floor][button] == config.Self_id {
+						addToLocalQueue <- Order{Floor: floor, Button: elevio.ButtonType(button)}
+						fmt.Println("WARNING - Order not in sync with system state, reassigning order TO MYSELF KJØH")
+					}
+				}
+			}
+		}
+	}
+
 }

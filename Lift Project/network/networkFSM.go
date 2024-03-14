@@ -25,8 +25,6 @@ const (
 	dt_wrangler
 	dt_offline
 )
-const N_FLOORS = config.N_FLOORS
-const N_BUTTONS = config.N_BUTTONS
 
 func NetworkFSM(
 	elevatorStateBcast <-chan Elev,
@@ -34,15 +32,15 @@ func NetworkFSM(
 	addToLocalQueue chan<- Order,
 	localOrderServed <-chan Orderstatus,
 ) {
-	
+
 	var startOrderForwarderOnce sync.Once
-	var LastnetworkOrders [N_FLOORS][N_BUTTONS]string
+	var LastnetworkOrders [config.N_FLOORS][config.N_BUTTONS]string
 	var ChosenOne bool = true
 
 	requestSystemState := make(chan bool, config.NETWORK_BUFFER_SIZE)
 	systemState := make(chan map[string]Elev, config.NETWORK_BUFFER_SIZE)
 	nodeLeftNetwork := make(chan string, config.NETWORK_BUFFER_SIZE)
-    assignOrder := make(chan Orderstatus, config.NETWORK_BUFFER_SIZE)
+	assignOrder := make(chan Orderstatus, config.NETWORK_BUFFER_SIZE)
 
 	go systemStateSynchronizer.SystemStateSynchronizer(
 		requestSystemState,
@@ -84,7 +82,7 @@ func NetworkFSM(
 				if wrangler.ConnectWranglerToSheriff(sIP) {
 					fmt.Println("CONNECTED TO SHERIFF WAITING TO RECIEVE IOP")
 					sheriffIP <- sIP
-					go wrangler.ReceiveMessageFromSheriff(addToLocalQueue, sheriffDead)
+					go wrangler.ReceiveMessageFromSheriff(addToLocalQueue, sheriffDead, requestSystemState, systemState, addToLocalQueue)
 					fmt.Println("IP recieved on channel, starting message reciever")
 					currentDuty = dt_wrangler
 				}
@@ -153,7 +151,7 @@ func InitSherrif(
 	assignOrder chan Orderstatus,
 	requestSystemState chan<- bool,
 	systemState <-chan map[string]Elev,
-	lastnetworkOrders [N_FLOORS][N_BUTTONS]string,
+	lastnetworkOrders [config.N_FLOORS][config.N_BUTTONS]string,
 	addToLocalQueue chan<- Order,
 ) {
 
@@ -234,35 +232,12 @@ func orderForwarder(
 	}
 }
 
-func checkSync(requestSystemState chan<- bool, systemState <-chan map[string]Elev, networkOrders *NetworkOrders, addToLocalQueue chan<- Order) {
-	for {
-		networkOrders.Mutex.Lock()
-		for floor := 0; floor < N_FLOORS; floor++ {
-			for button := 0; button < N_BUTTONS; button++ {
-				if networkOrders.Orders[floor][button] != "" {
-					requestSystemState <- true
-					localSystemState := <-systemState
-					assignedElev, existsInSystemState := localSystemState[networkOrders.Orders[floor][button]]
-					if !existsInSystemState || !assignedElev.Queue[floor][button] {
-						if networkOrders.Orders[floor][button] == config.Self_id {
-							addToLocalQueue <- Order{Floor: floor, Button: elevio.ButtonType(button)}
-							fmt.Println("WARNING - Order not in sync with system state, reassigning order TO MYSELF KJØH")
-						}
-					}
-				}
-			}
-		}
-		networkOrders.Mutex.Unlock()
-		time.Sleep(5 * time.Second)
-	}
-}
-
 func netWorkOrderHandler(
 	requestNetworkOrders <-chan bool,
 	writeNetworkOrders <-chan OrderID,
-	networkorders chan<- [N_FLOORS][N_BUTTONS]string,
+	networkorders chan<- [config.N_FLOORS][config.N_BUTTONS]string,
 	incomingOrder chan<- Orderstatus,
-	lastNetworkOrders [N_FLOORS][N_BUTTONS]string) {
+	lastNetworkOrders [config.N_FLOORS][config.N_BUTTONS]string) {
 
 	NetworkOrders := lastNetworkOrders
 

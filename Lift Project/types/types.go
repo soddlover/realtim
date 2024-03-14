@@ -2,7 +2,7 @@ package types
 
 import (
 	"encoding/json"
-	. "mymodule/config"
+	"mymodule/config"
 	"mymodule/elevator/elevio"
 	"sync"
 	"time"
@@ -43,7 +43,7 @@ type Elev struct {
 	State ElevatorState
 	Dir   ElevatorDirection
 	Floor int
-	Queue [N_FLOORS][N_BUTTONS]bool
+	Queue [config.N_FLOORS][config.N_BUTTONS]bool
 	Obstr bool
 }
 
@@ -64,12 +64,12 @@ type Message struct {
 }
 
 type NetworkOrders struct {
-	Orders [N_FLOORS][N_BUTTONS]string
+	Orders [config.N_FLOORS][config.N_BUTTONS]string
 	Mutex  sync.Mutex
 }
 
 type NetworkOrdersData struct {
-	NetworkOrders [N_FLOORS][N_BUTTONS]string
+	NetworkOrders [config.N_FLOORS][config.N_BUTTONS]string
 	TheChosenOne  bool
 }
 
