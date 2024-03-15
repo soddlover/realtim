@@ -61,8 +61,9 @@ func NetworkFSM(
 			sIP := wrangler.GetSheriffIP()
 			if sIP == "" {
 				if chosenOne {
-					fmt.Println("I am sheriff!")
+					fmt.Println("I am sheriff here is my latest orders i start with!")
 					currentDuty = dt_sherriff
+					fmt.Println(lastnetworkOrders)
 					go sheriff.Sheriff(assignOrder,
 						lastnetworkOrders,
 						addToLocalQueue,
@@ -105,9 +106,10 @@ func NetworkFSM(
 				lastnetworkOrders = latestNetworkOrderData.NetworkOrders
 				chosenOne = latestNetworkOrderData.TheChosenOne
 				currentDuty = dt_initial
-			case latestNetworkOrderData := <-recievedNetworkOrders:
+			case latestNetworkOrderData = <-recievedNetworkOrders:
 				wrangler.CheckSync(requestSystemState, systemState, latestNetworkOrderData.NetworkOrders, addToLocalQueue)
 				elevator.UpdateLightsFromNetworkOrders(latestNetworkOrderData.NetworkOrders)
+				fmt.Println("new network orders recieved", latestNetworkOrderData)
 			}
 		case dt_offline:
 

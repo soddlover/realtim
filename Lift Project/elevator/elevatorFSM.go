@@ -54,6 +54,7 @@ func RunElev(
 	for {
 		select {
 		case buttonEvent := <-drv_buttons:
+			fmt.Println("buttonevent on", buttonEvent.Floor)
 			localOrderRequest <- Order{Floor: buttonEvent.Floor, Button: buttonEvent.Button}
 
 		case order := <-addToQueue:

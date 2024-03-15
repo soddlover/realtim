@@ -10,6 +10,7 @@ import (
 	"mymodule/types"
 	. "mymodule/types"
 	"net"
+	"os"
 	"time"
 )
 
@@ -22,25 +23,12 @@ var nodeOrdersReceived = make(chan NetworkOrdersData)
 
 func ConnectWranglerToSheriff(sheriffIP string) bool {
 	fmt.Println("netdial to sheriff:", sheriffIP)
-	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", sheriffIP, config.TCP_port))
+	timeout := time.Duration(5 * time.Second)
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", sheriffIP, config.TCP_port), timeout)
+
 	if err != nil {
 		fmt.Println("Error connecting to sheriff:", err)
-		return false
-	}
-
-	tcpConn, ok := conn.(*net.TCPConn)
-	if !ok {
-		fmt.Println("Error asserting connection type")
-		return false
-	}
-
-	if err := tcpConn.SetKeepAlive(true); err != nil {
-		fmt.Println("Error setting keepalive:", err)
-		return false
-	}
-
-	if err := tcpConn.SetKeepAlivePeriod(3 * time.Second); err != nil {
-		fmt.Println("Error setting keepalive period:", err)
+		os.Exit(1)
 		return false
 	}
 
