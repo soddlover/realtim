@@ -10,20 +10,29 @@ import (
 var localIP string
 
 func LocalIP() string {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
 	for {
-		if localIP == "" {
-			conn, err := net.DialTCP("tcp4", nil, &net.TCPAddr{IP: []byte{8, 8, 8, 8}, Port: 53})
-			if err != nil {
-				if strings.Contains(err.Error(), "network is unreachable") {
-					return "offline"
+		select {
+		case <-ticker.C:
+			return "offline"
+		default:
+			if localIP == "" {
+				conn, err := net.DialTCP("tcp4", nil, &net.TCPAddr{IP: []byte{8, 8, 8, 8}, Port: 53})
+				if err != nil {
+					if strings.Contains(err.Error(), "network is unreachable") {
+						fmt.Println("Network is unreachable, retrying:", err)
+						//time.Sleep(1 * time.Second)
+						continue
+					}
+					fmt.Println("Error getting IP from google DNS, retrying:", err)
+					continue
 				}
-				fmt.Println("Error getting IP from google DNS, retrying:", err)
-				time.Sleep(3 * time.Second)
-				continue
+				defer conn.Close()
+				localIP = strings.Split(conn.LocalAddr().String(), ":")[0]
 			}
-			defer conn.Close()
-			localIP = strings.Split(conn.LocalAddr().String(), ":")[0]
+			return localIP
 		}
-		return localIP
 	}
 }
