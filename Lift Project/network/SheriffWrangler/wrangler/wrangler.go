@@ -120,6 +120,8 @@ func ReceiveMessageFromSheriff(
 			lastNetworkOrdersData = nodeOrdersData
 			recievedNetworkOrders <- nodeOrdersData
 			fmt.Println("NO Deadlocking recievednetworkordeers?")
+			fmt.Println("*******")
+			fmt.Println("")
 
 		default:
 			fmt.Println("Unknown message type:", msg.Type)
