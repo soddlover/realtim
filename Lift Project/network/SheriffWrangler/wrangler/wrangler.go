@@ -101,8 +101,9 @@ func ReceiveMessageFromSheriff(
 				fmt.Println("Error parsing order:", err)
 				continue
 			}
-
+			fmt.Println("Deadlocking addtolocalquee?")
 			addToLocalQueue <- Order{Floor: order.Floor, Button: order.Button}
+			fmt.Println("NO Deadlocking addtolocalquee?")
 			// Send the order to the elevator
 
 		case "NodeOrders":
@@ -114,9 +115,11 @@ func ReceiveMessageFromSheriff(
 				fmt.Println("Error parsing order:", err)
 				continue
 			}
-
+			fmt.Println("Deadlocking recievednetworkordeers?")
+			fmt.Println(nodeOrdersData)
 			lastNetworkOrdersData = nodeOrdersData
 			recievedNetworkOrders <- nodeOrdersData
+			fmt.Println("NO Deadlocking recievednetworkordeers?")
 
 		default:
 			fmt.Println("Unknown message type:", msg.Type)
