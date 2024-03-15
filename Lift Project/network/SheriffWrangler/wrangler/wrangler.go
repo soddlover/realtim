@@ -86,11 +86,9 @@ func SendOrderToSheriff(order Orderstatus) (bool, error) {
 
 // ReceiveMessageFromsheriff receives an order from the sheriff and sends an acknowledgement
 func ReceiveTCPMessageFromSheriff(
-	sheriffDead chan<- NetworkOrdersData,
+	sheriffDead chan<- bool,
 	recievedNetworkOrders chan<- NetworkOrdersData,
 	addToLocalQueue chan<- Order) {
-
-	var lastNetworkOrdersData NetworkOrdersData
 
 	scanner := bufio.NewScanner(sheriffConn)
 	for scanner.Scan() {
@@ -102,7 +100,7 @@ func ReceiveTCPMessageFromSheriff(
 		if err != nil {
 			fmt.Println("Error parsing message:", err)
 			sheriffConn.Close()
-			sheriffDead <- lastNetworkOrdersData
+			//sheriffDead <- true
 			continue
 		}
 
@@ -125,7 +123,7 @@ func ReceiveTCPMessageFromSheriff(
 	err := scanner.Err()
 	fmt.Println("Error reading from sheriff as wrangler:", err)
 	sheriffConn.Close()
-	sheriffDead <- lastNetworkOrdersData
+	//sheriffDead <- true
 	return
 
 }

@@ -23,6 +23,7 @@ func Sheriff(
 	requestNetworkOrders := make(chan bool)
 
 	ip := strings.Split(string(config.Id), ":")[0]
+	go broadCastNetwork()
 	go Transmitter(
 		config.Sheriff_port,
 		ip)

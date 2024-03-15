@@ -51,9 +51,9 @@ func NetworkFSM(
 		systemState,
 	)
 
-	sheriffDead := make(chan NetworkOrdersData)
+	sheriffDead := make(chan bool)
 	sheriffIP := make(chan string)
-	go CloseTCPConns(nodeLeftNetwork, sheriffIP)
+	go DisconnectHandeler(nodeLeftNetwork, sheriffIP, sheriffDead)
 
 	currentDuty = dt_initial
 	for {
@@ -122,7 +122,7 @@ func NetworkFSM(
 	}
 }
 
-func CloseTCPConns(lostConns <-chan string, sheriffID <-chan string) {
+func DisconnectHandeler(lostConns <-chan string, sheriffID <-chan string, sheriffDead chan<- bool) {
 	var lastSheriffID string
 	for {
 		select {
@@ -138,6 +138,8 @@ func CloseTCPConns(lostConns <-chan string, sheriffID <-chan string) {
 			id = strings.Split(id, ":")[0]
 			if currentDuty == dt_wrangler && lastSheriffID == id {
 				wrangler.CloseSheriffConn()
+				sheriffDead <- true
+
 			}
 
 		case id := <-sheriffID:
