@@ -2,9 +2,8 @@ package network
 
 import (
 	"fmt"
-	"mymodule/config"
+	. "mymodule/config"
 	"mymodule/elevator"
-	"mymodule/elevator/elevio"
 	"mymodule/network/SheriffWrangler/sheriff"
 	"mymodule/network/SheriffWrangler/wrangler"
 	"mymodule/systemStateSynchronizer"
@@ -35,14 +34,14 @@ func NetworkFSM(
 
 	var startOrderForwarderOnce sync.Once
 	var startUDPListenerOnce sync.Once
-	var chosenOne string = config.Id
+	var chosenOne string = SELF_ID
 	var latestNetworkOrderData NetworkOrderPacket
 
-	requestSystemState := make(chan bool, config.NETWORK_BUFFER_SIZE)
-	systemState := make(chan map[string]Elev, config.NETWORK_BUFFER_SIZE)
-	nodeLeftNetwork := make(chan string, config.NETWORK_BUFFER_SIZE)
-	assignOrder := make(chan Orderstatus, config.NETWORK_BUFFER_SIZE)
-	recievedNetworkOrders := make(chan NetworkOrderPacket, config.NETWORK_BUFFER_SIZE)
+	requestSystemState := make(chan bool, NETWORK_BUFFER_SIZE)
+	systemState := make(chan map[string]Elev, NETWORK_BUFFER_SIZE)
+	nodeLeftNetwork := make(chan string, NETWORK_BUFFER_SIZE)
+	assignOrder := make(chan Orderstatus, NETWORK_BUFFER_SIZE)
+	recievedNetworkOrders := make(chan NetworkOrderPacket, NETWORK_BUFFER_SIZE)
 
 	go systemStateSynchronizer.SystemStateSynchronizer(
 		requestSystemState,
@@ -61,8 +60,8 @@ func NetworkFSM(
 		case dt_initial:
 			sIP := wrangler.GetSheriffIP()
 			if sIP == "" {
-				fmt.Println("Attempting to become sheriff", chosenOne, config.Id)
-				if chosenOne == config.Id {
+				fmt.Println("Attempting to become sheriff", chosenOne, SELF_ID)
+				if chosenOne == SELF_ID {
 					fmt.Println("I am sheriff!")
 					currentDuty = dt_sherriff
 					go sheriff.Sheriff(assignOrder,
@@ -73,7 +72,7 @@ func NetworkFSM(
 
 				} else {
 					time.Sleep(1 * time.Second)
-					chosenOne = config.Id
+					chosenOne = SELF_ID
 					continue
 				}
 			} else {
@@ -99,14 +98,12 @@ func NetworkFSM(
 				fmt.Println("I have gone offline closing all connections")
 				sheriff.CloseConns("ALL")
 				currentDuty = dt_offline
-				//relievedOfDuty <- true
 			}
 			time.Sleep(1 * time.Second)
 
 		case dt_wrangler:
 			select {
 			case <-sheriffDead:
-				// latestNetworkOrderData = latestNetworkOrderData
 				fmt.Println("Sheriff is dead", latestNetworkOrderData)
 				chosenOne = latestNetworkOrderData.TheChosenOne
 				currentDuty = dt_initial
@@ -132,7 +129,7 @@ func CloseTCPConnections(lostConns <-chan string, sheriffID <-chan string) {
 		select {
 		case id := <-lostConns:
 
-			if id == config.Id {
+			if id == SELF_ID {
 				continue
 			}
 			fmt.Println("Lost connection to:", id)
@@ -160,7 +157,7 @@ func orderForwarder(
 		select {
 		case order := <-localOrderRequest:
 			orderstat := Orderstatus{Floor: order.Floor, Button: order.Button, Served: false}
-			if order.Button == elevio.BT_Cab {
+			if order.Button == BT_Cab {
 				addToLocalQueue <- Order{Floor: order.Floor, Button: order.Button}
 				continue
 			}

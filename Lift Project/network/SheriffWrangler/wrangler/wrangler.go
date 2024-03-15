@@ -6,16 +6,13 @@ import (
 	"fmt"
 	"log"
 	"mymodule/config"
-	"mymodule/elevator/elevio"
+	. "mymodule/config"
 	"mymodule/network/conn"
 	"mymodule/types"
 	. "mymodule/types"
 	"net"
 	"time"
 )
-
-const N_FLOORS = config.N_FLOORS
-const N_BUTTONS = config.N_BUTTONS
 
 var sheriffConn net.Conn
 
@@ -27,24 +24,8 @@ func ConnectWranglerToSheriff(sheriffIP string) bool {
 		return false
 	}
 
-	tcpConn, ok := conn.(*net.TCPConn)
-	if !ok {
-		fmt.Println("Error asserting connection type")
-		return false
-	}
-
-	if err := tcpConn.SetKeepAlive(true); err != nil {
-		fmt.Println("Error setting keepalive:", err)
-		return false
-	}
-
-	if err := tcpConn.SetKeepAlivePeriod(3 * time.Second); err != nil {
-		fmt.Println("Error setting keepalive period:", err)
-		return false
-	}
-
-	fmt.Fprintf(conn, "%s\n", config.Id)
-	fmt.Println("sent id to sheriff:", config.Id)
+	fmt.Fprintf(conn, "%s\n", SELF_ID)
+	fmt.Println("sent id to sheriff:", SELF_ID)
 	sheriffConn = conn
 	return true
 }
@@ -192,8 +173,8 @@ func CheckSync(requestSystemState chan<- bool, systemState <-chan map[string]Ele
 				localSystemState := <-systemState
 				assignedElev, existsInSystemState := localSystemState[networkOrders[floor][button]]
 				if !existsInSystemState || !assignedElev.Queue[floor][button] {
-					if networkOrders[floor][button] == config.Id {
-						addToLocalQueue <- Order{Floor: floor, Button: elevio.ButtonType(button)}
+					if networkOrders[floor][button] == SELF_ID {
+						addToLocalQueue <- Order{Floor: floor, Button: ButtonType(button)}
 					}
 				}
 			}

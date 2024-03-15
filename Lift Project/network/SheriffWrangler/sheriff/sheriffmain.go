@@ -3,8 +3,8 @@ package sheriff
 import (
 	"fmt"
 	"mymodule/config"
+	. "mymodule/config"
 	"mymodule/elevator"
-	"mymodule/elevator/elevio"
 	. "mymodule/types"
 	"strings"
 	"time"
@@ -16,14 +16,14 @@ func Sheriff(
 	addToLocalQueue chan<- Order,
 	requestSystemState chan<- bool,
 	systemState <-chan map[string]Elev) {
-		
+
 	fmt.Println("Sheriff started with latest network order data: ", lastnetworkOrdersData)
 	writeNetworkOrders := make(chan OrderID)
 	nodeUnavailabe := make(chan string)
-	networkorders := make(chan [config.N_FLOORS][config.N_BUTTONS]string)
+	networkorders := make(chan [N_FLOORS][N_BUTTONS]string)
 	requestNetworkOrders := make(chan bool)
 
-	ip := strings.Split(string(config.Id), ":")[0]
+	ip := strings.Split(string(SELF_ID), ":")[0]
 	go broadCastNetwork(
 		lastnetworkOrdersData.SequenceNum)
 	go Transmitter(
@@ -78,7 +78,7 @@ func netWorkOrderHandler(
 
 	NetworkOrders := lastNetworkOrders
 	orderTimestamps := [config.N_FLOORS][config.N_BUTTONS]time.Time{}
-	ticker := time.NewTicker(200 * time.Millisecond)
+	ticker := time.NewTicker(NETWORK_ORDER_FREQUENCY)
 
 	for {
 		select {
@@ -90,7 +90,7 @@ func netWorkOrderHandler(
 			if prev != orderId.ID {
 				SendNetworkOrders(NetworkOrders)
 				elevator.UpdateLightsFromNetworkOrders(NetworkOrders)
-				ticker.Reset(200 * time.Millisecond)
+				ticker.Reset(NETWORK_ORDER_FREQUENCY)
 				if orderId.ID == "" {
 					orderTimestamps[orderId.Floor][orderId.Button] = time.Time{}
 				} else {
@@ -104,7 +104,7 @@ func netWorkOrderHandler(
 			for floor, floorOrders := range NetworkOrders {
 				for button := range floorOrders {
 					if NetworkOrders[floor][button] != "" && now.Sub(orderTimestamps[floor][button]) > config.ORDER_DEADLINE {
-						assignOrder <- Orderstatus{Floor: floor, Button: elevio.ButtonType(button), Served: false}
+						assignOrder <- Orderstatus{Floor: floor, Button: ButtonType(button), Served: false}
 						fmt.Println("Order expired, reassigning order: ", floor, button)
 						orderTimestamps[floor][button] = now
 					}
@@ -112,7 +112,6 @@ func netWorkOrderHandler(
 			}
 
 			SendNetworkOrders(NetworkOrders)
-			fmt.Println("Sending out NetworkOrders")
 			elevator.UpdateLightsFromNetworkOrders(NetworkOrders)
 
 		}
@@ -152,14 +151,10 @@ func CheckMissingConnToOrders(
 
 	processedIDs := make(map[string]bool)
 
-	for _, floorButtons := range networkOrders { //floor
+	for _, floorButtons := range networkOrders {
 		for _, id := range floorButtons {
-			// The variable 'floor' represents the floor number. It's not used in this loop.
-
-			//fmt.Printf("Checking order at floor %d, button %d, id: %s\n", floor, button, id) // Print the current order being checked
-			if id != "" && wranglerConnections[id] == nil && id != config.Id && !processedIDs[id] {
+			if id != "" && wranglerConnections[id] == nil && id != SELF_ID && !processedIDs[id] {
 				nodeUnavailabe <- id
-				fmt.Println("***Missing connection to ACTIVE ORDER Reassigning order!!!***", id)
 				processedIDs[id] = true
 			}
 		}

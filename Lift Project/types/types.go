@@ -3,15 +3,14 @@ package types
 import (
 	"encoding/json"
 	"mymodule/config"
-	"mymodule/elevator/elevio"
 	"time"
 )
 
-type Button int
+type ButtonType int
 
 type Orderstatus struct {
 	Floor  int
-	Button elevio.ButtonType
+	Button ButtonType
 	Served bool
 }
 
@@ -28,6 +27,11 @@ const (
 	EB_Moving
 	EB_DoorOpen
 	EB_UNAVAILABLE
+)
+const (
+	BT_HallUp   ButtonType = 0
+	BT_HallDown            = 1
+	BT_Cab                 = 2
 )
 
 type ElevatorDirection int
@@ -47,12 +51,12 @@ type Elev struct {
 
 type Order struct {
 	Floor  int
-	Button elevio.ButtonType
+	Button ButtonType
 }
 
 type OrderID struct {
 	Floor  int
-	Button elevio.ButtonType
+	Button ButtonType
 	ID     string
 }
 

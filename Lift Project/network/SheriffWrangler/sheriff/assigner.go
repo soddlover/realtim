@@ -3,8 +3,8 @@ package sheriff
 import (
 	"fmt"
 	"mymodule/config"
+	. "mymodule/config"
 	"mymodule/elevator"
-	"mymodule/elevator/elevio"
 	. "mymodule/types"
 	"sort"
 	"time"
@@ -21,9 +21,7 @@ func Assigner(
 	for {
 		select {
 		case order := <-assignOrder:
-			//channels.OrderAssigned <- order
 			if order.Served {
-				fmt.Println("Order being deletetet")
 				writeNetworkOrders <- OrderID{Floor: order.Floor, Button: order.Button, ID: ""}
 				continue
 			}
@@ -35,7 +33,7 @@ func Assigner(
 
 			sortedIDs := calculateSortedIDs(localSystemState, networkOrders, Order{Floor: order.Floor, Button: order.Button})
 			for _, id := range sortedIDs {
-				if id == config.Id {
+				if id == SELF_ID {
 					addToLocalQueue <- Order{Floor: order.Floor, Button: order.Button}
 					writeNetworkOrders <- OrderID{Floor: order.Floor, Button: order.Button, ID: id}
 					break
@@ -64,11 +62,10 @@ func redistributor(
 			fmt.Println("Node is unavailable, redistributing orders")
 			requestNetworkOrders <- true
 			networkOrders := <-networkOrders
-			for floor := 0; floor < config.N_FLOORS; floor++ {
-				for button := 0; button < config.N_BUTTONS; button++ {
-					if networkOrders[floor][button] == peerID {
-						// Send to assigner for reassignment
-						assignOrder <- Orderstatus{Floor: floor, Button: elevio.ButtonType(button), Served: false}
+			for floor, floorOrders := range networkOrders {
+				for button, id := range floorOrders {
+					if id == peerID {
+						assignOrder <- Orderstatus{Floor: floor, Button: ButtonType(button), Served: false}
 					}
 				}
 			}
@@ -76,14 +73,14 @@ func redistributor(
 	}
 }
 
-func timeToServeRequest(e_old Elev, b elevio.ButtonType, f int) time.Duration {
+func timeToServeRequest(e_old Elev, b ButtonType, f int) time.Duration {
 
 	e := e_old
 	e.Queue[f][b] = true
 
 	arrivedAtRequest := 0
 
-	ifEqual := func(inner_b elevio.ButtonType, inner_f int) {
+	ifEqual := func(inner_b ButtonType, inner_f int) {
 		if inner_b == b && inner_f == f {
 			arrivedAtRequest = 1
 		}
@@ -121,9 +118,9 @@ func timeToServeRequest(e_old Elev, b elevio.ButtonType, f int) time.Duration {
 	}
 }
 
-func requestsClearAtCurrentFloor(e_old Elev, f func(elevio.ButtonType, int)) Elev {
+func requestsClearAtCurrentFloor(e_old Elev, f func(ButtonType, int)) Elev {
 	e := e_old
-	for b := elevio.ButtonType(0); b < config.N_BUTTONS; b++ {
+	for b := ButtonType(0); b < config.N_BUTTONS; b++ {
 		if e.Queue[e.Floor][b] {
 			e.Queue[e.Floor][b] = false
 			if f != nil {

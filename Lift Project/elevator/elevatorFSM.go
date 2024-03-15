@@ -18,7 +18,7 @@ func RunElev(
 	orderServed chan<- Orderstatus,
 	initElev Elev) {
 
-	nr, _ := strconv.Atoi(strings.Split(config.Id, ":")[0]) //remove before delivery
+	nr, _ := strconv.Atoi(strings.Split(SELF_ID, ":")[0]) //remove before delivery
 	port := config.SimulatorPort + nr
 	addr := "localhost:" + fmt.Sprint(port)
 	elevio.Init(addr, N_FLOORS)
@@ -87,7 +87,7 @@ func RunElev(
 				}
 
 			case EB_UNAVAILABLE:
-				if order.Button == elevio.BT_Cab && elevator.Floor == order.Floor && elevio.GetObstruction() {
+				if order.Button == BT_Cab && elevator.Floor == order.Floor && elevio.GetObstruction() {
 					elevator.Queue[order.Floor][order.Button] = false
 				}
 			}
@@ -126,7 +126,7 @@ func RunElev(
 			elevio.SetDoorOpenLamp(false)
 			prevdir := elevator.Dir
 			elevator.Dir = ChooseDirection(elevator)
-			if prevdir != elevator.Dir && (elevator.Queue[elevator.Floor][elevio.BT_HallUp] || elevator.Queue[elevator.Floor][elevio.BT_HallDown]) {
+			if prevdir != elevator.Dir && (elevator.Queue[elevator.Floor][BT_HallUp] || elevator.Queue[elevator.Floor][BT_HallDown]) {
 				elevio.SetDoorOpenLamp(true)
 				doorTimer.Reset(config.DOOR_OPEN_TIME)
 				clearAtFloor(&elevator, orderServed)
@@ -148,8 +148,8 @@ func RunElev(
 			fmt.Println("Motor error, killing myself")
 			elevio.SetStopLamp(true)
 			for floor := range elevator.Queue {
-				elevator.Queue[floor][elevio.BT_HallUp] = false
-				elevator.Queue[floor][elevio.BT_HallDown] = false
+				elevator.Queue[floor][BT_HallUp] = false
+				elevator.Queue[floor][BT_HallDown] = false
 			}
 			elevatorStateBackup <- elevator
 			elevatorStateBroadcast <- elevator

@@ -21,7 +21,7 @@ func main() {
 	}
 	localIP := localip.LocalIP()
 
-	config.Id = localIP + ":" + id
+	config.SELF_ID = localIP + ":" + id
 
 	initElev := backup.Backup(*fresh)
 

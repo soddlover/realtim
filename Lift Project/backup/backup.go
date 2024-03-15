@@ -4,28 +4,27 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"mymodule/config"
 	. "mymodule/config"
-	"mymodule/elevator/elevio"
 	. "mymodule/types"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 )
 
 func Backup(fresh bool) Elev {
 
 	if fresh {
-		os.Remove("backup" + "0" + ".txt")
+		os.Remove("backup" + strings.Split(SELF_ID, ":")[1] + ".txt")
 		return Elev{}
 	}
 
-	ticker := time.NewTicker(config.BACKUP_DEADLINE)
+	ticker := time.NewTicker(BACKUP_DEADLINE)
 
 	for {
 		<-ticker.C
 
-		fileInfo, err := os.Stat("backup" + "0" + ".txt")
+		fileInfo, err := os.Stat("backup" + strings.Split(SELF_ID, ":")[1] + ".txt")
 		if err != nil {
 			fmt.Println("Error getting file info:", err)
 			return takeControl()
@@ -33,16 +32,16 @@ func Backup(fresh bool) Elev {
 
 		currentModTime := fileInfo.ModTime()
 
-		if time.Since(currentModTime) > config.BACKUP_DEADLINE {
+		if time.Since(currentModTime) > BACKUP_DEADLINE {
 			return takeControl()
 		}
-		fmt.Println("Backup is still alive. KJØH ")
+		fmt.Println("Process is still alive, standing by...")
 	}
 }
 
 func WriteBackup(elevChan <-chan Elev) {
 
-	ticker := time.NewTicker(config.BACKUP_INTERVAL)
+	ticker := time.NewTicker(BACKUP_INTERVAL)
 	var elev Elev
 
 	for {
@@ -55,7 +54,7 @@ func WriteBackup(elevChan <-chan Elev) {
 			fmt.Println("Error marshalling json:", err)
 			continue
 		}
-		err = os.WriteFile("backup"+"0"+".txt", stateJson, 0644)
+		err = os.WriteFile("backup"+strings.Split(SELF_ID, ":")[1]+".txt", stateJson, 0644)
 		if err != nil {
 			fmt.Println("Error writing to file:", err)
 			continue
@@ -66,7 +65,7 @@ func WriteBackup(elevChan <-chan Elev) {
 func takeControl() Elev {
 	fmt.Println("Backup is taking over.")
 
-	stateJson, err := os.ReadFile("backup" + "0" + ".txt")
+	stateJson, err := os.ReadFile("backup" + strings.Split(SELF_ID, ":")[1] + ".txt")
 	if err != nil {
 		fmt.Println("Error reading file:", err)
 	}
@@ -75,14 +74,11 @@ func takeControl() Elev {
 	if err != nil {
 		fmt.Println("Error unmarshalling json:", err)
 	} else {
-		for Floor := 0; Floor < N_FLOORS; Floor++ {
-			if Floor < len(elev.Queue) && int(elevio.BT_HallUp) < len(elev.Queue[Floor]) && int(elevio.BT_HallDown) < len(elev.Queue[Floor]) {
-				elev.Queue[Floor][elevio.BT_HallUp] = false
-				elev.Queue[Floor][elevio.BT_HallDown] = false
-			} else {
-				fmt.Println("Index out of range")
-			}
+		for Floor := range elev.Queue {
+			elev.Queue[Floor][BT_HallUp] = false
+			elev.Queue[Floor][BT_HallDown] = false
 		}
+
 	}
 	cmd := exec.Command("gnome-terminal", "--", "go", "run", "main.go")
 	err = cmd.Run()

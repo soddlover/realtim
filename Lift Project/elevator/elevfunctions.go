@@ -2,14 +2,11 @@ package elevator
 
 import (
 	"fmt"
-	"mymodule/config"
+	. "mymodule/config"
 	"mymodule/elevator/elevio"
 	. "mymodule/types"
 	"time"
 )
-
-const N_FLOORS = config.N_FLOORS
-const N_BUTTONS = config.N_BUTTONS
 
 func elevatorInit(elevator Elev, drv_floors <-chan int) Elev {
 	if (elevator == Elev{}) {
@@ -21,12 +18,12 @@ func elevatorInit(elevator Elev, drv_floors <-chan int) Elev {
 		}
 	}
 	for floor := range elevator.Queue {
-		elevio.SetButtonLamp(elevio.BT_HallUp, floor, false)
-		elevio.SetButtonLamp(elevio.BT_HallDown, floor, false)
+		elevio.SetButtonLamp(BT_HallUp, floor, false)
+		elevio.SetButtonLamp(BT_HallDown, floor, false)
 	}
 	if elevio.GetFloor() == -1 {
 		elevio.SetMotorDirection(elevio.MD_Down)
-		ticker := time.NewTicker(config.MOTOR_ERROR_TIME)
+		ticker := time.NewTicker(MOTOR_ERROR_TIME)
 		defer ticker.Stop()
 		select {
 		case <-drv_floors:
@@ -52,13 +49,13 @@ func elevatorInit(elevator Elev, drv_floors <-chan int) Elev {
 func ShouldStop(elevator Elev) bool {
 	switch elevator.Dir {
 	case DirUp:
-		return elevator.Queue[elevator.Floor][elevio.BT_HallUp] ||
-			elevator.Queue[elevator.Floor][elevio.BT_Cab] ||
+		return elevator.Queue[elevator.Floor][BT_HallUp] ||
+			elevator.Queue[elevator.Floor][BT_Cab] ||
 			!OrdersAbove(elevator)
 
 	case DirDown:
-		return elevator.Queue[elevator.Floor][elevio.BT_HallDown] ||
-			elevator.Queue[elevator.Floor][elevio.BT_Cab] ||
+		return elevator.Queue[elevator.Floor][BT_HallDown] ||
+			elevator.Queue[elevator.Floor][BT_Cab] ||
 			!OrdersBelow(elevator)
 	default:
 		return true
@@ -120,21 +117,22 @@ func OrdersBelow(elevator Elev) bool {
 }
 
 func clearAtFloor(elevator *Elev, orderDelete chan<- Orderstatus) {
-	elevator.Queue[elevator.Floor][elevio.BT_Cab] = false
-	if elevator.Dir == DirUp && elevator.Queue[elevator.Floor][elevio.BT_HallUp] {
-		elevator.Queue[elevator.Floor][elevio.BT_HallUp] = false
-		orderDelete <- Orderstatus{Floor: elevator.Floor, Button: elevio.BT_HallUp, Served: true}
-	} else if elevator.Dir == DirDown && elevator.Queue[elevator.Floor][elevio.BT_HallDown] {
-		elevator.Queue[elevator.Floor][elevio.BT_HallDown] = false
-		orderDelete <- Orderstatus{Floor: elevator.Floor, Button: elevio.BT_HallDown, Served: true}
+	elevator.Queue[elevator.Floor][BT_Cab] = false
+	if elevator.Dir == DirUp &&
+		elevator.Queue[elevator.Floor][BT_HallUp] {
+		elevator.Queue[elevator.Floor][BT_HallUp] = false
+		orderDelete <- Orderstatus{Floor: elevator.Floor, Button: BT_HallUp, Served: true}
+	} else if elevator.Dir == DirDown && elevator.Queue[elevator.Floor][BT_HallDown] {
+		elevator.Queue[elevator.Floor][BT_HallDown] = false
+		orderDelete <- Orderstatus{Floor: elevator.Floor, Button: BT_HallDown, Served: true}
 	} else if elevator.Dir == DirStop || elevator.Floor == 0 || elevator.Floor == N_FLOORS-1 {
-		if elevator.Queue[elevator.Floor][elevio.BT_HallUp] {
-			elevator.Queue[elevator.Floor][elevio.BT_HallUp] = false
-			orderDelete <- Orderstatus{Floor: elevator.Floor, Button: elevio.BT_HallUp, Served: true}
+		if elevator.Queue[elevator.Floor][BT_HallUp] {
+			elevator.Queue[elevator.Floor][BT_HallUp] = false
+			orderDelete <- Orderstatus{Floor: elevator.Floor, Button: BT_HallUp, Served: true}
 		}
-		if elevator.Queue[elevator.Floor][elevio.BT_HallDown] {
-			elevator.Queue[elevator.Floor][elevio.BT_HallDown] = false
-			orderDelete <- Orderstatus{Floor: elevator.Floor, Button: elevio.BT_HallDown, Served: true}
+		if elevator.Queue[elevator.Floor][BT_HallDown] {
+			elevator.Queue[elevator.Floor][BT_HallDown] = false
+			orderDelete <- Orderstatus{Floor: elevator.Floor, Button: BT_HallDown, Served: true}
 		}
 	}
 }
@@ -143,8 +141,8 @@ func updateLights(elevator *Elev) {
 	for {
 		for floor := 0; floor < N_FLOORS; floor++ {
 			for button := 0; button < N_BUTTONS; button++ {
-				if elevio.ButtonType(button) == elevio.BT_Cab {
-					elevio.SetButtonLamp(elevio.ButtonType(button), floor, elevator.Queue[floor][button])
+				if ButtonType(button) == BT_Cab {
+					elevio.SetButtonLamp(ButtonType(button), floor, elevator.Queue[floor][button])
 				}
 			}
 		}
@@ -155,11 +153,11 @@ func updateLights(elevator *Elev) {
 func UpdateLightsFromNetworkOrders(networkorders [N_FLOORS][N_BUTTONS]string) {
 	for floor := 0; floor < N_FLOORS; floor++ {
 		for button := 0; button < N_BUTTONS; button++ {
-			if elevio.ButtonType(button) != elevio.BT_Cab {
+			if ButtonType(button) != BT_Cab {
 				if networkorders[floor][button] != "" {
-					elevio.SetButtonLamp(elevio.ButtonType(button), floor, true)
+					elevio.SetButtonLamp(ButtonType(button), floor, true)
 				} else {
-					elevio.SetButtonLamp(elevio.ButtonType(button), floor, false)
+					elevio.SetButtonLamp(ButtonType(button), floor, false)
 				}
 			}
 		}

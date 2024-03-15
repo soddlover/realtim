@@ -3,6 +3,7 @@ package systemStateSynchronizer
 import (
 	"fmt"
 	"mymodule/config"
+	. "mymodule/config"
 	"mymodule/network/bcast"
 	. "mymodule/types"
 	"time"
@@ -117,7 +118,7 @@ func repeater(elevatorState <-chan Elev, broadcastStateTx chan<- BcastState) {
 		case <-ticker.C:
 			broadcastState = BcastState{
 				ElevState:      lastElev,
-				ID:             config.Id,
+				ID:             SELF_ID,
 				SequenceNumber: i,
 			}
 			broadcastStateTx <- broadcastState
