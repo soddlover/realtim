@@ -89,7 +89,9 @@ func SendNetworkOrders(networkOrders [config.N_FLOORS][config.N_BUTTONS]string) 
 			TheChosenOne:  id == chosenOneID,
 			SequenceNum:   seqNum, // or false, depending on your logic
 		}
+		fmt.Println("Sequence number:", seqNum)
 		seqNum++
+
 		nodeOrdersDataJSON, err := json.Marshal(nodeOrdersData)
 		if err != nil {
 			fmt.Println("Error marshalling node orders to be sent to deputy:", err)
