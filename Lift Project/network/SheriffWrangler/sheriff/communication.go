@@ -54,11 +54,10 @@ func EstablishWranglerCommunications(
 		for {
 
 			conn, err := ln.Accept()
-			fmt.Println("Incoming connection, accepted")
 
 			if err != nil {
 				if errors.Is(err, net.ErrClosed) {
-					return // if the listener is closed, return from the goroutine
+					return
 				}
 				fmt.Println("Error accepting connection:", err)
 				continue
@@ -69,7 +68,7 @@ func EstablishWranglerCommunications(
 
 	for {
 		conn := <-newConn
-		fmt.Println("Incoming new connection starting reader")
+		fmt.Println("Incoming new connection waiting to recieve ID")
 		reader := bufio.NewReader(conn)
 
 		done := make(chan bool)
@@ -77,13 +76,13 @@ func EstablishWranglerCommunications(
 			message, err := reader.ReadString('\n')
 			if err != nil {
 				fmt.Println("Error reading from connection:", err)
+				conn.Close()
 				done <- false
-				return
 			}
 
 			peerID := strings.TrimSpace(message)
 			wranglerConnections[peerID] = conn
-			fmt.Printf("Accepted Wrangler %s\n", peerID)
+			fmt.Printf("ID recieved: %s\n", peerID)
 			go ReceiveMessage(conn, assignOrder, peerID, nodeUnavailabe)
 			done <- true
 		}()
@@ -91,9 +90,9 @@ func EstablishWranglerCommunications(
 		select {
 		case success := <-done:
 			if success {
-				fmt.Println("Read operation completed before timeout")
+				fmt.Println("Connections: ", wranglerConnections)
 			}
-		case <-time.After(5 * time.Second):
+		case <-time.After(TCP_ESTABLISH_DEADLINE):
 			fmt.Println("Timeout reading from connection, closing it")
 			conn.Close()
 		}

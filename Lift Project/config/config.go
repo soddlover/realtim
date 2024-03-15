@@ -26,6 +26,7 @@ const (
 	ORDER_DEADLINE          = TRAVEL_TIME * N_FLOORS * time.Second * 2
 	NETWORK_ORDER_FREQUENCY = 200 * time.Millisecond
 	SEQUENCE_NUMBER_LIMIT   = 10000
+	TCP_ESTABLISH_DEADLINE  = 8 * time.Second //under high packet loss this can take time
 )
 
 var SELF_ID string = ""
