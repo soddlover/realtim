@@ -98,7 +98,7 @@ func NetworkFSM(
 			sIP := wrangler.GetSheriffIP()
 			if sIP == "" {
 				fmt.Println("Diconnect from network detected")
-				sheriff.CloseConns("ALL")
+				sheriff.CloseAllConnections()
 				currentDuty = dt_offline
 			} else if sIP != selfIP {
 				fmt.Println("Challenger detected, commencing shootout...")
