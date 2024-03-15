@@ -110,7 +110,7 @@ func ReceiveUDPNodeOrders(
 	recievedNetworkOrders chan<- NetworkOrderPacket) {
 
 	// Create a UDP address for the broadcast
-	addr, err := net.ResolveUDPAddr("udp4", fmt.Sprintf("255.255.255.255:%d", 12345))
+	addr, err := net.ResolveUDPAddr("udp4", fmt.Sprintf("255.255.255.255:%d", UDP_NETWORK_ORDERS_PORT))
 	if err != nil {
 		log.Fatal(err)
 	}

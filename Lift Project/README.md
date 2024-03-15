@@ -9,3 +9,6 @@ To further customize the elevatorsystem for your needs, please modify config.go
 
 ## Acknoledgments
 Thank you GitHub CoPilot for sparring. Sanntidsalen has room for improvement in regards of air quality.
+
+packetloss:
+sudo ./packetloss -p 16000,16569,20000,16568 -r 0.35
