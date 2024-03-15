@@ -148,7 +148,8 @@ func ReceiveUDPNodeOrders(
 				fmt.Println("Error parsing order:", err)
 				continue
 			}
-			if nodeOrdersData.SequenceNum > lastSequenceNumber {
+			if (nodeOrdersData.SequenceNum > lastSequenceNumber) ||
+				((lastSequenceNumber - nodeOrdersData.SequenceNum) > (SEQUENCE_NUMBER_LIMIT / 2)) {
 				lastSequenceNumber = nodeOrdersData.SequenceNum
 				recievedNetworkOrders <- nodeOrdersData
 			}

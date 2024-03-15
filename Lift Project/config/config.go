@@ -23,6 +23,7 @@ const (
 	NETWORK_BUFFER_SIZE       = ELEVATOR_BUFFER_SIZE * N_ELEVATORS
 	ORDER_DEADLINE            = TRAVEL_TIME * N_FLOORS * time.Second
 	NETWORK_ORDER_FREQUENCY   = 200 * time.Millisecond
+	SEQUENCE_NUMBER_LIMIT     = 10000
 )
 
 var SELF_ID string = ""

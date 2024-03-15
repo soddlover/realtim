@@ -15,6 +15,7 @@ import (
 )
 
 const IP_TRANSMITT_INTERVAL = 15 * time.Millisecond
+const MAX_SEQUENCE_NUMBER = 1000
 
 var deputyID string
 var wranglerConnections = make(map[string]net.Conn)
@@ -94,18 +95,21 @@ func SendNetworkOrders(networkOrders [N_FLOORS][N_BUTTONS]string) {
 		}
 	}
 
+	seqNum = (seqNum + 1) % MAX_SEQUENCE_NUMBER
+
 	nodeOrdersData := NetworkOrderPacket{
 		Orders:      networkOrders,
 		DeputyID:    deputyID,
 		SequenceNum: seqNum, // or false, depending on your logic
 	}
-	seqNum++
+
 	nodeOrdersDataJSON, err := json.Marshal(nodeOrdersData)
 	if err != nil {
 		fmt.Println("Error marshalling node orders to be sent to deputy:", err)
 	}
-	fmt.Println("Sequence number:", seqNum)
-
+	if seqNum%50 == 0 {
+		fmt.Println("Sequence number:", seqNum)
+	}
 	// Create a new message with type "deputy"
 	msg := Message{
 		Type: "NodeOrders",

@@ -8,8 +8,6 @@ import (
 	"time"
 )
 
-const SEQUENCE_NUMBER_LIMIT = 10000
-
 func SystemStateSynchronizer(
 	requestSystemState <-chan bool,
 	nodeLeft chan<- string,
