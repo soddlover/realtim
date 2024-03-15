@@ -23,6 +23,7 @@ func Sheriff(
 	requestNetworkOrders := make(chan bool)
 
 	ip := strings.Split(string(config.Id), ":")[0]
+	go broadCastNetwork()
 	go Transmitter(
 		config.Sheriff_port,
 		ip)
@@ -75,7 +76,7 @@ func netWorkOrderHandler(
 
 	NetworkOrders := lastNetworkOrders
 	orderTimestamps := [config.N_FLOORS][config.N_BUTTONS]time.Time{}
-	ticker := time.NewTicker(500 * time.Millisecond)
+	ticker := time.NewTicker(200 * time.Millisecond)
 
 	for {
 		select {
@@ -87,7 +88,7 @@ func netWorkOrderHandler(
 			if prev != orderId.ID {
 				SendNetworkOrders(NetworkOrders)
 				elevator.UpdateLightsFromNetworkOrders(NetworkOrders)
-				ticker.Reset(5 * time.Second)
+				ticker.Reset(200 * time.Millisecond)
 				if orderId.ID == "" {
 					orderTimestamps[orderId.Floor][orderId.Button] = time.Time{}
 				} else {
