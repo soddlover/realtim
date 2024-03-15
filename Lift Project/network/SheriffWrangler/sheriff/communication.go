@@ -71,26 +71,32 @@ func EstablishWranglerCommunications(
 		conn := <-newConn
 		fmt.Println("Incoming new connection starting reader")
 		reader := bufio.NewReader(conn)
-		conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 
-		message, err := reader.ReadString('\n')
-		if err != nil {
-			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-				fmt.Println("Timeout reading from connection closing it")
-				conn.Close()
+		done := make(chan bool)
+		go func() {
+			message, err := reader.ReadString('\n')
+			if err != nil {
+				fmt.Println("Error reading from connection:", err)
+				done <- false
+				return
 			}
-			fmt.Println("Error reading from connection while listeing for wranglers:", err)
-			continue
+
+			peerID := strings.TrimSpace(message)
+			wranglerConnections[peerID] = conn
+			fmt.Printf("Accepted Wrangler %s\n", peerID)
+			go ReceiveMessage(conn, assignOrder, peerID, nodeUnavailabe)
+			done <- true
+		}()
+
+		select {
+		case success := <-done:
+			if success {
+				fmt.Println("Read operation completed before timeout")
+			}
+		case <-time.After(5 * time.Second):
+			fmt.Println("Timeout reading from connection, closing it")
+			conn.Close()
 		}
-
-		peerID := strings.TrimSpace(message)
-
-		wranglerConnections[peerID] = conn
-
-		fmt.Println("Accepted Wrangler", peerID)
-		fmt.Println(wranglerConnections)
-		go ReceiveMessage(conn, assignOrder, peerID, nodeUnavailabe)
-
 	}
 }
 
