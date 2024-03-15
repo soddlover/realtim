@@ -27,7 +27,9 @@ func RunElev(
 
 	doorTimer := time.NewTimer(DOOR_OPEN_TIME)
 	motorErrorTimer := time.NewTimer(MOTOR_ERROR_TIME)
-	doorTimer.Stop()
+	if elevator.State != EB_DoorOpen {
+		doorTimer.Stop()
+	}
 	motorErrorTimer.Stop()
 
 	elevatorStateBackup := make(chan Elev, ELEVATOR_BUFFER_SIZE)
