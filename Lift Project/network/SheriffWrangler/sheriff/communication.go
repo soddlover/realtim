@@ -21,6 +21,7 @@ var udpConn net.PacketConn
 var seqNum int
 
 func broadCastNetwork(seq int) {
+
 	if seq > 0 {
 		seqNum = seq
 	}
@@ -78,6 +79,7 @@ func listenForWranglerConnections(
 }
 
 func SendNetworkOrders(networkOrders [config.N_FLOORS][config.N_BUTTONS]string) {
+
 	addr, _ := net.ResolveUDPAddr("udp4", fmt.Sprintf("255.255.255.255:%d", 12345))
 
 	for id, _ := range wranglerConnections {
@@ -151,6 +153,7 @@ func ReceiveMessage(
 	assignOrder chan<- Orderstatus,
 	peerID string,
 	nodeUnavailabe chan<- string) (Orderstatus, error) {
+
 	scanner := bufio.NewScanner(conn)
 	for scanner.Scan() {
 		message := scanner.Text()
@@ -177,6 +180,7 @@ func ReceiveMessage(
 }
 
 func CloseConns(id string) {
+
 	if id == "ALL" {
 		for id, conn := range wranglerConnections {
 			fmt.Println("Closing connection to", id)
@@ -194,6 +198,7 @@ func CloseConns(id string) {
 const interval = 15 * time.Millisecond
 
 func Transmitter(port int, id string) {
+
 	conn := conn.DialBroadcastUDP(port)
 	addr, _ := net.ResolveUDPAddr("udp4", fmt.Sprintf("255.255.255.255:%d", port))
 	for {

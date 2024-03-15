@@ -9,6 +9,7 @@ import (
 )
 
 func elevatorInit(elevator Elev, drv_floors <-chan int) Elev {
+
 	if (elevator == Elev{}) {
 		elevator = Elev{
 			State: EB_Idle,
@@ -47,6 +48,7 @@ func elevatorInit(elevator Elev, drv_floors <-chan int) Elev {
 }
 
 func ShouldStop(elevator Elev) bool {
+
 	switch elevator.Dir {
 	case DirUp:
 		return elevator.Queue[elevator.Floor][BT_HallUp] ||
@@ -63,6 +65,7 @@ func ShouldStop(elevator Elev) bool {
 }
 
 func ChooseDirection(elevator Elev) ElevatorDirection {
+
 	switch elevator.Dir {
 	case DirStop:
 		if OrdersAbove(elevator) {
@@ -95,6 +98,7 @@ func ChooseDirection(elevator Elev) ElevatorDirection {
 }
 
 func OrdersAbove(elevator Elev) bool {
+
 	for floor := elevator.Floor + 1; floor < N_FLOORS; floor++ {
 		for btn := 0; btn < N_BUTTONS; btn++ {
 			if elevator.Queue[floor][btn] {
@@ -106,6 +110,7 @@ func OrdersAbove(elevator Elev) bool {
 }
 
 func OrdersBelow(elevator Elev) bool {
+
 	for floor := 0; floor < elevator.Floor; floor++ {
 		for btn := 0; btn < N_BUTTONS; btn++ {
 			if elevator.Queue[floor][btn] {
@@ -116,7 +121,10 @@ func OrdersBelow(elevator Elev) bool {
 	return false
 }
 
-func clearAtFloor(elevator *Elev, orderDelete chan<- Orderstatus) {
+func clearAtFloor(
+	elevator *Elev,
+	orderDelete chan<- Orderstatus) {
+
 	elevator.Queue[elevator.Floor][BT_Cab] = false
 	if elevator.Dir == DirUp &&
 		elevator.Queue[elevator.Floor][BT_HallUp] {
@@ -138,6 +146,7 @@ func clearAtFloor(elevator *Elev, orderDelete chan<- Orderstatus) {
 }
 
 func updateLights(elevator *Elev) {
+
 	for {
 		for floor := 0; floor < N_FLOORS; floor++ {
 			for button := 0; button < N_BUTTONS; button++ {
@@ -151,6 +160,7 @@ func updateLights(elevator *Elev) {
 }
 
 func UpdateLightsFromNetworkOrders(networkorders [N_FLOORS][N_BUTTONS]string) {
+
 	for floor := 0; floor < N_FLOORS; floor++ {
 		for button := 0; button < N_BUTTONS; button++ {
 			if ButtonType(button) != BT_Cab {

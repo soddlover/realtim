@@ -47,8 +47,7 @@ func NetworkFSM(
 		requestSystemState,
 		nodeLeftNetwork,
 		elevatorStateBcast,
-		systemState,
-	)
+		systemState)
 
 	sheriffDead := make(chan bool)
 	sheriffIP := make(chan string)
@@ -123,8 +122,12 @@ func NetworkFSM(
 	}
 }
 
-func closeTCPConnections(lostConns <-chan string, sheriffID <-chan string) {
+func closeTCPConnections(
+	lostConns <-chan string,
+	sheriffID <-chan string) {
+
 	var lastSheriffID string
+
 	for {
 		select {
 		case id := <-lostConns:
@@ -151,8 +154,8 @@ func orderForwarder(
 	assignOrder chan<- Orderstatus,
 	addToLocalQueue chan<- Order,
 	localOrderRequest <-chan Order,
-	localOrderServed <-chan Orderstatus,
-) {
+	localOrderServed <-chan Orderstatus) {
+
 	for {
 		select {
 		case order := <-localOrderRequest:

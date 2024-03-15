@@ -21,7 +21,7 @@ func RunElev(
 	nr, _ := strconv.Atoi(strings.Split(SELF_ID, ":")[0]) //remove before delivery
 	port := SimulatorPort + nr
 	addr := "localhost:" + fmt.Sprint(port)
-	elevio.Init(addr, N_FLOORS)
+	elevio.Init(addr, config.N_FLOORS)
 
 	elevator := initElev
 
@@ -55,6 +55,7 @@ func RunElev(
 
 	for {
 		select {
+
 		case buttonEvent := <-drv_buttons:
 			localOrderRequest <- Order{Floor: buttonEvent.Floor, Button: buttonEvent.Button}
 
@@ -115,6 +116,7 @@ func RunElev(
 			}
 			elevatorStateBackup <- elevator
 			elevatorStateBroadcast <- elevator
+
 		case <-doorTimer.C:
 			if elevio.GetObstruction() {
 				doorTimer.Reset(DOOR_OPEN_TIME)
@@ -144,6 +146,7 @@ func RunElev(
 			}
 			elevatorStateBackup <- elevator
 			elevatorStateBroadcast <- elevator
+
 		case <-motorErrorTimer.C:
 			elevator.State = EB_UNAVAILABLE
 			fmt.Println("Motor error detected")
