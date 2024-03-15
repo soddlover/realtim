@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+const SEQUENCE_NUMBER_LIMIT = 10000
+
 func SystemStateSynchronizer(
 	requestSystemState <-chan bool,
 	nodeLeft chan<- string,
@@ -24,22 +26,27 @@ func SystemStateSynchronizer(
 	go repeater(
 		elevatorState,
 		broadcastStateTx)
+
 	go bcast.Transmitter(
 		Broadcast_state_port,
 		broadcastStateTx)
+
 	go bcast.Receiver(
 		Broadcast_state_port,
 		broadcastStateRx)
+
 	go updateBcastSystemState(
 		updateFromBcast,
 		broadcastStateRx,
 		removeBcastNode,
 		heartBeat)
+
 	go checkHeartbeats(
 		heartBeat,
 		heartBeatMissing)
 
 	localSystemState := make(map[string]Elev)
+
 	for {
 		select {
 		case id := <-heartBeatMissing:
@@ -69,10 +76,12 @@ func updateBcastSystemState(
 
 			heartBeat <- HeartBeat{ID: bcastState.ID, Time: time.Now()}
 			currentBcastState, existsInBcastSystem := bcastSystem[bcastState.ID]
-			if existsInBcastSystem && bcastState.SequenceNumber > currentBcastState.SequenceNumber {
+			if !existsInBcastSystem ||
+				bcastState.SequenceNumber > currentBcastState.SequenceNumber ||
+				(currentBcastState.SequenceNumber-bcastState.SequenceNumber) > (SEQUENCE_NUMBER_LIMIT/2) {
 				bcastSystem[bcastState.ID] = bcastState
 			} else {
-				bcastSystem[bcastState.ID] = bcastState
+				fmt.Println("Rejected new state because.", currentBcastState.SequenceNumber, "and ", bcastState.SequenceNumber)
 			}
 			updateFromBcast <- convertToSystemState(bcastSystem)
 
@@ -83,14 +92,6 @@ func updateBcastSystemState(
 			updateFromBcast <- convertToSystemState(bcastSystem)
 		}
 	}
-}
-
-func convertToSystemState(bcastSystem map[string]BcastState) map[string]Elev {
-	systemState := make(map[string]Elev)
-	for id, bcastState := range bcastSystem {
-		systemState[id] = bcastState.ElevState
-	}
-	return systemState
 }
 
 func checkHeartbeats(
@@ -129,6 +130,7 @@ func repeater(
 	var broadcastState BcastState
 	var lastElev Elev
 	for i := 0; ; i++ {
+		sequenceNumber := i % SEQUENCE_NUMBER_LIMIT
 		select {
 		case elev := <-elevatorState:
 			lastElev = elev
@@ -136,9 +138,17 @@ func repeater(
 			broadcastState = BcastState{
 				ElevState:      lastElev,
 				ID:             SELF_ID,
-				SequenceNumber: i,
+				SequenceNumber: sequenceNumber,
 			}
 			broadcastStateTx <- broadcastState
 		}
 	}
+}
+
+func convertToSystemState(bcastSystem map[string]BcastState) map[string]Elev {
+	systemState := make(map[string]Elev)
+	for id, bcastState := range bcastSystem {
+		systemState[id] = bcastState.ElevState
+	}
+	return systemState
 }
