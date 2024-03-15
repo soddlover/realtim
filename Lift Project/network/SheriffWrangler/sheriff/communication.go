@@ -106,9 +106,7 @@ func SendNetworkOrders(networkOrders [N_FLOORS][N_BUTTONS]string) {
 	if err != nil {
 		fmt.Println("Error marshalling node orders to be sent to deputy:", err)
 	}
-	if seqNum%50 == 0 {
-		fmt.Println("Sequence number:", seqNum)
-	}
+
 	// Create a new message with type "deputy"
 	msg := Message{
 		Type: "NodeOrders",

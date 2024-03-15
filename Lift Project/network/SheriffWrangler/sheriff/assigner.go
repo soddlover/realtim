@@ -30,13 +30,13 @@ func Assigner(
 		localSystemState := <-systemState
 		requestNetworkOrders <- true
 		networkOrders := <-networkOrders
-
 		assigned := false
 		sortedIDs := calculateSortedIDs(localSystemState, networkOrders, Order{Floor: order.Floor, Button: order.Button})
 		for _, id := range sortedIDs {
 			if id == SELF_ID {
 				addToLocalQueue <- Order{Floor: order.Floor, Button: order.Button}
 				writeNetworkOrders <- OrderID{Floor: order.Floor, Button: order.Button, ID: id}
+				fmt.Println("Order assigned to self", OrderID{Floor: order.Floor, Button: order.Button, ID: id})
 				assigned = true
 				break
 			} else {
@@ -44,12 +44,15 @@ func Assigner(
 				if success {
 					writeNetworkOrders <- OrderID{Floor: order.Floor, Button: order.Button, ID: id}
 					assigned = true
+					fmt.Println("Order assigned to ", OrderID{Floor: order.Floor, Button: order.Button, ID: id})
 					break
 				}
 			}
 		}
 		if !assigned {
+			fmt.Println("No available elevators attempting assigning again")
 			goto recalculate
+
 		}
 
 	}
