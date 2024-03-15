@@ -1,4 +1,6 @@
 # Western Elevator
+![Alt text](elevator-1.png?raw=true "")
+
 Hold your horses and beware the elevator system from the wild west! It is powerd by 15 horses driving a huge horsemill. The local Sheriff is orchestarting all of it with good help from his Wranglers who are ready to step in at any time.
 
 ## Getting Started

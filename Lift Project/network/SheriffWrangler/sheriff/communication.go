@@ -121,11 +121,7 @@ func SendNetworkOrders(networkOrders [N_FLOORS][N_BUTTONS]string) {
 		fmt.Println("Error marshalling deputy message:", err)
 	}
 
-	_, err = udpConn.WriteTo(msgJSON, addr)
-	if err != nil {
-		fmt.Println("Error sending node orders to deputy, he might be dead:", err)
-	}
-
+	_, _ = udpConn.WriteTo(msgJSON, addr)
 }
 
 func SendOrderMessage(peer string, order Orderstatus) (bool, error) {

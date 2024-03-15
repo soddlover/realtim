@@ -62,6 +62,7 @@ func RunElev(
 			localOrderRequest <- Order{Floor: buttonEvent.Floor, Button: buttonEvent.Button}
 
 		case order := <-addToQueue:
+			fmt.Println("Order added to local elevator queue: Floor: ", order.Floor, " Button: ", order.Button)
 			elevator.Queue[order.Floor][order.Button] = true
 			switch elevator.State {
 
