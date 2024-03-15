@@ -61,9 +61,9 @@ func NetworkFSM(
 		case dt_initial:
 			sIP := wrangler.GetSheriffIP()
 			if sIP == "" {
-				fmt.Println("Attempting to become sheriff", chosenOne, config.Id)
+				fmt.Println("Attempting to become sheriff...", chosenOne, config.Id)
 				if chosenOne == config.Id {
-					fmt.Println("I am sheriff!")
+					fmt.Println("Sucsess!! I am Sheriff!")
 					currentDuty = dt_sherriff
 					go sheriff.Sheriff(assignOrder,
 						latestNetworkOrderData,
@@ -77,7 +77,7 @@ func NetworkFSM(
 					continue
 				}
 			} else {
-				fmt.Println("Attempting Connecting to Sheriff:")
+				fmt.Println("Attempting Connecting to Sheriff...")
 				if wrangler.ConnectWranglerToSheriff(sIP) {
 					sheriffIP <- sIP
 					go wrangler.ReceiveTCPMessageFromSheriff(sheriffDead, addToLocalQueue)
@@ -85,7 +85,7 @@ func NetworkFSM(
 						go wrangler.ReceiveUDPNodeOrders(recievedNetworkOrders)
 					})
 					currentDuty = dt_wrangler
-					fmt.Println("I am wrangler!")
+					fmt.Println("Suceessfully connected to Sheriff!")
 				}
 			}
 			startOrderForwarderOnce.Do(func() {
@@ -96,7 +96,7 @@ func NetworkFSM(
 			sIP := wrangler.GetSheriffIP()
 
 			if sIP == "" {
-				fmt.Println("I have gone offline closing all connections")
+				fmt.Println("Diconnect from network detected")
 				sheriff.CloseConns("ALL")
 				currentDuty = dt_offline
 				//relievedOfDuty <- true
@@ -107,7 +107,7 @@ func NetworkFSM(
 			select {
 			case <-sheriffDead:
 				// latestNetworkOrderData = latestNetworkOrderData
-				fmt.Println("Sheriff is dead", latestNetworkOrderData)
+				fmt.Println("Sheriff disconnect detected", latestNetworkOrderData)
 				chosenOne = latestNetworkOrderData.TheChosenOne
 				currentDuty = dt_initial
 			case latestNetworkOrderData = <-recievedNetworkOrders:
@@ -118,7 +118,7 @@ func NetworkFSM(
 
 			sIP := wrangler.GetSheriffIP()
 			if sIP != "" {
-				fmt.Println("Coming back online, restarting...")
+				fmt.Println("Reconnected to network. Restarting...")
 				os.Exit(1)
 			}
 			time.Sleep(1 * time.Second)
