@@ -35,7 +35,7 @@ func GetSheriffIP() string {
 
 	var buf [1024]byte
 
-	conn := conn.DialBroadcastUDP(SHERIFF_PORT)
+	conn := conn.DialBroadcastUDP(SHERIFF_TRANSMITT_IP_PORT)
 	defer conn.Close()
 	conn.SetReadDeadline(time.Now().Add(SHERIFF_IP_DEADLINE))
 	n, _, err := conn.ReadFrom(buf[0:])

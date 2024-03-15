@@ -23,8 +23,8 @@ var seqNum int
 
 func transmittIP() {
 	ip := strings.Split(string(SELF_ID), ":")[0]
-	conn := conn.DialBroadcastUDP(SHERIFF_PORT)
-	addr, _ := net.ResolveUDPAddr("udp4", fmt.Sprintf("255.255.255.255:%d", SHERIFF_PORT))
+	conn := conn.DialBroadcastUDP(SHERIFF_TRANSMITT_IP_PORT)
+	addr, _ := net.ResolveUDPAddr("udp4", fmt.Sprintf("255.255.255.255:%d", SHERIFF_TRANSMITT_IP_PORT))
 	for {
 		<-time.After(IP_TRANSMITT_INTERVAL)
 		conn.WriteTo([]byte(ip), addr)
