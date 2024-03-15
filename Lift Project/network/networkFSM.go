@@ -34,15 +34,15 @@ func NetworkFSM(
 ) {
 
 	var startOrderForwarderOnce sync.Once
-	var lastnetworkOrders [config.N_FLOORS][config.N_BUTTONS]string
+	var startUDPListenerOnce sync.Once
 	var chosenOne bool = true
-	var latestNetworkOrderData NetworkOrdersData
+	var latestNetworkOrderData NetworkOrderPacket
 
 	requestSystemState := make(chan bool, config.NETWORK_BUFFER_SIZE)
 	systemState := make(chan map[string]Elev, config.NETWORK_BUFFER_SIZE)
 	nodeLeftNetwork := make(chan string, config.NETWORK_BUFFER_SIZE)
 	assignOrder := make(chan Orderstatus, config.NETWORK_BUFFER_SIZE)
-	recievedNetworkOrders := make(chan NetworkOrdersData, config.NETWORK_BUFFER_SIZE)
+	recievedNetworkOrders := make(chan NetworkOrderPacket, config.NETWORK_BUFFER_SIZE)
 
 	go systemStateSynchronizer.SystemStateSynchronizer(
 		requestSystemState,
@@ -65,7 +65,7 @@ func NetworkFSM(
 					fmt.Println("I am sheriff!")
 					currentDuty = dt_sherriff
 					go sheriff.Sheriff(assignOrder,
-						lastnetworkOrders,
+						latestNetworkOrderData,
 						addToLocalQueue,
 						requestSystemState,
 						systemState)
@@ -79,8 +79,10 @@ func NetworkFSM(
 				fmt.Println("Attempting Connecting to Sheriff:")
 				if wrangler.ConnectWranglerToSheriff(sIP) {
 					sheriffIP <- sIP
-					go wrangler.ReceiveTCPMessageFromSheriff(sheriffDead, recievedNetworkOrders, addToLocalQueue)
-					go wrangler.ReceiveUDPNodeOrders(recievedNetworkOrders)
+					go wrangler.ReceiveTCPMessageFromSheriff(sheriffDead, addToLocalQueue)
+					startUDPListenerOnce.Do(func() {
+						go wrangler.ReceiveUDPNodeOrders(recievedNetworkOrders)
+					})
 					currentDuty = dt_wrangler
 					fmt.Println("I am wrangler!")
 				}
@@ -103,7 +105,7 @@ func NetworkFSM(
 		case dt_wrangler:
 			select {
 			case <-sheriffDead:
-				lastnetworkOrders = latestNetworkOrderData.NetworkOrders
+				latestNetworkOrderData = latestNetworkOrderData
 				chosenOne = latestNetworkOrderData.TheChosenOne
 				currentDuty = dt_initial
 			case latestNetworkOrderData := <-recievedNetworkOrders:

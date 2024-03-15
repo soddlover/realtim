@@ -20,7 +20,10 @@ var wranglerConnections = make(map[string]net.Conn)
 var udpConn net.PacketConn
 var seqNum int
 
-func broadCastNetwork() {
+func broadCastNetwork(seq int) {
+	if seq > 0 {
+		seqNum = seq
+	}
 	var err error
 	udpConn = conn.DialBroadcastUDP(12345)
 	if err != nil {

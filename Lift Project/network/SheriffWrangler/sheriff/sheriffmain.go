@@ -12,7 +12,7 @@ import (
 
 func Sheriff(
 	assignOrder chan Orderstatus,
-	lastnetworkOrders [config.N_FLOORS][config.N_BUTTONS]string,
+	lastnetworkOrdersData NetworkOrderPacket,
 	addToLocalQueue chan<- Order,
 	requestSystemState chan<- bool,
 	systemState <-chan map[string]Elev) {
@@ -23,7 +23,8 @@ func Sheriff(
 	requestNetworkOrders := make(chan bool)
 
 	ip := strings.Split(string(config.Id), ":")[0]
-	go broadCastNetwork()
+	go broadCastNetwork(
+		lastnetworkOrdersData.SequenceNum)
 	go Transmitter(
 		config.Sheriff_port,
 		ip)
@@ -54,7 +55,7 @@ func Sheriff(
 		writeNetworkOrders,
 		networkorders,
 		assignOrder,
-		lastnetworkOrders)
+		lastnetworkOrdersData.NetworkOrders)
 
 	go checkForUnavailable(
 		requestSystemState,

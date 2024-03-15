@@ -85,7 +85,6 @@ func SendOrderToSheriff(order Orderstatus) (bool, error) {
 // ReceiveMessageFromsheriff receives an order from the sheriff and sends an acknowledgement
 func ReceiveTCPMessageFromSheriff(
 	sheriffDead chan<- bool,
-	recievedNetworkOrders chan<- NetworkOrdersData,
 	addToLocalQueue chan<- Order) {
 
 	scanner := bufio.NewScanner(sheriffConn)
@@ -125,7 +124,7 @@ func ReceiveTCPMessageFromSheriff(
 
 }
 func ReceiveUDPNodeOrders(
-	recievedNetworkOrders chan<- NetworkOrdersData) {
+	recievedNetworkOrders chan<- NetworkOrderPacket) {
 
 	// Create a UDP address for the broadcast
 	addr, err := net.ResolveUDPAddr("udp4", fmt.Sprintf("255.255.255.255:%d", 12345))
@@ -168,7 +167,7 @@ func ReceiveUDPNodeOrders(
 			}
 			if nodeOrdersData.SequenceNum > lastSequenceNumber {
 				lastSequenceNumber = nodeOrdersData.SequenceNum
-				recievedNetworkOrders <- NetworkOrdersData{NetworkOrders: nodeOrdersData.NetworkOrders, TheChosenOne: nodeOrdersData.TheChosenOne}
+				recievedNetworkOrders <- nodeOrdersData
 			}
 
 		}
