@@ -52,7 +52,10 @@ func EstablishWranglerCommunications(
 	newConn := make(chan net.Conn)
 	go func() {
 		for {
+
 			conn, err := ln.Accept()
+			fmt.Println("Incoming connection, accepted")
+
 			if err != nil {
 				if errors.Is(err, net.ErrClosed) {
 					return // if the listener is closed, return from the goroutine
@@ -66,6 +69,7 @@ func EstablishWranglerCommunications(
 
 	for {
 		conn := <-newConn
+		fmt.Println("Incoming new connection starting reader")
 		reader := bufio.NewReader(conn)
 		message, err := reader.ReadString('\n')
 		if err != nil {
