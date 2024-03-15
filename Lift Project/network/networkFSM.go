@@ -90,12 +90,16 @@ func NetworkFSM(
 		case dt_sherriff:
 
 			sIP := wrangler.GetSheriffIP()
-
+			selfIP := strings.Split(config.Id, ":")[0]
 			if sIP == "" {
 				fmt.Println("I have gone offline closing all connections")
 				sheriff.CloseConns("ALL")
 				currentDuty = dt_offline
 				//relievedOfDuty <- true
+			} else if sIP != selfIP {
+				if sIP > selfIP {
+					os.Exit(1)
+				}
 			}
 			time.Sleep(1 * time.Second)
 
