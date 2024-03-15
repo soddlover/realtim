@@ -15,7 +15,6 @@ import (
 )
 
 const IP_TRANSMITT_INTERVAL = 15 * time.Millisecond
-const MAX_SEQUENCE_NUMBER = 1000
 
 var deputyID string
 var wranglerConnections = make(map[string]net.Conn)
@@ -95,7 +94,7 @@ func SendNetworkOrders(networkOrders [N_FLOORS][N_BUTTONS]string) {
 		}
 	}
 
-	seqNum = (seqNum + 1) % MAX_SEQUENCE_NUMBER
+	seqNum = (seqNum + 1) % SEQUENCE_NUMBER_LIMIT
 
 	nodeOrdersData := NetworkOrderPacket{
 		Orders:      networkOrders,

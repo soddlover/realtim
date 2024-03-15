@@ -100,7 +100,7 @@ func NetworkFSM(
 				fmt.Println("Diconnect from network detected")
 				sheriff.CloseConns("ALL")
 				currentDuty = dt_offline
-			} else {
+			} else if sIP != SELF_ID {
 				fmt.Println("Challenger detected, commencing shootout...")
 				selfIP := strings.Split(string(SELF_ID), ":")[0]
 				if sIP > selfIP {
