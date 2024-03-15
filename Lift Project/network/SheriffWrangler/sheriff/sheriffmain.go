@@ -55,7 +55,7 @@ func Sheriff(
 
 	fmt.Println("Sheriff started with latest network order data: ", lastnetworkOrdersData)
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(time.Second)
 	requestNetworkOrders <- true
 	networkOrders := <-networkorders
 	CheckMissingConnToOrders(networkOrders, nodeUnavailabe)
