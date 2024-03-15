@@ -73,7 +73,7 @@ func NetworkFSM(
 						systemState)
 
 				} else {
-					time.Sleep(1 * time.Second)
+					time.Sleep(time.Second)
 					deputy = SELF_ID
 					continue
 				}
@@ -110,7 +110,7 @@ func NetworkFSM(
 					time.Sleep(5 * time.Second)
 				}
 			}
-			time.Sleep(1 * time.Second)
+			time.Sleep(time.Second)
 
 		case dt_wrangler:
 
@@ -131,7 +131,7 @@ func NetworkFSM(
 				fmt.Println("Reconnected to network. Restarting...")
 				os.Exit(1)
 			}
-			time.Sleep(1 * time.Second)
+			time.Sleep(time.Second)
 		}
 	}
 }
