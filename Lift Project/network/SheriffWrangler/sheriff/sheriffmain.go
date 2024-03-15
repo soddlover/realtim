@@ -2,7 +2,6 @@ package sheriff
 
 import (
 	"fmt"
-	"mymodule/config"
 	. "mymodule/config"
 	"mymodule/elevator"
 	. "mymodule/types"
@@ -64,12 +63,12 @@ func Sheriff(
 func netWorkOrderHandler(
 	requestNetworkOrders <-chan bool,
 	writeNetworkOrders <-chan OrderID,
-	networkorders chan<- [config.N_FLOORS][config.N_BUTTONS]string,
+	networkorders chan<- [N_FLOORS][N_BUTTONS]string,
 	assignOrder chan<- Orderstatus,
-	lastNetworkOrders [config.N_FLOORS][config.N_BUTTONS]string) {
+	lastNetworkOrders [N_FLOORS][N_BUTTONS]string) {
 
 	NetworkOrders := lastNetworkOrders
-	orderTimestamps := [config.N_FLOORS][config.N_BUTTONS]time.Time{}
+	orderTimestamps := [N_FLOORS][N_BUTTONS]time.Time{}
 	ticker := time.NewTicker(NETWORK_ORDER_FREQUENCY)
 
 	for {
@@ -95,7 +94,7 @@ func netWorkOrderHandler(
 			now := time.Now()
 			for floor, floorOrders := range NetworkOrders {
 				for button := range floorOrders {
-					if NetworkOrders[floor][button] != "" && now.Sub(orderTimestamps[floor][button]) > config.ORDER_DEADLINE {
+					if NetworkOrders[floor][button] != "" && now.Sub(orderTimestamps[floor][button]) > ORDER_DEADLINE {
 						assignOrder <- Orderstatus{Floor: floor, Button: ButtonType(button), Served: false}
 						fmt.Println("Order expired, reassigning order: ", floor, button)
 						orderTimestamps[floor][button] = now
@@ -122,7 +121,7 @@ func checkForUnavailable(
 		localSystemState := <-systemState
 
 		for id, elev := range localSystemState {
-			if elev.State == EB_UNAVAILABLE {
+			if elev.State == EB_Unavailable {
 				if _, alreadyUnavailable := unavailableIDs[id]; !alreadyUnavailable {
 					unavailableIDs[id] = true
 					fmt.Println("Elevator", id, "is unavailable")
@@ -137,7 +136,7 @@ func checkForUnavailable(
 }
 
 func CheckMissingConnToOrders(
-	networkOrders [config.N_FLOORS][config.N_BUTTONS]string,
+	networkOrders [N_FLOORS][N_BUTTONS]string,
 	nodeUnavailabe chan<- string) {
 
 	processedIDs := make(map[string]bool)

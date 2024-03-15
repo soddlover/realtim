@@ -43,7 +43,7 @@ func RunElev(
 	go elevio.PollFloorSensor(drv_floors)
 	go elevio.PollObstructionSwitch(drv_obstr)
 	go elevio.PollStopButton(drv_stop)
-	go updateLights(&elevator) //SPM: OK to use a pointer here?
+	go updateLights(&elevator)
 
 	elevatorStateBackup <- elevator
 
@@ -91,7 +91,7 @@ func RunElev(
 					doorTimer.Reset(DOOR_OPEN_TIME)
 				}
 
-			case EB_UNAVAILABLE:
+			case EB_Unavailable:
 				if order.Button == BT_Cab && elevator.Floor == order.Floor && elevio.GetObstruction() {
 					elevator.Queue[order.Floor][order.Button] = false
 				}
@@ -101,7 +101,7 @@ func RunElev(
 			elevatorStateBroadcast <- elevator
 
 		case elevator.Floor = <-drv_floors:
-			if elevator.State == EB_UNAVAILABLE {
+			if elevator.State == EB_Unavailable {
 				elevio.SetStopLamp(false)
 				elevator.State = EB_Moving
 			}
@@ -123,7 +123,7 @@ func RunElev(
 			if elevio.GetObstruction() {
 				doorTimer.Reset(DOOR_OPEN_TIME)
 				elevio.SetStopLamp(true)
-				elevator.State = EB_UNAVAILABLE
+				elevator.State = EB_Unavailable
 				fmt.Println("Obstruction detected")
 				elevatorStateBackup <- elevator
 				elevatorStateBroadcast <- elevator
@@ -150,7 +150,7 @@ func RunElev(
 			elevatorStateBroadcast <- elevator
 
 		case <-motorErrorTimer.C:
-			elevator.State = EB_UNAVAILABLE
+			elevator.State = EB_Unavailable
 			fmt.Println("Motor error detected")
 			elevio.SetStopLamp(true)
 			for floor := range elevator.Queue {
@@ -161,7 +161,7 @@ func RunElev(
 			elevatorStateBroadcast <- elevator
 
 		case obstruction := <-drv_obstr:
-			if !obstruction && elevator.State == EB_UNAVAILABLE {
+			if !obstruction && elevator.State == EB_Unavailable {
 				doorTimer.Reset(DOOR_OPEN_TIME)
 				elevio.SetStopLamp(false)
 				elevator.State = EB_DoorOpen

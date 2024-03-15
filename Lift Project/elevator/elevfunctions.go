@@ -39,7 +39,7 @@ func elevatorInit(elevator Elev, drv_floors <-chan int) Elev {
 
 		case <-ticker.C:
 			fmt.Println("Motor error detected")
-			elevator.State = EB_UNAVAILABLE
+			elevator.State = EB_Unavailable
 			elevio.SetMotorDirection(elevio.MD_Down)
 			ticker.Stop()
 		}

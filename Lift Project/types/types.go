@@ -2,7 +2,7 @@ package types
 
 import (
 	"encoding/json"
-	"mymodule/config"
+	. "mymodule/config"
 	"time"
 )
 
@@ -12,6 +12,16 @@ type Orderstatus struct {
 	Floor  int
 	Button ButtonType
 	Served bool
+}
+type Order struct {
+	Floor  int
+	Button ButtonType
+}
+
+type OrderID struct {
+	Floor  int
+	Button ButtonType
+	ID     string
 }
 
 type BcastState struct {
@@ -26,7 +36,7 @@ const (
 	EB_Idle ElevatorState = iota
 	EB_Moving
 	EB_DoorOpen
-	EB_UNAVAILABLE
+	EB_Unavailable
 )
 const (
 	BT_HallUp   ButtonType = 0
@@ -46,18 +56,7 @@ type Elev struct {
 	State ElevatorState
 	Dir   ElevatorDirection
 	Floor int
-	Queue [config.N_FLOORS][config.N_BUTTONS]bool
-}
-
-type Order struct {
-	Floor  int
-	Button ButtonType
-}
-
-type OrderID struct {
-	Floor  int
-	Button ButtonType
-	ID     string
+	Queue [N_FLOORS][N_BUTTONS]bool
 }
 
 type Message struct {
@@ -65,13 +64,8 @@ type Message struct {
 	Data json.RawMessage `json:"data"`
 }
 
-type NetworkOrdersData struct {
-	Orders   [config.N_FLOORS][config.N_BUTTONS]string
-	DeputyID string
-}
-
 type NetworkOrderPacket struct {
-	Orders      [config.N_FLOORS][config.N_BUTTONS]string
+	Orders      [N_FLOORS][N_BUTTONS]string
 	DeputyID    string
 	SequenceNum int
 }

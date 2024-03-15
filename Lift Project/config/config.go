@@ -14,16 +14,16 @@ const (
 	TCP_PORT                  = 16000
 	SIMULATOR_PORT            = 15657
 	UDP_NETWORK_ORDERS_PORT   = 12345
-	HEARTBEAT                 = 20 * time.Millisecond
+	HEARTBEAT                 = 50 * time.Millisecond
 	HEARTBEAT_DEADLINE        = 2000 * time.Millisecond
 	BACKUP_INTERVAL           = 1 * time.Second
 	BACKUP_DEADLINE           = 2 * time.Second
 	SHERIFF_IP_DEADLINE       = 1 * time.Second
 	ELEVATOR_BUFFER_SIZE      = N_FLOORS * N_BUTTONS
 	NETWORK_BUFFER_SIZE       = ELEVATOR_BUFFER_SIZE * N_ELEVATORS
-	ORDER_DEADLINE            = TRAVEL_TIME * N_FLOORS * time.Second
+	ORDER_DEADLINE            = TRAVEL_TIME * N_FLOORS * time.Second * 2
 	NETWORK_ORDER_FREQUENCY   = 200 * time.Millisecond
-	SEQUENCE_NUMBER_LIMIT     = 500
+	SEQUENCE_NUMBER_LIMIT     = 10000
 )
 
 var SELF_ID string = ""

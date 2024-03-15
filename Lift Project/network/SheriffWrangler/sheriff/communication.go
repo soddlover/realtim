@@ -88,7 +88,7 @@ func SendNetworkOrders(networkOrders [N_FLOORS][N_BUTTONS]string) {
 
 	addr, _ := net.ResolveUDPAddr("udp4", fmt.Sprintf("255.255.255.255:%d", UDP_NETWORK_ORDERS_PORT))
 
-	for id, _ := range wranglerConnections {
+	for id := range wranglerConnections {
 		if deputyID == "" || wranglerConnections[deputyID] == nil {
 			deputyID = id
 		}
