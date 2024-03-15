@@ -1,8 +1,8 @@
 package elevio
 
 import (
+	. "Project/types"
 	"fmt"
-	. "mymodule/types"
 	"net"
 	"sync"
 	"time"

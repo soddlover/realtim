@@ -1,13 +1,13 @@
 package network
 
 import (
+	. "Project/config"
+	"Project/elevator"
+	"Project/network/SheriffWrangler/sheriff"
+	"Project/network/SheriffWrangler/wrangler"
+	"Project/network/systemStateSynchronizer"
+	. "Project/types"
 	"fmt"
-	. "mymodule/config"
-	"mymodule/elevator"
-	"mymodule/network/SheriffWrangler/sheriff"
-	"mymodule/network/SheriffWrangler/wrangler"
-	"mymodule/systemStateSynchronizer"
-	. "mymodule/types"
 	"os"
 	"strings"
 	"sync"

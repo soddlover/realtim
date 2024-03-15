@@ -1,11 +1,11 @@
 package backup
 
 import (
+	. "Project/config"
+	. "Project/types"
 	"encoding/json"
 	"fmt"
 	"log"
-	. "mymodule/config"
-	. "mymodule/types"
 	"os"
 	"os/exec"
 	"strings"

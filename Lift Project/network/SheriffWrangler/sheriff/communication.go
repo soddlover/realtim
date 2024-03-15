@@ -1,13 +1,13 @@
 package sheriff
 
 import (
+	. "Project/config"
+	"Project/network/conn"
+	. "Project/types"
 	"bufio"
 	"encoding/json"
 	"errors"
 	"fmt"
-	. "mymodule/config"
-	"mymodule/network/conn"
-	. "mymodule/types"
 	"net"
 	"strconv"
 	"strings"

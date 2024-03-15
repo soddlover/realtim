@@ -1,9 +1,9 @@
 package bcast
 
 import (
+	"Project/network/conn"
 	"encoding/json"
 	"fmt"
-	"mymodule/network/conn"
 	"net"
 	"reflect"
 )

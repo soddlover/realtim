@@ -1,14 +1,13 @@
 package main
 
 import (
+	"Project/backup"
+	. "Project/config"
+	elev "Project/elevator"
+	"Project/network"
+	"Project/network/localip"
+	. "Project/types"
 	"flag"
-	"mymodule/backup"
-	"mymodule/config"
-	. "mymodule/config"
-	elev "mymodule/elevator"
-	"mymodule/network"
-	"mymodule/network/localip"
-	. "mymodule/types"
 )
 
 func main() {
@@ -20,7 +19,7 @@ func main() {
 		id = "0"
 	}
 	localIP := localip.LocalIP()
-	config.SELF_ID = localIP + ":" + id
+	SELF_ID = localIP + ":" + id
 
 	initElev := backup.Backup(*disableWatcher)
 

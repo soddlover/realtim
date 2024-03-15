@@ -1,11 +1,11 @@
 package elevator
 
 import (
+	"Project/backup"
+	. "Project/config"
+	"Project/elevator/elevio"
+	. "Project/types"
 	"fmt"
-	"mymodule/backup"
-	. "mymodule/config"
-	"mymodule/elevator/elevio"
-	. "mymodule/types"
 	"strconv"
 	"strings"
 	"time"

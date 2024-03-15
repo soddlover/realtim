@@ -1,8 +1,8 @@
 package types
 
 import (
+	. "Project/config"
 	"encoding/json"
-	. "mymodule/config"
 	"time"
 )
 

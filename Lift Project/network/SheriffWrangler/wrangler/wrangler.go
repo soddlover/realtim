@@ -1,14 +1,14 @@
 package wrangler
 
 import (
+	. "Project/config"
+	"Project/network/conn"
+	"Project/types"
+	. "Project/types"
 	"bufio"
 	"encoding/json"
 	"fmt"
 	"log"
-	. "mymodule/config"
-	"mymodule/network/conn"
-	"mymodule/types"
-	. "mymodule/types"
 	"net"
 	"time"
 )

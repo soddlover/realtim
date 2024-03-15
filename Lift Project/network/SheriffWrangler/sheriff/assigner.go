@@ -1,10 +1,10 @@
 package sheriff
 
 import (
+	. "Project/config"
+	"Project/elevator"
+	. "Project/types"
 	"fmt"
-	. "mymodule/config"
-	"mymodule/elevator"
-	. "mymodule/types"
 	"sort"
 	"time"
 )

@@ -1,10 +1,10 @@
 package elevator
 
 import (
+	. "Project/config"
+	"Project/elevator/elevio"
+	. "Project/types"
 	"fmt"
-	. "mymodule/config"
-	"mymodule/elevator/elevio"
-	. "mymodule/types"
 	"time"
 )
 
