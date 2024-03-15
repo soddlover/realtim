@@ -52,7 +52,7 @@ func NetworkFSM(
 
 	sheriffDead := make(chan bool)
 	sheriffIP := make(chan string)
-	go CloseTCPConnections(nodeLeftNetwork, sheriffIP)
+	go closeTCPConnections(nodeLeftNetwork, sheriffIP)
 
 	currentDuty = dt_initial
 	for {
@@ -62,7 +62,7 @@ func NetworkFSM(
 			if sIP == "" {
 				fmt.Println("Attempting to become sheriff", chosenOne, SELF_ID)
 				if chosenOne == SELF_ID {
-					fmt.Println("I am sheriff!")
+					fmt.Println("Sucsess!! I am Sheriff!")
 					currentDuty = dt_sherriff
 					go sheriff.Sheriff(assignOrder,
 						latestNetworkOrderData,
@@ -76,7 +76,7 @@ func NetworkFSM(
 					continue
 				}
 			} else {
-				fmt.Println("Attempting Connecting to Sheriff:")
+				fmt.Println("Attempting Connecting to Sheriff...")
 				if wrangler.ConnectWranglerToSheriff(sIP) {
 					sheriffIP <- sIP
 					go wrangler.ReceiveTCPMessageFromSheriff(sheriffDead, addToLocalQueue)
@@ -84,7 +84,7 @@ func NetworkFSM(
 						go wrangler.ReceiveUDPNodeOrders(recievedNetworkOrders)
 					})
 					currentDuty = dt_wrangler
-					fmt.Println("I am wrangler!")
+					fmt.Println("Suceessfully connected to Sheriff!")
 				}
 			}
 			startOrderForwarderOnce.Do(func() {
@@ -95,7 +95,7 @@ func NetworkFSM(
 			sIP := wrangler.GetSheriffIP()
 
 			if sIP == "" {
-				fmt.Println("I have gone offline closing all connections")
+				fmt.Println("Diconnect from network detected")
 				sheriff.CloseConns("ALL")
 				currentDuty = dt_offline
 			}
@@ -104,7 +104,7 @@ func NetworkFSM(
 		case dt_wrangler:
 			select {
 			case <-sheriffDead:
-				fmt.Println("Sheriff is dead", latestNetworkOrderData)
+				fmt.Println("Sheriff disconnect detected", latestNetworkOrderData)
 				chosenOne = latestNetworkOrderData.TheChosenOne
 				currentDuty = dt_initial
 			case latestNetworkOrderData = <-recievedNetworkOrders:
@@ -115,7 +115,7 @@ func NetworkFSM(
 
 			sIP := wrangler.GetSheriffIP()
 			if sIP != "" {
-				fmt.Println("Coming back online, restarting...")
+				fmt.Println("Reconnected to network. Restarting...")
 				os.Exit(1)
 			}
 			time.Sleep(1 * time.Second)
@@ -123,7 +123,7 @@ func NetworkFSM(
 	}
 }
 
-func CloseTCPConnections(lostConns <-chan string, sheriffID <-chan string) {
+func closeTCPConnections(lostConns <-chan string, sheriffID <-chan string) {
 	var lastSheriffID string
 	for {
 		select {
