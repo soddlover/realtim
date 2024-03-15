@@ -28,6 +28,7 @@ func Assigner(
 	recalculate:
 		requestSystemState <- true
 		localSystemState := <-systemState
+
 		requestNetworkOrders <- true
 		networkOrders := <-networkOrders
 		assigned := false
@@ -44,7 +45,7 @@ func Assigner(
 				if success {
 					writeNetworkOrders <- OrderID{Floor: order.Floor, Button: order.Button, ID: id}
 					assigned = true
-					fmt.Println("Order assigned to ", OrderID{Floor: order.Floor, Button: order.Button, ID: id})
+					fmt.Println("Order succesfully sent and assigned to ", OrderID{Floor: order.Floor, Button: order.Button, ID: id})
 					break
 				}
 			}
@@ -166,6 +167,7 @@ func calculateSortedIDs(
 			if elev.State != EB_Unavailable {
 				// If the order is already assigned to a working elevator, move it to the front of the list
 				durations = append([]IDAndDuration{{ID: assigned, Duration: 0}}, durations...)
+				fmt.Println("Already assigned to elevator, moving to front of list", assigned)
 			}
 		}
 	}
