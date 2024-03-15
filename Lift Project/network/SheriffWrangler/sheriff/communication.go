@@ -125,7 +125,6 @@ func SendOrderMessage(peer string, order Orderstatus) (bool, error) {
 		delete(wranglerConnections, peer)
 		return false, err
 	}
-	fmt.Println("successs Sent order to", peer, "order:", order)
 	return true, nil
 }
 
@@ -145,8 +144,6 @@ func ReceiveMessage(
 			fmt.Println("Error unmarshalling order:", err)
 			continue
 		}
-
-		fmt.Println("Received order from", peerID)
 
 		//DeputyUpdateChan <- true
 

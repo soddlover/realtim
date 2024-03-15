@@ -3,6 +3,7 @@ package network
 import (
 	"fmt"
 	"mymodule/config"
+	"mymodule/elevator"
 	"mymodule/elevator/elevio"
 	"mymodule/network/SheriffWrangler/sheriff"
 	"mymodule/network/SheriffWrangler/wrangler"
@@ -40,6 +41,7 @@ func NetworkFSM(
 	systemState := make(chan map[string]Elev, config.NETWORK_BUFFER_SIZE)
 	nodeLeftNetwork := make(chan string, config.NETWORK_BUFFER_SIZE)
 	assignOrder := make(chan Orderstatus, config.NETWORK_BUFFER_SIZE)
+	recievedNetworkOrders := make(chan NetworkOrdersData, config.NETWORK_BUFFER_SIZE)
 
 	go systemStateSynchronizer.SystemStateSynchronizer(
 		requestSystemState,
@@ -76,7 +78,7 @@ func NetworkFSM(
 				fmt.Println("Attempting Connecting to Sheriff:")
 				if wrangler.ConnectWranglerToSheriff(sIP) {
 					sheriffIP <- sIP
-					go wrangler.ReceiveMessageFromSheriff(addToLocalQueue, sheriffDead, requestSystemState, systemState, addToLocalQueue)
+					go wrangler.ReceiveMessageFromSheriff(sheriffDead, recievedNetworkOrders, addToLocalQueue)
 					currentDuty = dt_wrangler
 					fmt.Println("I am wrangler!")
 				}
@@ -97,11 +99,16 @@ func NetworkFSM(
 			time.Sleep(1 * time.Second)
 
 		case dt_wrangler:
-			networkOrderData := <-sheriffDead
-			lastnetworkOrders = networkOrderData.NetworkOrders
-			chosenOne = networkOrderData.TheChosenOne
-			currentDuty = dt_initial
-
+			var latestNetworkOrderData NetworkOrdersData
+			select {
+			case <-sheriffDead:
+				lastnetworkOrders = latestNetworkOrderData.NetworkOrders
+				chosenOne = latestNetworkOrderData.TheChosenOne
+				currentDuty = dt_initial
+			case latestNetworkOrderData := <-recievedNetworkOrders:
+				wrangler.CheckSync(requestSystemState, systemState, latestNetworkOrderData.NetworkOrders, addToLocalQueue)
+				elevator.UpdateLightsFromNetworkOrders(latestNetworkOrderData.NetworkOrders)
+			}
 		case dt_offline:
 
 			sIP := wrangler.GetSheriffIP()
