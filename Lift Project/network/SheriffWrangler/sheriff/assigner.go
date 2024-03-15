@@ -25,7 +25,6 @@ func Assigner(
 			writeNetworkOrders <- OrderID{Floor: order.Floor, Button: order.Button, ID: ""}
 			continue
 		}
-	recalculate:
 		requestSystemState <- true
 		localSystemState := <-systemState
 
@@ -52,7 +51,8 @@ func Assigner(
 		}
 		if !assigned {
 			fmt.Println("No available elevators attempting assigning again")
-			goto recalculate
+			addToLocalQueue <- Order{Floor: order.Floor, Button: order.Button}
+			writeNetworkOrders <- OrderID{Floor: order.Floor, Button: order.Button, ID: SELF_ID}
 
 		}
 
