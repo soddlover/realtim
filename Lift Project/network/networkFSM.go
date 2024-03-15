@@ -35,6 +35,7 @@ func NetworkFSM(
 
 	var startOrderForwarderOnce sync.Once
 	var lastnetworkOrders [config.N_FLOORS][config.N_BUTTONS]string
+	var latestNetworkOrderData NetworkOrdersData
 	var chosenOne bool = true
 
 	requestSystemState := make(chan bool, config.NETWORK_BUFFER_SIZE)
@@ -100,7 +101,6 @@ func NetworkFSM(
 			time.Sleep(1 * time.Second)
 
 		case dt_wrangler:
-			var latestNetworkOrderData NetworkOrdersData
 			select {
 			case <-sheriffDead:
 				lastnetworkOrders = latestNetworkOrderData.NetworkOrders
