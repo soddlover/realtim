@@ -132,7 +132,6 @@ func RunElev(
 				elevio.SetDoorOpenLamp(true)
 				doorTimer.Reset(DOOR_OPEN_TIME)
 				clearAtFloor(&elevator, orderServed)
-				fmt.Println("BOomb booomm baby changing direction")
 				continue
 			}
 			if elevator.Dir == DirStop {
@@ -147,7 +146,7 @@ func RunElev(
 			elevatorStateBroadcast <- elevator
 		case <-motorErrorTimer.C:
 			elevator.State = EB_UNAVAILABLE
-			fmt.Println("Motor error, killing myself")
+			fmt.Println("Motor error detected")
 			elevio.SetStopLamp(true)
 			for floor := range elevator.Queue {
 				elevator.Queue[floor][BT_HallUp] = false

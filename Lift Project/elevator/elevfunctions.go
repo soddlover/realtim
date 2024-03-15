@@ -37,7 +37,7 @@ func elevatorInit(elevator Elev, drv_floors <-chan int) Elev {
 			elevio.SetMotorDirection(elevio.MotorDirection(elevator.Dir))
 
 		case <-ticker.C:
-			fmt.Println("Failed to arrive at floor within time limit initallym, motor error assumed")
+			fmt.Println("Motor error detected")
 			elevator.State = EB_UNAVAILABLE
 			elevio.SetMotorDirection(elevio.MD_Down)
 			ticker.Stop()
