@@ -35,7 +35,7 @@ func NetworkFSM(
 
 	var startOrderForwarderOnce sync.Once
 	var startUDPListenerOnce sync.Once
-	var chosenOne bool = true
+	var chosenOne string = config.Id
 	var latestNetworkOrderData NetworkOrderPacket
 
 	requestSystemState := make(chan bool, config.NETWORK_BUFFER_SIZE)
@@ -61,7 +61,8 @@ func NetworkFSM(
 		case dt_initial:
 			sIP := wrangler.GetSheriffIP()
 			if sIP == "" {
-				if chosenOne {
+				fmt.Println("Attempting to become sheriff", chosenOne, config.Id)
+				if chosenOne == config.Id {
 					fmt.Println("I am sheriff!")
 					currentDuty = dt_sherriff
 					go sheriff.Sheriff(assignOrder,
@@ -72,7 +73,7 @@ func NetworkFSM(
 
 				} else {
 					time.Sleep(1 * time.Second)
-					chosenOne = true
+					chosenOne = config.Id
 					continue
 				}
 			} else {

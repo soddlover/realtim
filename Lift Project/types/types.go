@@ -63,12 +63,12 @@ type Message struct {
 
 type NetworkOrdersData struct {
 	NetworkOrders [config.N_FLOORS][config.N_BUTTONS]string
-	TheChosenOne  bool
+	TheChosenOne  string
 }
 
 type NetworkOrderPacket struct {
 	NetworkOrders [config.N_FLOORS][config.N_BUTTONS]string
-	TheChosenOne  bool
+	TheChosenOne  string
 	SequenceNum   int
 }
 
