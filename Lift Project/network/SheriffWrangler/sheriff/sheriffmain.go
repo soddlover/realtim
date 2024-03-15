@@ -45,9 +45,8 @@ func Sheriff(
 
 	go redistributor(
 		nodeUnavailabe,
-		assignOrder,
-		requestSystemState,
-		systemState,
+		assignOrder,	//requestSystemState chan<- bool,
+		//systemState <-chan map[string]Elev,
 		requestNetworkOrders,
 		networkorders)
 
@@ -121,8 +120,8 @@ func netWorkOrderHandler(
 func checkForUnavailable(
 	requestSystemState chan<- bool,
 	systemState <-chan map[string]Elev,
-	nodeUnavailabe chan<- string,
-) {
+	nodeUnavailabe chan<- string) {
+
 	unavailableIDs := make(map[string]bool)
 
 	for {
@@ -140,7 +139,6 @@ func checkForUnavailable(
 				delete(unavailableIDs, id)
 			}
 		}
-
 		time.Sleep(3 * time.Second)
 	}
 }

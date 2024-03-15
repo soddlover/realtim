@@ -18,6 +18,7 @@ func Assigner(
 	writeNetworkOrders chan<- OrderID,
 	requestNetworkOrders chan<- bool,
 	networkOrders <-chan [config.N_FLOORS][config.N_BUTTONS]string) {
+
 	for {
 		select {
 		case order := <-assignOrder:
@@ -52,10 +53,9 @@ func Assigner(
 func redistributor(
 	nodeUnavailabe <-chan string,
 	assignOrder chan<- Orderstatus,
-	requestSystemState chan<- bool,
-	systemState <-chan map[string]Elev,
 	requestNetworkOrders chan<- bool,
 	networkOrders <-chan [config.N_FLOORS][config.N_BUTTONS]string) {
+
 	for {
 		select {
 		case peerID := <-nodeUnavailabe:
@@ -119,6 +119,7 @@ func timeToServeRequest(e_old Elev, b ButtonType, f int) time.Duration {
 }
 
 func requestsClearAtCurrentFloor(e_old Elev, f func(ButtonType, int)) Elev {
+
 	e := e_old
 	for b := ButtonType(0); b < config.N_BUTTONS; b++ {
 		if e.Queue[e.Floor][b] {
@@ -131,7 +132,11 @@ func requestsClearAtCurrentFloor(e_old Elev, f func(ButtonType, int)) Elev {
 	return e
 }
 
-func calculateSortedIDs(systemState map[string]Elev, networkOrders [config.N_FLOORS][config.N_BUTTONS]string, order Order) []string {
+func calculateSortedIDs(
+	systemState map[string]Elev,
+	networkOrders [config.N_FLOORS][config.N_BUTTONS]string,
+	order Order) []string {
+
 	var durations []IDAndDuration
 
 	for id, elevator := range systemState {

@@ -63,6 +63,7 @@ func WriteBackup(elevChan <-chan Elev) {
 }
 
 func takeControl() Elev {
+
 	fmt.Println("Backup is taking over.")
 
 	stateJson, err := os.ReadFile("backup" + strings.Split(SELF_ID, ":")[1] + ".txt")

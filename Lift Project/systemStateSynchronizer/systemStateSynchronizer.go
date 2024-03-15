@@ -13,8 +13,8 @@ func SystemStateSynchronizer(
 	requestSystemState <-chan bool,
 	nodeLeft chan<- string,
 	elevatorState <-chan Elev,
-	systemState chan<- map[string]Elev,
-) {
+	systemState chan<- map[string]Elev) {
+
 	broadcastStateTx := make(chan BcastState, config.ELEVATOR_BUFFER_SIZE)
 	go repeater(elevatorState, broadcastStateTx)
 	go bcast.Transmitter(config.Broadcast_state_port, broadcastStateTx)
@@ -49,8 +49,7 @@ func updateBcastSystemState(
 	updateFromBcast chan<- map[string]Elev,
 	broadcastStateRx <-chan BcastState,
 	removeNode <-chan string,
-	heartBeat chan<- HeartBeat,
-) {
+	heartBeat chan<- HeartBeat) {
 	bcastSystem := make(map[string]BcastState)
 	for {
 		select {
@@ -82,7 +81,10 @@ func convertToSystemState(bcastSystem map[string]BcastState) map[string]Elev {
 	return systemState
 }
 
-func checkHeartbeats(heartBeat <-chan HeartBeat, lostConn chan<- string) {
+func checkHeartbeats(
+	heartBeat <-chan HeartBeat,
+	lostConn chan<- string) {
+
 	lastHeartBeat := make(map[string]time.Time)
 	lastReported := make(map[string]bool)
 	ticker := time.NewTicker(config.HEARTBEAT_DEADLINE)
@@ -107,7 +109,10 @@ func checkHeartbeats(heartBeat <-chan HeartBeat, lostConn chan<- string) {
 	}
 }
 
-func repeater(elevatorState <-chan Elev, broadcastStateTx chan<- BcastState) {
+func repeater(
+	elevatorState <-chan Elev,
+	broadcastStateTx chan<- BcastState) {
+		
 	ticker := time.NewTicker(config.HEARTBEAT)
 	var broadcastState BcastState
 	var lastElev Elev

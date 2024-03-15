@@ -17,8 +17,10 @@ import (
 var sheriffConn net.Conn
 
 func ConnectWranglerToSheriff(sheriffIP string) bool {
+
 	fmt.Println("netdial to sheriff:", sheriffIP)
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", sheriffIP, config.TCP_port))
+
 	if err != nil {
 		fmt.Println("Error connecting to sheriff:", err)
 		return false
@@ -31,6 +33,7 @@ func ConnectWranglerToSheriff(sheriffIP string) bool {
 }
 
 func GetSheriffIP() string {
+
 	var buf [1024]byte
 
 	conn := conn.DialBroadcastUDP(config.Sheriff_port)
@@ -156,6 +159,7 @@ func ReceiveUDPNodeOrders(
 }
 
 func CloseSheriffConn() {
+
 	err := sheriffConn.Close()
 	if err != nil {
 		fmt.Println("Error closing sheriff connection:", err)
@@ -164,7 +168,11 @@ func CloseSheriffConn() {
 	fmt.Println("Sheriff connection closed")
 }
 
-func CheckSync(requestSystemState chan<- bool, systemState <-chan map[string]Elev, networkOrders [config.N_FLOORS][config.N_BUTTONS]string, addToLocalQueue chan<- Order) {
+func CheckSync(
+	requestSystemState chan<- bool,
+	systemState <-chan map[string]Elev,
+	networkOrders [config.N_FLOORS][config.N_BUTTONS]string,
+	addToLocalQueue chan<- Order) {
 
 	for floor := 0; floor < config.N_FLOORS; floor++ {
 		for button := 0; button < config.N_BUTTONS; button++ {
