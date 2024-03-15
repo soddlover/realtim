@@ -71,8 +71,14 @@ func EstablishWranglerCommunications(
 		conn := <-newConn
 		fmt.Println("Incoming new connection starting reader")
 		reader := bufio.NewReader(conn)
+		conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+
 		message, err := reader.ReadString('\n')
 		if err != nil {
+			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				fmt.Println("Timeout reading from connection closing it")
+				conn.Close()
+			}
 			fmt.Println("Error reading from connection while listeing for wranglers:", err)
 			continue
 		}

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"time"
 )
 
@@ -18,11 +19,11 @@ var sheriffConn net.Conn
 func ConnectWranglerToSheriff(sheriffIP string) bool {
 
 	fmt.Println("netdial to sheriff:", sheriffIP)
-	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", sheriffIP, TCP_PORT))
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", sheriffIP, TCP_PORT), 5*time.Second)
 
 	if err != nil {
 		fmt.Println("Error connecting to sheriff:", err)
-		return false
+		os.Exit(1)
 	}
 
 	fmt.Fprintf(conn, "%s\n", SELF_ID)
