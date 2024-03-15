@@ -17,10 +17,8 @@ func main() {
 	flag.Parse()
 	if id == "" {
 		id = "0"
-
 	}
 	localIP := localip.LocalIP()
-
 	config.Id = localIP + ":" + id
 
 	initElev := backup.Backup(*fresh)

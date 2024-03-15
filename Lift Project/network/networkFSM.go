@@ -53,7 +53,7 @@ func NetworkFSM(
 
 	sheriffDead := make(chan bool)
 	sheriffIP := make(chan string)
-	go CloseTCPConnections(nodeLeftNetwork, sheriffIP)
+	go closeTCPConnections(nodeLeftNetwork, sheriffIP)
 
 	currentDuty = dt_initial
 	for {
@@ -126,7 +126,7 @@ func NetworkFSM(
 	}
 }
 
-func CloseTCPConnections(lostConns <-chan string, sheriffID <-chan string) {
+func closeTCPConnections(lostConns <-chan string, sheriffID <-chan string) {
 	var lastSheriffID string
 	for {
 		select {
