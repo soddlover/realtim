@@ -14,7 +14,7 @@ import (
 func main() {
 	var id string
 	flag.StringVar(&id, "id", "", "id of this peer, default to 0. If running several elevators on same host ID, must be increased for each new elevator.")
-	enableWatcher := flag.Bool("enableWatcher", false, " Eneables process pair, watcher") //remove before delivery
+	disableWatcher := flag.Bool("disableWatcher", false, " Eneables process pair, watcher") //remove before delivery
 	flag.Parse()
 	if id == "" {
 		id = "0"
@@ -22,7 +22,7 @@ func main() {
 	localIP := localip.LocalIP()
 	config.SELF_ID = localIP + ":" + id
 
-	initElev := backup.Backup(*enableWatcher)
+	initElev := backup.Backup(*disableWatcher)
 
 	elevatorStateBroadcast := make(chan Elev, NETWORK_BUFFER_SIZE)
 	localOrderRequest := make(chan Order, ELEVATOR_BUFFER_SIZE)

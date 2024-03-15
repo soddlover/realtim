@@ -12,9 +12,9 @@ import (
 	"time"
 )
 
-func Backup(enableWatcher bool) Elev {
+func Backup(disableWatcher bool) Elev {
 
-	if !enableWatcher {
+	if disableWatcher {
 		os.Remove("backup" + strings.Split(SELF_ID, ":")[1] + ".txt")
 		return Elev{}
 	}
