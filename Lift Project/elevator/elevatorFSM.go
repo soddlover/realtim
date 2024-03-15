@@ -21,7 +21,7 @@ func RunElev(
 	nr, _ := strconv.Atoi(strings.Split(SELF_ID, ":")[0]) //remove before delivery
 	port := SimulatorPort + nr
 	addr := "localhost:" + fmt.Sprint(port)
-	elevio.Init(addr, config.N_FLOORS)
+	elevio.Init(addr, N_FLOORS)
 
 	elevator := initElev
 

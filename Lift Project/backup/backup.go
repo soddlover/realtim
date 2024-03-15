@@ -12,9 +12,9 @@ import (
 	"time"
 )
 
-func Backup(fresh bool) Elev {
+func Backup(enableWatcher bool) Elev {
 
-	if fresh {
+	if !enableWatcher {
 		os.Remove("backup" + strings.Split(SELF_ID, ":")[1] + ".txt")
 		return Elev{}
 	}
@@ -84,7 +84,6 @@ func takeControl() Elev {
 	cmd := exec.Command("gnome-terminal", "--", "go", "run", "main.go")
 	err = cmd.Run()
 	if err != nil {
-		fmt.Println("THis sucks")
 		log.Fatal(err)
 	}
 	return elev
