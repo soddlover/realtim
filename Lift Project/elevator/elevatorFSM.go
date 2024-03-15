@@ -2,7 +2,8 @@ package elevator
 
 import (
 	"fmt"
-	"mymodule/config"
+	"mymodule/backup"
+	. "mymodule/config"
 	"mymodule/elevator/elevio"
 	. "mymodule/types"
 	"strconv"
@@ -11,7 +12,6 @@ import (
 )
 
 func RunElev(
-	elevatorStateBackup chan<- Elev,
 	elevatorStateBroadcast chan<- Elev,
 	localOrderRequest chan<- Order,
 	addToQueue <-chan Order,
@@ -19,22 +19,24 @@ func RunElev(
 	initElev Elev) {
 
 	nr, _ := strconv.Atoi(strings.Split(SELF_ID, ":")[0]) //remove before delivery
-	port := config.SimulatorPort + nr
+	port := SimulatorPort + nr
 	addr := "localhost:" + fmt.Sprint(port)
 	elevio.Init(addr, N_FLOORS)
 
 	elevator := initElev
 
-	doorTimer := time.NewTimer(config.DOOR_OPEN_TIME)
-	motorErrorTimer := time.NewTimer(config.MOTOR_ERROR_TIME)
+	doorTimer := time.NewTimer(DOOR_OPEN_TIME)
+	motorErrorTimer := time.NewTimer(MOTOR_ERROR_TIME)
 	doorTimer.Stop()
 	motorErrorTimer.Stop()
 
-	drv_buttons := make(chan elevio.ButtonEvent, config.ELEVATOR_BUFFER_SIZE)
-	drv_floors := make(chan int, config.ELEVATOR_BUFFER_SIZE)
-	drv_obstr := make(chan bool, config.ELEVATOR_BUFFER_SIZE)
-	drv_stop := make(chan bool, config.ELEVATOR_BUFFER_SIZE)
+	elevatorStateBackup := make(chan Elev, ELEVATOR_BUFFER_SIZE)
+	drv_buttons := make(chan elevio.ButtonEvent, ELEVATOR_BUFFER_SIZE)
+	drv_floors := make(chan int, ELEVATOR_BUFFER_SIZE)
+	drv_obstr := make(chan bool, ELEVATOR_BUFFER_SIZE)
+	drv_stop := make(chan bool, ELEVATOR_BUFFER_SIZE)
 
+	go backup.WriteBackup(elevatorStateBackup)
 	go elevio.PollButtons(drv_buttons)
 	go elevio.PollFloorSensor(drv_floors)
 	go elevio.PollObstructionSwitch(drv_obstr)
@@ -45,7 +47,7 @@ func RunElev(
 
 	elevator = elevatorInit(elevator, drv_floors)
 	if elevator.Dir != DirStop {
-		motorErrorTimer.Reset(config.MOTOR_ERROR_TIME)
+		motorErrorTimer.Reset(MOTOR_ERROR_TIME)
 	}
 
 	elevatorStateBackup <- elevator
@@ -65,13 +67,13 @@ func RunElev(
 				elevio.SetMotorDirection(elevio.MotorDirection(elevator.Dir))
 				if elevator.Dir == DirStop {
 					elevator.State = EB_DoorOpen
-					doorTimer.Reset(config.DOOR_OPEN_TIME)
+					doorTimer.Reset(DOOR_OPEN_TIME)
 					elevio.SetDoorOpenLamp(true)
 					clearAtFloor(&elevator, orderServed)
 
 				} else {
 					elevator.State = EB_Moving
-					motorErrorTimer.Reset(config.MOTOR_ERROR_TIME)
+					motorErrorTimer.Reset(MOTOR_ERROR_TIME)
 				}
 
 			case EB_Moving:
@@ -83,7 +85,7 @@ func RunElev(
 						orderServed <- Orderstatus{Floor: order.Floor, Button: order.Button, Served: true}
 					}
 
-					doorTimer.Reset(config.DOOR_OPEN_TIME)
+					doorTimer.Reset(DOOR_OPEN_TIME)
 				}
 
 			case EB_UNAVAILABLE:
@@ -105,17 +107,17 @@ func RunElev(
 				motorErrorTimer.Stop()
 				elevio.SetMotorDirection(elevio.MD_Stop)
 				elevio.SetDoorOpenLamp(true)
-				doorTimer.Reset(config.DOOR_OPEN_TIME)
+				doorTimer.Reset(DOOR_OPEN_TIME)
 				clearAtFloor(&elevator, orderServed)
 				elevator.State = EB_DoorOpen
 			} else if elevator.State == EB_Moving {
-				motorErrorTimer.Reset(config.MOTOR_ERROR_TIME)
+				motorErrorTimer.Reset(MOTOR_ERROR_TIME)
 			}
 			elevatorStateBackup <- elevator
 			elevatorStateBroadcast <- elevator
 		case <-doorTimer.C:
 			if elevio.GetObstruction() {
-				doorTimer.Reset(config.DOOR_OPEN_TIME)
+				doorTimer.Reset(DOOR_OPEN_TIME)
 				elevio.SetStopLamp(true)
 				elevator.State = EB_UNAVAILABLE
 				fmt.Println("Obstruction detected")
@@ -128,7 +130,7 @@ func RunElev(
 			elevator.Dir = ChooseDirection(elevator)
 			if prevdir != elevator.Dir && (elevator.Queue[elevator.Floor][BT_HallUp] || elevator.Queue[elevator.Floor][BT_HallDown]) {
 				elevio.SetDoorOpenLamp(true)
-				doorTimer.Reset(config.DOOR_OPEN_TIME)
+				doorTimer.Reset(DOOR_OPEN_TIME)
 				clearAtFloor(&elevator, orderServed)
 				fmt.Println("BOomb booomm baby changing direction")
 				continue
@@ -139,7 +141,7 @@ func RunElev(
 			} else {
 				elevator.State = EB_Moving
 				elevio.SetMotorDirection(elevio.MotorDirection(elevator.Dir))
-				motorErrorTimer.Reset(config.MOTOR_ERROR_TIME)
+				motorErrorTimer.Reset(MOTOR_ERROR_TIME)
 			}
 			elevatorStateBackup <- elevator
 			elevatorStateBroadcast <- elevator
@@ -156,7 +158,7 @@ func RunElev(
 
 		case obstruction := <-drv_obstr:
 			if !obstruction && elevator.State == EB_UNAVAILABLE {
-				doorTimer.Reset(config.DOOR_OPEN_TIME)
+				doorTimer.Reset(DOOR_OPEN_TIME)
 				elevio.SetStopLamp(false)
 				elevator.State = EB_DoorOpen
 				elevatorStateBackup <- elevator
