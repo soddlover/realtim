@@ -3,44 +3,57 @@ package network
 import (
 	"fmt"
 	"mymodule/config"
+	"mymodule/elevator"
 	"mymodule/elevator/elevio"
-	"mymodule/network/SheriffDeputyWrangler/sheriff"
-	"mymodule/network/SheriffDeputyWrangler/wrangler"
+	"mymodule/network/SheriffWrangler/sheriff"
+	"mymodule/network/SheriffWrangler/wrangler"
+	"mymodule/systemStateSynchronizer"
 	. "mymodule/types"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
 
 type duty int
 
-const (
-	dt_initial duty = iota
-	dt_sherriff
-	dt_deputy
-	dt_wrangler
-	dt_offline
-)
-
 var currentDuty duty
 
-func NetworkFSM(
-	orderRequest chan Order,
-	orderAssigned chan Order,
-	orderDelete chan Orderstatus,
-	systemState map[string]Elev,
-	incommingOrder chan Orderstatus,
-) {
-	networkOrders := &NetworkOrders{}
-	var startOrderForwarderOnce sync.Once
+const (
+	dt_initial  duty = 0
+	dt_sherriff duty = 1
+	dt_wrangler duty = 2
+	dt_offline  duty = 3
+)
 
-	sheriffDead := make(chan NetworkOrdersData)
-	relievedOfDuty := make(chan bool)
-	remainingOrders := make(chan [config.N_FLOORS][config.N_BUTTONS]string)
-	lostConns := make(chan string)
-	go CheckHeartbeats(lostConns)
-	go Heartbeats(lostConns, systemState)
-	go checkSync(systemState, networkOrders, orderAssigned)
+func NetworkFSM(
+	elevatorStateBcast <-chan Elev,
+	localOrderRequest <-chan Order,
+	addToLocalQueue chan<- Order,
+	localOrderServed <-chan Orderstatus,
+) {
+
+	var startOrderForwarderOnce sync.Once
+	var startUDPListenerOnce sync.Once
+	var chosenOne string = config.Id
+	var latestNetworkOrderData NetworkOrderPacket
+
+	requestSystemState := make(chan bool, config.NETWORK_BUFFER_SIZE)
+	systemState := make(chan map[string]Elev, config.NETWORK_BUFFER_SIZE)
+	nodeLeftNetwork := make(chan string, config.NETWORK_BUFFER_SIZE)
+	assignOrder := make(chan Orderstatus, config.NETWORK_BUFFER_SIZE)
+	recievedNetworkOrders := make(chan NetworkOrderPacket, config.NETWORK_BUFFER_SIZE)
+
+	go systemStateSynchronizer.SystemStateSynchronizer(
+		requestSystemState,
+		nodeLeftNetwork,
+		elevatorStateBcast,
+		systemState,
+	)
+
+	sheriffDead := make(chan bool)
+	sheriffIP := make(chan string)
+	go CloseTCPConnections(nodeLeftNetwork, sheriffIP)
 
 	currentDuty = dt_initial
 	for {
@@ -48,114 +61,107 @@ func NetworkFSM(
 		case dt_initial:
 			sIP := wrangler.GetSheriffIP()
 			if sIP == "" {
+				fmt.Println("Attempting to become sheriff", chosenOne, config.Id)
+				if chosenOne == config.Id {
+					fmt.Println("I am sheriff!")
+					currentDuty = dt_sherriff
+					go sheriff.Sheriff(assignOrder,
+						latestNetworkOrderData,
+						addToLocalQueue,
+						requestSystemState,
+						systemState)
 
-				InitSherrif(incommingOrder, systemState, networkOrders, relievedOfDuty, remainingOrders, orderAssigned)
-				currentDuty = dt_sherriff
+				} else {
+					time.Sleep(1 * time.Second)
+					chosenOne = config.Id
+					continue
+				}
 			} else {
-				fmt.Println("I am not the only Wrangler in town, connecting to Sheriff:")
+				fmt.Println("Attempting Connecting to Sheriff:")
 				if wrangler.ConnectWranglerToSheriff(sIP) {
-					fmt.Println("Me, a Wrangler connected to Sheriff")
-					go wrangler.ReceiveMessageFromSheriff(orderAssigned, sheriffDead, networkOrders)
+					sheriffIP <- sIP
+					go wrangler.ReceiveTCPMessageFromSheriff(sheriffDead, addToLocalQueue)
+					startUDPListenerOnce.Do(func() {
+						go wrangler.ReceiveUDPNodeOrders(recievedNetworkOrders)
+					})
 					currentDuty = dt_wrangler
+					fmt.Println("I am wrangler!")
 				}
 			}
 			startOrderForwarderOnce.Do(func() {
-				go orderForwarder(incommingOrder, orderAssigned, orderRequest, orderDelete)
+				go orderForwarder(assignOrder, addToLocalQueue, localOrderRequest, localOrderServed)
 			})
 		case dt_sherriff:
 
 			sIP := wrangler.GetSheriffIP()
 
 			if sIP == "" {
-				fmt.Println("This is weird, I should have been broadcasting my IP, read '' as broadcasted IP")
-				fmt.Println("I must be offline so sad")
+				fmt.Println("I have gone offline closing all connections")
+				sheriff.CloseConns("ALL")
 				currentDuty = dt_offline
 				//relievedOfDuty <- true
 			}
 			time.Sleep(1 * time.Second)
 
 		case dt_wrangler:
-			networkOrderData := <-sheriffDead
-			fmt.Println("Lets double check if sherriff actually is dead")
-			sIP := wrangler.GetSheriffIP()
-			if sIP == "" {
-				if networkOrderData.TheChosenOne {
-					fmt.Println("I am the chosen one, I am the Sheriff!")
-					networkOrders.Mutex.Lock()
-					networkOrders.Orders = networkOrderData.NetworkOrders
-					networkOrders.Mutex.Unlock()
-					InitSherrif(incommingOrder, systemState, networkOrders, relievedOfDuty, remainingOrders, orderAssigned)
-					currentDuty = dt_sherriff
-
-				} else {
-					fmt.Println("I am not the chosen one, I am a Deputy")
-					currentDuty = dt_initial
-				}
-			} else {
+			select {
+			case <-sheriffDead:
+				// latestNetworkOrderData = latestNetworkOrderData
+				fmt.Println("Sheriff is dead", latestNetworkOrderData)
+				chosenOne = latestNetworkOrderData.TheChosenOne
 				currentDuty = dt_initial
+			case latestNetworkOrderData = <-recievedNetworkOrders:
+				wrangler.CheckSync(requestSystemState, systemState, latestNetworkOrderData.NetworkOrders, addToLocalQueue)
+				elevator.UpdateLightsFromNetworkOrders(latestNetworkOrderData.NetworkOrders)
 			}
-			//listen for incoming orders
-			//listen for new peers
-			//listen for lost peers
-			//listen for orders to delete
-			//listen for orders to assign
 		case dt_offline:
+
 			sIP := wrangler.GetSheriffIP()
 			if sIP != "" {
-				fmt.Println("Back online, time to restart")
+				fmt.Println("Coming back online, restarting...")
 				os.Exit(1)
 			}
 			time.Sleep(1 * time.Second)
-			//listen for incoming orders
-			//listen for new peers
-			//listen for lost peers
-			//listen for orders to delete
-			//listen for orders to assign
 		}
 	}
 }
 
-func Heartbeats(lostConns <-chan string, systemState map[string]Elev) {
+func CloseTCPConnections(lostConns <-chan string, sheriffID <-chan string) {
+	var lastSheriffID string
 	for {
-		id := <-lostConns
-		if currentDuty == dt_sherriff {
-			sheriff.CloseConns(id)
-		} else {
-			wrangler.CloseSheriffConn()
-		}
-		delete(systemState, id)
-	}
-}
+		select {
+		case id := <-lostConns:
 
-func InitSherrif(
-	incomingOrder chan Orderstatus,
-	systemState map[string]Elev,
-	networkorders *NetworkOrders,
-	relievedOfDuty <-chan bool,
-	remainingOrders chan<- [config.N_FLOORS][config.N_BUTTONS]string,
-	orderAssigned chan<- Order,
-) {
-	nodeLeftNetwork := make(chan string)
-	quitAssigner := make(chan bool)
-	fmt.Println("I am the only Wrangler in town, I am the Sheriff!")
-	networkUpdate := make(chan bool)
-	go sheriff.Sheriff(incomingOrder, networkorders, nodeLeftNetwork, networkUpdate, relievedOfDuty, quitAssigner)
-	go Assigner(networkUpdate, orderAssigned, systemState, networkorders, nodeLeftNetwork, incomingOrder, quitAssigner, remainingOrders)
-	go redistributor(nodeLeftNetwork, incomingOrder, systemState, networkorders)
+			if id == config.Id {
+				continue
+			}
+			fmt.Println("Lost connection to:", id)
+			if currentDuty == dt_sherriff {
+				sheriff.CloseConns(id)
+			}
+			id = strings.Split(id, ":")[0]
+			if currentDuty == dt_wrangler && lastSheriffID == id {
+				wrangler.CloseSheriffConn()
+			}
+
+		case id := <-sheriffID:
+			lastSheriffID = id
+		}
+	}
 }
 
 func orderForwarder(
-	incomingOrder chan<- Orderstatus,
-	orderAssigned chan<- Order,
-	orderRequest <-chan Order,
-	orderDelete <-chan Orderstatus,
+	assignOrder chan<- Orderstatus,
+	addToLocalQueue chan<- Order,
+	localOrderRequest <-chan Order,
+	localOrderServed <-chan Orderstatus,
 ) {
 	for {
 		select {
-		case order := <-orderRequest:
-			orderstat := Orderstatus{Owner: config.Self_id, Floor: order.Floor, Button: order.Button, Served: false}
+		case order := <-localOrderRequest:
+			orderstat := Orderstatus{Floor: order.Floor, Button: order.Button, Served: false}
 			if order.Button == elevio.BT_Cab {
-				orderAssigned <- Order{Floor: order.Floor, Button: order.Button}
+				addToLocalQueue <- Order{Floor: order.Floor, Button: order.Button}
 				continue
 			}
 			if currentDuty == dt_offline {
@@ -163,47 +169,16 @@ func orderForwarder(
 			}
 
 			if currentDuty == dt_sherriff {
-				incomingOrder <- orderstat
+				assignOrder <- orderstat
 			} else {
 				wrangler.SendOrderToSheriff(orderstat)
 			}
-		case orderstat := <-orderDelete:
+		case orderstat := <-localOrderServed:
 			if currentDuty == dt_sherriff || currentDuty == dt_offline {
-				incomingOrder <- orderstat
+				assignOrder <- orderstat
 			} else {
 				wrangler.SendOrderToSheriff(orderstat)
 			}
 		}
-	}
-}
-
-func checkSync(systemState map[string]Elev, networkOrders *NetworkOrders, orderAssigned chan<- Order) {
-	for {
-		networkOrders.Mutex.Lock()
-		for floor := 0; floor < config.N_FLOORS; floor++ {
-			for button := 0; button < config.N_BUTTONS; button++ {
-				if networkOrders.Orders[floor][button] != "" {
-					assignedElev, existsInSystemState := systemState[networkOrders.Orders[floor][button]]
-					if !existsInSystemState || !assignedElev.Queue[floor][button] {
-						if networkOrders.Orders[floor][button] == config.Self_id {
-							//delete(systemState, networkOrders[floor][button])
-							//networkOrders[floor][button] = ""
-
-							//elev := systemState[config.Self_id]
-							// Modify the struct
-							//elev.Queue[floor][button] = true
-							// Put the struct back into the map
-							//systemState[config.Self_id] = elev
-							networkOrders.Mutex.Unlock()
-							orderAssigned <- Order{Floor: floor, Button: elevio.ButtonType(button)}
-							networkOrders.Mutex.Lock()
-							fmt.Println("WARNING - Order not in sync with system state, reassigning order TO MYSELF KJØH")
-						}
-					}
-				}
-			}
-		}
-		networkOrders.Mutex.Unlock()
-		time.Sleep(5 * time.Second)
 	}
 }

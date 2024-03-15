@@ -16,7 +16,7 @@ import (
 func Backup(fresh bool) Elev {
 
 	if fresh {
-		os.Remove("backup" + config.Self_nr + ".txt")
+		os.Remove("backup" + "0" + ".txt")
 		return Elev{}
 	}
 
@@ -25,7 +25,7 @@ func Backup(fresh bool) Elev {
 	for {
 		<-ticker.C
 
-		fileInfo, err := os.Stat("backup" + config.Self_nr + ".txt")
+		fileInfo, err := os.Stat("backup" + "0" + ".txt")
 		if err != nil {
 			fmt.Println("Error getting file info:", err)
 			return takeControl()
@@ -55,7 +55,7 @@ func WriteBackup(elevChan <-chan Elev) {
 			fmt.Println("Error marshalling json:", err)
 			continue
 		}
-		err = os.WriteFile("backup"+config.Self_nr+".txt", stateJson, 0644)
+		err = os.WriteFile("backup"+"0"+".txt", stateJson, 0644)
 		if err != nil {
 			fmt.Println("Error writing to file:", err)
 			continue
@@ -66,7 +66,7 @@ func WriteBackup(elevChan <-chan Elev) {
 func takeControl() Elev {
 	fmt.Println("Backup is taking over.")
 
-	stateJson, err := os.ReadFile("backup" + config.Self_nr + ".txt")
+	stateJson, err := os.ReadFile("backup" + "0" + ".txt")
 	if err != nil {
 		fmt.Println("Error reading file:", err)
 	}

@@ -2,77 +2,51 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"mymodule/backup"
 	"mymodule/config"
 	elev "mymodule/elevator"
 	"mymodule/network"
 	"mymodule/network/localip"
 	. "mymodule/types"
-	"time"
 )
 
 func main() {
-
-	// WHen starting
 	var id string
 	flag.StringVar(&id, "id", "", "id of this peer")
-	fresh := flag.Bool("fresh", false, "Start a fresh elevator")
+	fresh := flag.Bool("fresh", false, "Start a fresh elevator") //remove before delivery
 	flag.Parse()
-
-	var localIP string
-	var err error
-
-	for {
-		localIP, err = localip.LocalIP()
-		if err != nil {
-			fmt.Println(err)
-			time.Sleep(1 * time.Second)
-		} else {
-			break
-		}
-	}
-
 	if id == "" {
-		id = localIP + ":0"
-		config.Self_nr = "0"
-	} else {
-		config.Self_nr = id
-		id = localIP + ":" + id
-	}
+		id = "0"
 
-	config.Self_id = id
+	}
+	localIP := localip.LocalIP()
+
+	config.Id = localIP + ":" + id
 
 	initElev := backup.Backup(*fresh)
 
-	if (initElev == Elev{}) {
-		fmt.Println("Starting with fresh elevator")
-	}
+	elevatorStateBackup := make(chan Elev, config.ELEVATOR_BUFFER_SIZE)
+	elevatorStateBroadcast := make(chan Elev, config.NETWORK_BUFFER_SIZE)
+	localOrderRequest := make(chan Order, config.ELEVATOR_BUFFER_SIZE)
+	addToLocalQueue := make(chan Order, config.ELEVATOR_BUFFER_SIZE)
+	localOrderServed := make(chan Orderstatus, config.ELEVATOR_BUFFER_SIZE)
 
-	systemState := make(map[string]Elev)
+	go backup.WriteBackup(
+		elevatorStateBackup)
 
-	elevatorStateBackup := make(chan Elev, 10)
-	elevatorStateBroadcast := make(chan Elev, 10)
-	orderRequest := make(chan Order, 10)
-	orderAssigned := make(chan Order, 10)
-	orderDelete := make(chan Orderstatus, 10)
-	incomingOrder := make(chan Orderstatus, 10)
-
-	go network.StateBroadcaster(elevatorStateBroadcast, systemState, id)
-	go backup.WriteBackup(elevatorStateBackup)
 	go elev.RunElev(
 		elevatorStateBackup,
 		elevatorStateBroadcast,
-		orderRequest,
-		orderAssigned,
-		orderDelete,
+		localOrderRequest,
+		addToLocalQueue,
+		localOrderServed,
 		initElev)
+
 	go network.NetworkFSM(
-		orderRequest,
-		orderAssigned,
-		orderDelete,
-		systemState,
-		incomingOrder)
+		elevatorStateBroadcast,
+		localOrderRequest,
+		addToLocalQueue,
+		localOrderServed)
 
 	select {}
 }

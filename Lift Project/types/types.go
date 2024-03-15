@@ -2,16 +2,14 @@ package types
 
 import (
 	"encoding/json"
-	. "mymodule/config"
+	"mymodule/config"
 	"mymodule/elevator/elevio"
-	"sync"
+	"time"
 )
 
-// this is where all universally used types are definedtype ElevatorState ints
 type Button int
 
 type Orderstatus struct {
-	Owner  string
 	Floor  int
 	Button elevio.ButtonType
 	Served bool
@@ -29,7 +27,7 @@ const (
 	EB_Idle ElevatorState = iota
 	EB_Moving
 	EB_DoorOpen
-	Undefined
+	EB_UNAVAILABLE
 )
 
 type ElevatorDirection int
@@ -44,8 +42,7 @@ type Elev struct {
 	State ElevatorState
 	Dir   ElevatorDirection
 	Floor int
-	Queue [N_FLOORS][N_BUTTONS]bool
-	Obstr bool
+	Queue [config.N_FLOORS][config.N_BUTTONS]bool
 }
 
 type Order struct {
@@ -53,17 +50,34 @@ type Order struct {
 	Button elevio.ButtonType
 }
 
+type OrderID struct {
+	Floor  int
+	Button elevio.ButtonType
+	ID     string
+}
+
 type Message struct {
 	Type string          `json:"type"`
 	Data json.RawMessage `json:"data"`
 }
 
-type NetworkOrders struct {
-	Orders [N_FLOORS][N_BUTTONS]string
-	Mutex  sync.Mutex
+type NetworkOrdersData struct {
+	NetworkOrders [config.N_FLOORS][config.N_BUTTONS]string
+	TheChosenOne  string
 }
 
-type NetworkOrdersData struct {
-	NetworkOrders [N_FLOORS][N_BUTTONS]string
-	TheChosenOne  bool
+type NetworkOrderPacket struct {
+	NetworkOrders [config.N_FLOORS][config.N_BUTTONS]string
+	TheChosenOne  string
+	SequenceNum   int
+}
+
+type HeartBeat struct {
+	ID   string
+	Time time.Time
+}
+
+type IDAndDuration struct {
+	ID       string
+	Duration time.Duration
 }

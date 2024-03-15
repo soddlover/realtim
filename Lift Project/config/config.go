@@ -4,7 +4,7 @@ import "time"
 
 const (
 	N_FLOORS             = 4
-	N_ELEVATORS          = 1
+	N_ELEVATORS          = 3
 	N_BUTTONS            = 3
 	TRAVEL_TIME          = 2
 	DOOR_OPEN_TIME       = 3 * time.Second
@@ -15,13 +15,13 @@ const (
 	TCP_port             = 16000
 	SimulatorPort        = 15657
 	HEARTBEAT            = 20 * time.Millisecond
-	HEARTBEAT_DEADLINE   = 1000 * time.Millisecond
+	HEARTBEAT_DEADLINE   = 2000 * time.Millisecond
 	BACKUP_INTERVAL      = 1 * time.Second
 	BACKUP_DEADLINE      = 2 * time.Second
 	SHERIFF_IP_DEADLINE  = 1 * time.Second
+	ELEVATOR_BUFFER_SIZE = N_FLOORS * N_BUTTONS
+	NETWORK_BUFFER_SIZE  = ELEVATOR_BUFFER_SIZE * N_ELEVATORS
+	ORDER_DEADLINE       = TRAVEL_TIME * N_FLOORS * time.Second
 )
 
-var Self_id string = ""
-var Self_nr string = "0"
-
-//this really should not be here right?
+var Id string = ""
