@@ -75,7 +75,7 @@ func netWorkOrderHandler(
 
 	NetworkOrders := lastNetworkOrders
 	orderTimestamps := [config.N_FLOORS][config.N_BUTTONS]time.Time{}
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(500 * time.Millisecond)
 
 	for {
 		select {

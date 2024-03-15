@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"log"
 	"mymodule/config"
 	"mymodule/elevator/elevio"
 	"mymodule/network/conn"
@@ -84,7 +85,7 @@ func SendOrderToSheriff(order Orderstatus) (bool, error) {
 }
 
 // ReceiveMessageFromsheriff receives an order from the sheriff and sends an acknowledgement
-func ReceiveMessageFromSheriff(
+func ReceiveTCPMessageFromSheriff(
 	sheriffDead chan<- NetworkOrdersData,
 	recievedNetworkOrders chan<- NetworkOrdersData,
 	addToLocalQueue chan<- Order) {
@@ -117,19 +118,6 @@ func ReceiveMessageFromSheriff(
 			addToLocalQueue <- Order{Floor: order.Floor, Button: order.Button}
 			// Send the order to the elevator
 
-		case "NodeOrders":
-			var nodeOrdersData NetworkOrdersData
-
-			//initDeputy() //not sure if it should be go'ed or not
-			err = json.Unmarshal(msg.Data, &nodeOrdersData)
-			if err != nil {
-				fmt.Println("Error parsing order:", err)
-				continue
-			}
-
-			lastNetworkOrdersData = nodeOrdersData
-			recievedNetworkOrders <- nodeOrdersData
-
 		default:
 			fmt.Println("Unknown message type:", msg.Type)
 		}
@@ -141,6 +129,57 @@ func ReceiveMessageFromSheriff(
 	return
 
 }
+func ReceiveUDPNodeOrders(
+	recievedNetworkOrders chan<- NetworkOrdersData) {
+
+	// Create a UDP address for the broadcast
+	addr, err := net.ResolveUDPAddr("udp4", fmt.Sprintf("255.255.255.255:%d", 12345))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Listen for UDP broadcasts
+	conn, err := net.ListenUDP("udp4", addr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	buf := make([]byte, 1024)
+	lastSequenceNumber := -1
+
+	for {
+		n, _, err := conn.ReadFromUDP(buf)
+		if err != nil {
+			fmt.Println("Error reading from UDP:", err)
+			return
+		}
+
+		message := string(buf[:n])
+
+		var msg types.Message
+		err = json.Unmarshal([]byte(message), &msg)
+		if err != nil {
+			fmt.Println("Error parsing message:", err)
+			continue
+		}
+
+		if msg.Type == "NodeOrders" {
+			var nodeOrdersData NetworkOrderPacket
+			err = json.Unmarshal(msg.Data, &nodeOrdersData)
+			if err != nil {
+				fmt.Println("Error parsing order:", err)
+				continue
+			}
+			if nodeOrdersData.SequenceNum > lastSequenceNumber {
+				lastSequenceNumber = nodeOrdersData.SequenceNum
+				recievedNetworkOrders <- NetworkOrdersData{NetworkOrders: nodeOrdersData.NetworkOrders, TheChosenOne: nodeOrdersData.TheChosenOne}
+			}
+
+		}
+	}
+}
+
 func CloseSheriffConn() {
 	err := sheriffConn.Close()
 	if err != nil {

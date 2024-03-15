@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"mymodule/config"
 	"mymodule/elevator/elevio"
-	"sync"
 	"time"
 )
 
@@ -62,14 +61,15 @@ type Message struct {
 	Data json.RawMessage `json:"data"`
 }
 
-type NetworkOrders struct {
-	Orders [config.N_FLOORS][config.N_BUTTONS]string
-	Mutex  sync.Mutex
-}
-
 type NetworkOrdersData struct {
 	NetworkOrders [config.N_FLOORS][config.N_BUTTONS]string
 	TheChosenOne  bool
+}
+
+type NetworkOrderPacket struct {
+	NetworkOrders [config.N_FLOORS][config.N_BUTTONS]string
+	TheChosenOne  bool
+	SequenceNum   int
 }
 
 type HeartBeat struct {

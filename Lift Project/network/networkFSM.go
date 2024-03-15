@@ -79,7 +79,8 @@ func NetworkFSM(
 				fmt.Println("Attempting Connecting to Sheriff:")
 				if wrangler.ConnectWranglerToSheriff(sIP) {
 					sheriffIP <- sIP
-					go wrangler.ReceiveMessageFromSheriff(sheriffDead, recievedNetworkOrders, addToLocalQueue)
+					go wrangler.ReceiveTCPMessageFromSheriff(sheriffDead, recievedNetworkOrders, addToLocalQueue)
+					go wrangler.ReceiveUDPNodeOrders(recievedNetworkOrders)
 					currentDuty = dt_wrangler
 					fmt.Println("I am wrangler!")
 				}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"mymodule/config"
 	"mymodule/network/conn"
 	. "mymodule/types"
@@ -16,6 +17,17 @@ import (
 
 var chosenOneID string
 var wranglerConnections = make(map[string]net.Conn)
+var udpConn net.PacketConn
+var seqNum int
+
+func broadCastNetwork() {
+	var err error
+	udpConn = conn.DialBroadcastUDP(12345)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+}
 
 func listenForWranglerConnections(
 	assignOrder chan<- Orderstatus,
@@ -63,15 +75,18 @@ func listenForWranglerConnections(
 }
 
 func SendNetworkOrders(networkOrders [config.N_FLOORS][config.N_BUTTONS]string) {
+	addr, _ := net.ResolveUDPAddr("udp4", fmt.Sprintf("255.255.255.255:%d", 12345))
 
-	for id, conn := range wranglerConnections {
+	for id, _ := range wranglerConnections {
 		if chosenOneID == "" || wranglerConnections[chosenOneID] == nil {
 			chosenOneID = id
 		}
-		nodeOrdersData := NetworkOrdersData{
+		nodeOrdersData := NetworkOrderPacket{
 			NetworkOrders: networkOrders,
-			TheChosenOne:  id == chosenOneID, // or false, depending on your logic
+			TheChosenOne:  id == chosenOneID,
+			SequenceNum:   seqNum, // or false, depending on your logic
 		}
+		seqNum++
 		nodeOrdersDataJSON, err := json.Marshal(nodeOrdersData)
 		if err != nil {
 			fmt.Println("Error marshalling node orders to be sent to deputy:", err)
@@ -89,11 +104,9 @@ func SendNetworkOrders(networkOrders [config.N_FLOORS][config.N_BUTTONS]string) 
 			fmt.Println("Error marshalling deputy message:", err)
 		}
 
-		_, err = fmt.Fprintln(conn, string(msgJSON))
+		_, err = udpConn.WriteTo(msgJSON, addr)
 		if err != nil {
 			fmt.Println("Error sending node orders to deputy, he might be dead:", err)
-			//deputyConn.Close()
-			//DeputyDisconnectChan <- deputyConn
 		}
 	}
 }
