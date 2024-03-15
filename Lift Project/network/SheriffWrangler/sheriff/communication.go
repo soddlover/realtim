@@ -84,34 +84,35 @@ func SendNetworkOrders(networkOrders [config.N_FLOORS][config.N_BUTTONS]string) 
 		if chosenOneID == "" || wranglerConnections[chosenOneID] == nil {
 			chosenOneID = id
 		}
-		nodeOrdersData := NetworkOrderPacket{
-			NetworkOrders: networkOrders,
-			TheChosenOne:  id == chosenOneID,
-			SequenceNum:   seqNum, // or false, depending on your logic
-		}
-		seqNum++
-		nodeOrdersDataJSON, err := json.Marshal(nodeOrdersData)
-		if err != nil {
-			fmt.Println("Error marshalling node orders to be sent to deputy:", err)
-		}
-
-		// Create a new message with type "deputy"
-		msg := Message{
-			Type: "NodeOrders",
-			Data: nodeOrdersDataJSON,
-		}
-
-		// Convert the message to JSON
-		msgJSON, err := json.Marshal(msg)
-		if err != nil {
-			fmt.Println("Error marshalling deputy message:", err)
-		}
-
-		_, err = udpConn.WriteTo(msgJSON, addr)
-		if err != nil {
-			fmt.Println("Error sending node orders to deputy, he might be dead:", err)
-		}
 	}
+	nodeOrdersData := NetworkOrderPacket{
+		NetworkOrders: networkOrders,
+		TheChosenOne:  id == chosenOneID,
+		SequenceNum:   seqNum, // or false, depending on your logic
+	}
+	seqNum++
+	nodeOrdersDataJSON, err := json.Marshal(nodeOrdersData)
+	if err != nil {
+		fmt.Println("Error marshalling node orders to be sent to deputy:", err)
+	}
+
+	// Create a new message with type "deputy"
+	msg := Message{
+		Type: "NodeOrders",
+		Data: nodeOrdersDataJSON,
+	}
+
+	// Convert the message to JSON
+	msgJSON, err := json.Marshal(msg)
+	if err != nil {
+		fmt.Println("Error marshalling deputy message:", err)
+	}
+
+	_, err = udpConn.WriteTo(msgJSON, addr)
+	if err != nil {
+		fmt.Println("Error sending node orders to deputy, he might be dead:", err)
+	}
+
 }
 
 func SendOrderMessage(peer string, order Orderstatus) (bool, error) {
