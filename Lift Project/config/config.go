@@ -13,7 +13,7 @@ const (
 	BROADCAST_STATE_PORT      = 16569
 	TCP_PORT                  = 16000
 	SIMULATOR_PORT            = 15657
-	UDP_NETWORK_ORDERS_PORT   = 16568
+	UDP_NETWORK_ORDERS_PORT   = 12345
 	HEARTBEAT                 = 20 * time.Millisecond
 	HEARTBEAT_DEADLINE        = 2000 * time.Millisecond
 	BACKUP_INTERVAL           = 1 * time.Second
