@@ -105,10 +105,11 @@ func NetworkFSM(
 		case dt_wrangler:
 			select {
 			case <-sheriffDead:
-				latestNetworkOrderData = latestNetworkOrderData
+				// latestNetworkOrderData = latestNetworkOrderData
+				fmt.Println("Sheriff is dead", latestNetworkOrderData)
 				chosenOne = latestNetworkOrderData.TheChosenOne
 				currentDuty = dt_initial
-			case latestNetworkOrderData := <-recievedNetworkOrders:
+			case latestNetworkOrderData = <-recievedNetworkOrders:
 				wrangler.CheckSync(requestSystemState, systemState, latestNetworkOrderData.NetworkOrders, addToLocalQueue)
 				elevator.UpdateLightsFromNetworkOrders(latestNetworkOrderData.NetworkOrders)
 			}

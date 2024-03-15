@@ -95,6 +95,7 @@ func SendNetworkOrders(networkOrders [config.N_FLOORS][config.N_BUTTONS]string) 
 	if err != nil {
 		fmt.Println("Error marshalling node orders to be sent to deputy:", err)
 	}
+		fmt.Println("Sequence number:", seqNum)
 
 	// Create a new message with type "deputy"
 	msg := Message{

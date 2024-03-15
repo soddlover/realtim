@@ -16,7 +16,8 @@ func Sheriff(
 	addToLocalQueue chan<- Order,
 	requestSystemState chan<- bool,
 	systemState <-chan map[string]Elev) {
-
+		
+	fmt.Println("Sheriff started with latest network order data: ", lastnetworkOrdersData)
 	writeNetworkOrders := make(chan OrderID)
 	nodeUnavailabe := make(chan string)
 	networkorders := make(chan [config.N_FLOORS][config.N_BUTTONS]string)
