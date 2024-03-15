@@ -23,7 +23,6 @@ func LocalIP() string {
 				if err != nil {
 					if strings.Contains(err.Error(), "network is unreachable") {
 						fmt.Println("Network is unreachable, retrying:", err)
-						//time.Sleep(1 * time.Second)
 						continue
 					}
 					fmt.Println("Error getting IP from google DNS, retrying:", err)

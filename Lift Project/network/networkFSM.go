@@ -119,13 +119,13 @@ func NetworkFSM(
 				fmt.Println("Sheriff disconnect detected", latestNetworkOrderData)
 				deputy = latestNetworkOrderData.DeputyID
 				currentDuty = dt_initial
+
 			case latestNetworkOrderData = <-recievedNetworkOrders:
 				wrangler.CheckSync(requestSystemState, systemState, latestNetworkOrderData.Orders, addToLocalQueue)
 				elevator.UpdateLightsFromNetworkOrders(latestNetworkOrderData.Orders)
 			}
 
 		case dt_offline:
-
 			sIP := wrangler.GetSheriffIP()
 			if sIP != "" {
 				fmt.Println("Reconnected to network. Restarting...")
@@ -172,9 +172,7 @@ func orderForwarder(
 
 	for {
 		select {
-
 		case order := <-localOrderRequest:
-
 			orderstat := Orderstatus{Floor: order.Floor, Button: order.Button, Served: false}
 
 			if order.Button == BT_Cab {

@@ -78,8 +78,6 @@ func updateBcastSystemState(
 				bcastState.SequenceNumber > currentBcastState.SequenceNumber ||
 				(currentBcastState.SequenceNumber-bcastState.SequenceNumber) > (SEQUENCE_NUMBER_LIMIT/2) {
 				bcastSystem[bcastState.ID] = bcastState
-			} else {
-				fmt.Println("Rejected new state because.", currentBcastState.SequenceNumber, "and ", bcastState.SequenceNumber)
 			}
 			updateFromBcast <- convertToSystemState(bcastSystem)
 

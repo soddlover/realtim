@@ -66,7 +66,6 @@ func SendOrderToSheriff(order Orderstatus) (bool, error) {
 	return true, nil
 }
 
-// ReceiveMessageFromsheriff receives an order from the sheriff and sends an acknowledgement
 func ReceiveTCPMessageFromSheriff(
 	sheriffDead chan<- bool,
 	addToLocalQueue chan<- Order) {
@@ -74,7 +73,6 @@ func ReceiveTCPMessageFromSheriff(
 	scanner := bufio.NewScanner(sheriffConn)
 	for scanner.Scan() {
 		message := scanner.Text()
-		//fmt.Println("Received message from sheriff:", message)
 
 		var msg types.Message
 		err := json.Unmarshal([]byte(message), &msg)
@@ -95,7 +93,6 @@ func ReceiveTCPMessageFromSheriff(
 			}
 
 			addToLocalQueue <- Order{Floor: order.Floor, Button: order.Button}
-			// Send the order to the elevator
 
 		default:
 			fmt.Println("Unknown message type:", msg.Type)
@@ -110,13 +107,11 @@ func ReceiveTCPMessageFromSheriff(
 func ReceiveUDPNodeOrders(
 	recievedNetworkOrders chan<- NetworkOrderPacket) {
 
-	// Create a UDP address for the broadcast
 	addr, err := net.ResolveUDPAddr("udp4", fmt.Sprintf("255.255.255.255:%d", UDP_NETWORK_ORDERS_PORT))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Listen for UDP broadcasts
 	conn, err := net.ListenUDP("udp4", addr)
 	if err != nil {
 		log.Fatal(err)

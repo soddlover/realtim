@@ -75,9 +75,11 @@ func netWorkOrderHandler(
 		select {
 		case <-requestNetworkOrders:
 			networkorders <- NetworkOrders
+
 		case orderId := <-writeNetworkOrders:
 			prev := NetworkOrders[orderId.Floor][orderId.Button]
 			NetworkOrders[orderId.Floor][orderId.Button] = orderId.ID
+
 			if prev != orderId.ID {
 				SendNetworkOrders(NetworkOrders)
 				elevator.UpdateLightsFromNetworkOrders(NetworkOrders)
@@ -90,7 +92,6 @@ func netWorkOrderHandler(
 			}
 
 		case <-ticker.C:
-			// Send out NetworkOrders every time the ticker fires
 			now := time.Now()
 			for floor, floorOrders := range NetworkOrders {
 				for button := range floorOrders {

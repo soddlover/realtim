@@ -52,9 +52,7 @@ func EstablishWranglerCommunications(
 	newConn := make(chan net.Conn)
 	go func() {
 		for {
-
 			conn, err := ln.Accept()
-
 			if err != nil {
 				if errors.Is(err, net.ErrClosed) {
 					return
@@ -70,8 +68,8 @@ func EstablishWranglerCommunications(
 		conn := <-newConn
 		fmt.Println("Incoming new connection waiting to recieve ID")
 		reader := bufio.NewReader(conn)
-
 		done := make(chan bool)
+
 		go func() {
 			message, err := reader.ReadString('\n')
 			if err != nil {
@@ -92,6 +90,7 @@ func EstablishWranglerCommunications(
 			if success {
 				fmt.Println("Connections: ", wranglerConnections)
 			}
+
 		case <-time.After(TCP_ESTABLISH_DEADLINE):
 			fmt.Println("Timeout reading from connection, closing it")
 			conn.Close()
@@ -178,17 +177,13 @@ func ReceiveMessage(
 	scanner := bufio.NewScanner(conn)
 	for scanner.Scan() {
 		message := scanner.Text()
-
-		// Convert the message from JSON to Orderstatus
 		var order Orderstatus
 		err := json.Unmarshal([]byte(message), &order)
+
 		if err != nil {
 			fmt.Println("Error unmarshalling order:", err)
 			continue
 		}
-
-		//DeputyUpdateChan <- true
-
 		assignOrder <- order
 	}
 
