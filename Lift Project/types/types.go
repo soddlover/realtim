@@ -66,14 +66,14 @@ type Message struct {
 }
 
 type NetworkOrdersData struct {
-	NetworkOrders [config.N_FLOORS][config.N_BUTTONS]string
-	TheChosenOne  string
+	Orders   [config.N_FLOORS][config.N_BUTTONS]string
+	DeputyID string
 }
 
 type NetworkOrderPacket struct {
-	NetworkOrders [config.N_FLOORS][config.N_BUTTONS]string
-	TheChosenOne  string
-	SequenceNum   int
+	Orders      [config.N_FLOORS][config.N_BUTTONS]string
+	DeputyID    string
+	SequenceNum int
 }
 
 type HeartBeat struct {

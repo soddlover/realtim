@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"mymodule/config"
 	. "mymodule/config"
 	"mymodule/network/conn"
 	"mymodule/types"
@@ -19,7 +18,7 @@ var sheriffConn net.Conn
 func ConnectWranglerToSheriff(sheriffIP string) bool {
 
 	fmt.Println("netdial to sheriff:", sheriffIP)
-	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", sheriffIP, config.TCP_port))
+	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", sheriffIP, TCP_PORT))
 
 	if err != nil {
 		fmt.Println("Error connecting to sheriff:", err)
@@ -36,9 +35,9 @@ func GetSheriffIP() string {
 
 	var buf [1024]byte
 
-	conn := conn.DialBroadcastUDP(config.Sheriff_port)
+	conn := conn.DialBroadcastUDP(SHERIFF_PORT)
 	defer conn.Close()
-	conn.SetReadDeadline(time.Now().Add(config.SHERIFF_IP_DEADLINE))
+	conn.SetReadDeadline(time.Now().Add(SHERIFF_IP_DEADLINE))
 	n, _, err := conn.ReadFrom(buf[0:])
 	if err != nil {
 		fmt.Println("Error reading from sheriff:", err)
@@ -171,17 +170,17 @@ func CloseSheriffConn() {
 func CheckSync(
 	requestSystemState chan<- bool,
 	systemState <-chan map[string]Elev,
-	networkOrders [config.N_FLOORS][config.N_BUTTONS]string,
+	networkOrders [N_FLOORS][N_BUTTONS]string,
 	addToLocalQueue chan<- Order) {
 
-	for floor := 0; floor < config.N_FLOORS; floor++ {
-		for button := 0; button < config.N_BUTTONS; button++ {
-			if networkOrders[floor][button] != "" {
+	for floor, floorOrders := range networkOrders {
+		for button, assignedID := range floorOrders {
+			if assignedID != "" {
 				requestSystemState <- true
 				localSystemState := <-systemState
-				assignedElev, existsInSystemState := localSystemState[networkOrders[floor][button]]
+				assignedElev, existsInSystemState := localSystemState[assignedID]
 				if !existsInSystemState || !assignedElev.Queue[floor][button] {
-					if networkOrders[floor][button] == SELF_ID {
+					if assignedID == SELF_ID {
 						addToLocalQueue <- Order{Floor: floor, Button: ButtonType(button)}
 					}
 				}

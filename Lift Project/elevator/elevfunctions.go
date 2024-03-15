@@ -146,7 +146,6 @@ func clearAtFloor(
 }
 
 func updateLights(elevator *Elev) {
-
 	for {
 		for floor := 0; floor < N_FLOORS; floor++ {
 			for button := 0; button < N_BUTTONS; button++ {

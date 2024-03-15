@@ -9,11 +9,12 @@ const (
 	TRAVEL_TIME             = 2
 	DOOR_OPEN_TIME          = 3 * time.Second
 	MOTOR_ERROR_TIME        = 3 * time.Second
-	Sheriff_port            = 20000
-	Broadcast_state_port    = 16569
-	Peer_port               = 15647
-	TCP_port                = 16000
-	SimulatorPort           = 15657
+	SHERIFF_PORT            = 20000
+	BROADCAST_STATE_PORT    = 16569
+	PEER_PORT               = 15647
+	TCP_PORT                = 16000
+	SIMULATOR_PORT          = 15657
+	UDP_NETWORK_ORDERS_PORT = 16568
 	HEARTBEAT               = 20 * time.Millisecond
 	HEARTBEAT_DEADLINE      = 2000 * time.Millisecond
 	BACKUP_INTERVAL         = 1 * time.Second

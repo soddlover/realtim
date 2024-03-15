@@ -6,7 +6,6 @@ import (
 	. "mymodule/config"
 	"mymodule/elevator"
 	. "mymodule/types"
-	"strings"
 	"time"
 )
 
@@ -17,22 +16,15 @@ func Sheriff(
 	requestSystemState chan<- bool,
 	systemState <-chan map[string]Elev) {
 
-	fmt.Println("Sheriff started with latest network order data: ", lastnetworkOrdersData)
 	writeNetworkOrders := make(chan OrderID)
 	nodeUnavailabe := make(chan string)
 	networkorders := make(chan [N_FLOORS][N_BUTTONS]string)
 	requestNetworkOrders := make(chan bool)
 
-	ip := strings.Split(string(SELF_ID), ":")[0]
-	go broadCastNetwork(
-		lastnetworkOrdersData.SequenceNum)
-	go Transmitter(
-		config.Sheriff_port,
-		ip)
-
-	go listenForWranglerConnections(
+	go EstablishWranglerCommunications(
 		assignOrder,
-		nodeUnavailabe)
+		nodeUnavailabe,
+		lastnetworkOrdersData.SequenceNum)
 
 	go Assigner(
 		addToLocalQueue,
@@ -45,8 +37,7 @@ func Sheriff(
 
 	go redistributor(
 		nodeUnavailabe,
-		assignOrder,	//requestSystemState chan<- bool,
-		//systemState <-chan map[string]Elev,
+		assignOrder,
 		requestNetworkOrders,
 		networkorders)
 
@@ -55,12 +46,14 @@ func Sheriff(
 		writeNetworkOrders,
 		networkorders,
 		assignOrder,
-		lastnetworkOrdersData.NetworkOrders)
+		lastnetworkOrdersData.Orders)
 
 	go checkForUnavailable(
 		requestSystemState,
 		systemState,
 		nodeUnavailabe)
+
+	fmt.Println("Sheriff started with latest network order data: ", lastnetworkOrdersData)
 
 	time.Sleep(1 * time.Second)
 	requestNetworkOrders <- true

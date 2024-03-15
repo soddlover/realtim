@@ -28,11 +28,11 @@ func SystemStateSynchronizer(
 		broadcastStateTx)
 
 	go bcast.Transmitter(
-		Broadcast_state_port,
+		BROADCAST_STATE_PORT,
 		broadcastStateTx)
 
 	go bcast.Receiver(
-		Broadcast_state_port,
+		BROADCAST_STATE_PORT,
 		broadcastStateRx)
 
 	go updateBcastSystemState(

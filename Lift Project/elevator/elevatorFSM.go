@@ -19,7 +19,7 @@ func RunElev(
 	initElev Elev) {
 
 	nr, _ := strconv.Atoi(strings.Split(SELF_ID, ":")[0])
-	port := SimulatorPort + nr
+	port := SIMULATOR_PORT + nr
 	addr := "localhost:" + fmt.Sprint(port)
 	elevio.Init(addr, N_FLOORS)
 

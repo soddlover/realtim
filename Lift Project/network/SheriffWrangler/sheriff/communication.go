@@ -5,8 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
-	"mymodule/config"
+	. "mymodule/config"
 	"mymodule/network/conn"
 	. "mymodule/types"
 	"net"
@@ -15,29 +14,36 @@ import (
 	"time"
 )
 
-var chosenOneID string
+const IP_TRANSMITT_INTERVAL = 15 * time.Millisecond
+
+var deputyID string
 var wranglerConnections = make(map[string]net.Conn)
 var udpConn net.PacketConn
 var seqNum int
 
-func broadCastNetwork(seq int) {
-
-	if seq > 0 {
-		seqNum = seq
+func transmittIP() {
+	ip := strings.Split(string(SELF_ID), ":")[0]
+	conn := conn.DialBroadcastUDP(SHERIFF_PORT)
+	addr, _ := net.ResolveUDPAddr("udp4", fmt.Sprintf("255.255.255.255:%d", SHERIFF_PORT))
+	for {
+		<-time.After(IP_TRANSMITT_INTERVAL)
+		conn.WriteTo([]byte(ip), addr)
 	}
-	var err error
-	udpConn = conn.DialBroadcastUDP(12345)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 }
 
-func listenForWranglerConnections(
+func EstablishWranglerCommunications(
 	assignOrder chan<- Orderstatus,
-	nodeUnavailabe chan<- string) {
+	nodeUnavailabe chan<- string,
+	latestSequenceNr int) {
 
-	ln, err := net.Listen("tcp", ":"+strconv.Itoa(config.TCP_port))
+	go transmittIP()
+	udpConn = conn.DialBroadcastUDP(UDP_NETWORK_ORDERS_PORT)
+
+	if latestSequenceNr > 0 {
+		seqNum = latestSequenceNr
+	}
+
+	ln, err := net.Listen("tcp", ":"+strconv.Itoa(TCP_PORT))
 	if err != nil {
 		fmt.Println("Error listening for connections:", err)
 		return
@@ -78,19 +84,20 @@ func listenForWranglerConnections(
 	}
 }
 
-func SendNetworkOrders(networkOrders [config.N_FLOORS][config.N_BUTTONS]string) {
+func SendNetworkOrders(networkOrders [N_FLOORS][N_BUTTONS]string) {
 
 	addr, _ := net.ResolveUDPAddr("udp4", fmt.Sprintf("255.255.255.255:%d", 12345))
 
 	for id, _ := range wranglerConnections {
-		if chosenOneID == "" || wranglerConnections[chosenOneID] == nil {
-			chosenOneID = id
+		if deputyID == "" || wranglerConnections[deputyID] == nil {
+			deputyID = id
 		}
 	}
+
 	nodeOrdersData := NetworkOrderPacket{
-		NetworkOrders: networkOrders,
-		TheChosenOne:  chosenOneID,
-		SequenceNum:   seqNum, // or false, depending on your logic
+		Orders:      networkOrders,
+		DeputyID:    deputyID,
+		SequenceNum: seqNum, // or false, depending on your logic
 	}
 	seqNum++
 	nodeOrdersDataJSON, err := json.Marshal(nodeOrdersData)
@@ -137,6 +144,8 @@ func SendOrderMessage(peer string, order Orderstatus) (bool, error) {
 	}
 	msgJSON, err := json.Marshal(msg)
 	if err != nil {
+		fmt.Println("Error marshalling order:", err)
+		return false, err
 	}
 	_, err = fmt.Fprintln(conn, string(msgJSON))
 	if err != nil {
@@ -192,17 +201,5 @@ func CloseConns(id string) {
 		wranglerConnections[id].Close()
 	} else {
 		fmt.Println("Connection already closed", id)
-	}
-}
-
-const interval = 15 * time.Millisecond
-
-func Transmitter(port int, id string) {
-
-	conn := conn.DialBroadcastUDP(port)
-	addr, _ := net.ResolveUDPAddr("udp4", fmt.Sprintf("255.255.255.255:%d", port))
-	for {
-		<-time.After(interval)
-		conn.WriteTo([]byte(id), addr)
 	}
 }
