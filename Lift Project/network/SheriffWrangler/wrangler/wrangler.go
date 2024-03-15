@@ -23,11 +23,13 @@ var nodeOrdersReceived = make(chan NetworkOrdersData)
 
 func ConnectWranglerToSheriff(sheriffIP string) bool {
 	fmt.Println("netdial to sheriff:", sheriffIP)
-	timeout := time.Duration(5 * time.Second)
+	timeout := time.Duration(15 * time.Second)
 	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", sheriffIP, config.TCP_port), timeout)
 
 	if err != nil {
 		fmt.Println("Error connecting to sheriff:", err)
+		conn.Close()
+		time.Sleep(5 * time.Second)
 		os.Exit(1)
 		return false
 	}
