@@ -4,6 +4,7 @@ import (
 	"flag"
 	"mymodule/backup"
 	"mymodule/config"
+	. "mymodule/config"
 	elev "mymodule/elevator"
 	"mymodule/network"
 	"mymodule/network/localip"
@@ -23,10 +24,10 @@ func main() {
 
 	initElev := backup.Backup(*enableWatcher)
 
-	elevatorStateBroadcast := make(chan Elev, config.NETWORK_BUFFER_SIZE)
-	localOrderRequest := make(chan Order, config.ELEVATOR_BUFFER_SIZE)
-	addToLocalQueue := make(chan Order, config.ELEVATOR_BUFFER_SIZE)
-	localOrderServed := make(chan Orderstatus, config.ELEVATOR_BUFFER_SIZE)
+	elevatorStateBroadcast := make(chan Elev, NETWORK_BUFFER_SIZE)
+	localOrderRequest := make(chan Order, ELEVATOR_BUFFER_SIZE)
+	addToLocalQueue := make(chan Order, ELEVATOR_BUFFER_SIZE)
+	localOrderServed := make(chan Orderstatus, ELEVATOR_BUFFER_SIZE)
 
 	go elev.RunElev(
 		elevatorStateBroadcast,

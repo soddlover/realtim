@@ -18,7 +18,7 @@ func RunElev(
 	orderServed chan<- Orderstatus,
 	initElev Elev) {
 
-	nr, _ := strconv.Atoi(strings.Split(SELF_ID, ":")[0]) //remove before delivery
+	nr, _ := strconv.Atoi(strings.Split(SELF_ID, ":")[0])
 	port := SimulatorPort + nr
 	addr := "localhost:" + fmt.Sprint(port)
 	elevio.Init(addr, N_FLOORS)
